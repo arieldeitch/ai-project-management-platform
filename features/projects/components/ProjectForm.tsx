@@ -17,7 +17,12 @@ import {
 import { TopBar } from '@/components/layout/TopBar'
 import { ArrowLeft, Loader2 } from 'lucide-react'
 import Link from 'next/link'
-import type { Project, ProjectStatus, ProjectPriority } from '@/types/entities'
+import type {
+  Project,
+  ProjectStatus,
+  ProjectPriority,
+  ProjectDomain,
+} from '@/types/entities'
 
 const STATUS_OPTIONS: { value: ProjectStatus; label: string }[] = [
   { value: 'idea',      label: 'Idea' },
@@ -37,6 +42,12 @@ const PRIORITY_OPTIONS: { value: ProjectPriority; label: string }[] = [
   { value: 'unset',    label: 'No priority' },
 ]
 
+const DOMAIN_OPTIONS: { value: ProjectDomain; label: string }[] = [
+  { value: 'personal', label: 'Personal' },
+  { value: 'work',     label: 'Work' },
+  { value: 'general',  label: 'General' },
+]
+
 interface ProjectFormProps {
   mode: 'create' | 'edit'
   project?: Project
@@ -46,13 +57,17 @@ export function ProjectForm({ mode, project }: ProjectFormProps) {
   const router = useRouter()
   const { create, update } = useProjectsStore()
 
-  const [name, setName]             = useState(project?.name ?? '')
-  const [description, setDesc]      = useState(project?.description ?? '')
-  const [status, setStatus]         = useState<ProjectStatus>(project?.status ?? 'idea')
-  const [priority, setPriority]     = useState<ProjectPriority>(project?.priority ?? 'unset')
-  const [nextAction, setNextAction] = useState(project?.next_action ?? '')
-  const [saving, setSaving]         = useState(false)
-  const [error, setError]           = useState<string | null>(null)
+  const [name,          setName]         = useState(project?.name ?? '')
+  const [description,   setDesc]         = useState(project?.description ?? '')
+  const [goal,          setGoal]         = useState(project?.goal ?? '')
+  const [domain,        setDomain]       = useState<ProjectDomain | ''>(project?.domain ?? '')
+  const [status,        setStatus]       = useState<ProjectStatus>(project?.status ?? 'idea')
+  const [priority,      setPriority]     = useState<ProjectPriority>(project?.priority ?? 'unset')
+  const [currentPhase,  setCurrentPhase] = useState(project?.current_phase ?? '')
+  const [nextAction,    setNextAction]   = useState(project?.next_action ?? '')
+  const [blockedReason, setBlockedReason]= useState(project?.blocked_reason ?? '')
+  const [saving, setSaving]             = useState(false)
+  const [error,  setError]              = useState<string | null>(null)
 
   const isEdit  = mode === 'edit' && !!project
   const backUrl = isEdit ? `/projects/${project.id}` : '/projects'
@@ -61,15 +76,30 @@ export function ProjectForm({ mode, project }: ProjectFormProps) {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!name.trim()) { setError('Project name is required.'); return }
+    if (status === 'blocked' && !blockedReason.trim()) {
+      setError('Please describe why this project is blocked.')
+      return
+    }
 
     setSaving(true)
     setError(null)
     try {
+      const payload = {
+        name: name.trim(),
+        description,
+        goal,
+        domain: domain || undefined,
+        status,
+        priority,
+        current_phase: currentPhase,
+        next_action: nextAction,
+        blocked_reason: status === 'blocked' ? blockedReason : '',
+      }
       if (isEdit) {
-        await update(project.id, { name: name.trim(), description, status, priority, next_action: nextAction })
+        await update(project.id, payload)
         router.push(`/projects/${project.id}`)
       } else {
-        const p = await create({ name: name.trim(), description, status, priority, next_action: nextAction })
+        const p = await create(payload)
         router.push(`/projects/${p.id}`)
       }
     } catch (err) {
@@ -93,6 +123,7 @@ export function ProjectForm({ mode, project }: ProjectFormProps) {
       <div className="flex-1 overflow-y-auto">
         <div className="mx-auto max-w-2xl px-6 py-8">
           <form onSubmit={handleSubmit} className="space-y-6">
+
             {/* Name */}
             <div className="space-y-1.5">
               <Label htmlFor="name">Project Name <span className="text-destructive">*</span></Label>
@@ -105,6 +136,17 @@ export function ProjectForm({ mode, project }: ProjectFormProps) {
               />
             </div>
 
+            {/* Goal */}
+            <div className="space-y-1.5">
+              <Label htmlFor="goal">Goal / Objective</Label>
+              <Input
+                id="goal"
+                value={goal}
+                onChange={(e) => setGoal(e.target.value)}
+                placeholder="What does success look like?"
+              />
+            </div>
+
             {/* Description */}
             <div className="space-y-1.5">
               <Label htmlFor="description">Description</Label>
@@ -112,43 +154,60 @@ export function ProjectForm({ mode, project }: ProjectFormProps) {
                 id="description"
                 value={description}
                 onChange={(e) => setDesc(e.target.value)}
-                placeholder="What is this project about?"
+                placeholder="Context, ideas, relevant details..."
                 rows={4}
               />
             </div>
 
-            {/* Status + Priority row */}
+            {/* Status + Priority */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label htmlFor="status">Status</Label>
                 <Select value={status} onValueChange={(v) => setStatus(v as ProjectStatus)}>
-                  <SelectTrigger id="status">
-                    <SelectValue />
-                  </SelectTrigger>
+                  <SelectTrigger id="status"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {STATUS_OPTIONS.map((opt) => (
-                      <SelectItem key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </SelectItem>
+                      <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
-
               <div className="space-y-1.5">
                 <Label htmlFor="priority">Priority</Label>
                 <Select value={priority} onValueChange={(v) => setPriority(v as ProjectPriority)}>
-                  <SelectTrigger id="priority">
-                    <SelectValue />
-                  </SelectTrigger>
+                  <SelectTrigger id="priority"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {PRIORITY_OPTIONS.map((opt) => (
-                      <SelectItem key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </SelectItem>
+                      <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+            </div>
+
+            {/* Domain + Current Phase */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="domain">Domain</Label>
+                <Select value={domain} onValueChange={(v) => setDomain(v as ProjectDomain)}>
+                  <SelectTrigger id="domain">
+                    <SelectValue placeholder="Select domain" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {DOMAIN_OPTIONS.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="current_phase">Current Phase</Label>
+                <Input
+                  id="current_phase"
+                  value={currentPhase}
+                  onChange={(e) => setCurrentPhase(e.target.value)}
+                  placeholder="e.g. Design, Development"
+                />
               </div>
             </div>
 
@@ -159,9 +218,25 @@ export function ProjectForm({ mode, project }: ProjectFormProps) {
                 id="next_action"
                 value={nextAction}
                 onChange={(e) => setNextAction(e.target.value)}
-                placeholder="What is the immediate next step?"
+                placeholder="The immediate next step"
               />
             </div>
+
+            {/* Blocked reason — only shown when status is blocked */}
+            {status === 'blocked' && (
+              <div className="space-y-1.5 rounded-lg border border-red-200 bg-red-50/50 p-4 dark:border-red-900/30 dark:bg-red-950/20">
+                <Label htmlFor="blocked_reason" className="text-red-700 dark:text-red-400">
+                  Blocked Reason <span className="text-destructive">*</span>
+                </Label>
+                <Textarea
+                  id="blocked_reason"
+                  value={blockedReason}
+                  onChange={(e) => setBlockedReason(e.target.value)}
+                  placeholder="What is blocking this project? What needs to happen to unblock it?"
+                  rows={3}
+                />
+              </div>
+            )}
 
             {/* Error */}
             {error && (
