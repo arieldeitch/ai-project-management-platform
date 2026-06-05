@@ -17,7 +17,7 @@ export function StatusBadge({ status, className }: StatusBadgeProps) {
         className
       )}
     >
-      <span className={cn('h-1.5 w-1.5 rounded-full', config.dot)} />
+      <span className={cn('h-1.5 w-1.5 rounded-full', config.dot, config.pulse && 'animate-pulse')} />
       {config.label}
     </span>
   )

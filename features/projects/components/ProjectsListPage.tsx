@@ -5,16 +5,20 @@ import Link from 'next/link'
 import { useProjectsStore } from '@/store/projects.store'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { PriorityBadge } from '@/components/shared/PriorityBadge'
+import { DomainBadge } from '@/components/shared/DomainBadge'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { TopBar } from '@/components/layout/TopBar'
 import { buttonVariants } from '@/components/ui/button'
-import { Plus, FolderKanban, ChevronRight, ArrowUpDown } from 'lucide-react'
+import { Plus, FolderKanban, ChevronRight, ArrowUpDown, AlertTriangle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { STATUS_ORDER } from '@/lib/constants/statuses'
-import type { Project, ProjectStatus, ProjectPriority } from '@/types/entities'
+import type { Project, ProjectStatus, ProjectDomain, ProjectPriority } from '@/types/entities'
 import { formatDistanceToNow } from 'date-fns'
 
 const PRIORITY_ORDER: ProjectPriority[] = ['critical', 'high', 'medium', 'low', 'unset']
+
+type DomainFilter = 'all' | ProjectDomain
+type SortMode = 'status' | 'priority' | 'updated'
 
 const STATUS_FILTER_OPTIONS: { value: ProjectStatus | 'all'; label: string }[] = [
   { value: 'all',       label: 'All' },
@@ -27,7 +31,12 @@ const STATUS_FILTER_OPTIONS: { value: ProjectStatus | 'all'; label: string }[] =
   { value: 'archived',  label: 'Archived' },
 ]
 
-type SortMode = 'status' | 'priority' | 'updated'
+const DOMAIN_FILTER_OPTIONS: { value: DomainFilter; label: string }[] = [
+  { value: 'all',      label: 'All' },
+  { value: 'personal', label: 'Personal' },
+  { value: 'work',     label: 'Work' },
+  { value: 'general',  label: 'General' },
+]
 
 function sortProjects(list: Project[], mode: SortMode): Project[] {
   const copy = [...list]
@@ -46,13 +55,24 @@ function ProjectRow({ project }: { project: Project }) {
   return (
     <Link
       href={`/projects/${project.id}`}
-      className="group flex items-center gap-4 border-b border-border px-6 py-4 last:border-0 hover:bg-muted/40 transition-colors"
+      className="group flex items-start gap-4 border-b border-border px-6 py-3.5 last:border-0 hover:bg-muted/40 transition-colors"
     >
       <div className="min-w-0 flex-1">
-        <span className="truncate text-sm font-medium text-foreground group-hover:text-primary">
-          {project.name}
-        </span>
-        {project.next_action ? (
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-sm font-medium text-foreground group-hover:text-primary">
+            {project.name}
+          </span>
+          {project.domain && <DomainBadge domain={project.domain} />}
+        </div>
+        {/* Show blocked reason prominently for blocked projects */}
+        {project.status === 'blocked' && project.blocked_reason ? (
+          <div className="mt-1 flex items-start gap-1.5">
+            <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0 text-red-500" />
+            <p className="text-xs text-red-600/80 dark:text-red-400/70 line-clamp-1">
+              {project.blocked_reason}
+            </p>
+          </div>
+        ) : project.next_action ? (
           <p className="mt-0.5 truncate text-xs text-muted-foreground">
             → {project.next_action}
           </p>
@@ -63,7 +83,7 @@ function ProjectRow({ project }: { project: Project }) {
         ) : null}
       </div>
 
-      <div className="flex shrink-0 items-center gap-4">
+      <div className="flex shrink-0 items-center gap-3 pt-0.5">
         <PriorityBadge priority={project.priority} />
         <StatusBadge status={project.status} />
         <span className="hidden text-xs text-muted-foreground sm:block w-24 text-right">
@@ -75,17 +95,39 @@ function ProjectRow({ project }: { project: Project }) {
   )
 }
 
-export function ProjectsListPage() {
+interface ProjectsListPageProps {
+  initialStatus?: ProjectStatus
+  initialDomain?: ProjectDomain
+}
+
+export function ProjectsListPage({ initialStatus, initialDomain }: ProjectsListPageProps) {
   const { projects, isLoading, load } = useProjectsStore()
-  const [filter, setFilter] = useState<ProjectStatus | 'all'>('all')
-  const [sort, setSort]     = useState<SortMode>('status')
+  const [statusFilter, setStatusFilter] = useState<ProjectStatus | 'all'>(initialStatus ?? 'all')
+  const [domainFilter, setDomainFilter] = useState<DomainFilter>(initialDomain ?? 'all')
+  const [sort, setSort] = useState<SortMode>('status')
 
   useEffect(() => {
     load()
   }, [load])
 
-  const base     = filter === 'all' ? projects : projects.filter((p) => p.status === filter)
-  const filtered = sortProjects(base, sort)
+  /* apply filters */
+  const afterStatus =
+    statusFilter === 'all' ? projects : projects.filter((p) => p.status === statusFilter)
+  const afterDomain =
+    domainFilter === 'all' ? afterStatus : afterStatus.filter((p) => p.domain === domainFilter)
+  const filtered = sortProjects(afterDomain, sort)
+
+  /* counts for status tabs — always computed from domain-filtered set */
+  const domainBase =
+    domainFilter === 'all' ? projects : projects.filter((p) => p.domain === domainFilter)
+
+  function statusCount(s: ProjectStatus | 'all') {
+    return s === 'all' ? domainBase.length : domainBase.filter((p) => p.status === s).length
+  }
+
+  function domainCount(d: DomainFilter) {
+    return d === 'all' ? projects.length : projects.filter((p) => p.domain === d).length
+  }
 
   return (
     <div className="flex flex-col overflow-hidden">
@@ -99,31 +141,30 @@ export function ProjectsListPage() {
         }
       />
 
-      {/* Filter + sort bar */}
-      <div className="flex items-center gap-1 border-b border-border bg-background px-6 py-2 overflow-x-auto">
-        <div className="flex flex-1 items-center gap-1">
+      {/* Unified filter bar */}
+      <div className="flex items-center border-b border-border bg-background px-6 overflow-x-auto">
+        {/* Status tabs — underline style */}
+        <div className="flex flex-1 items-stretch gap-0">
           {STATUS_FILTER_OPTIONS.map((opt) => {
-            const count =
-              opt.value === 'all'
-                ? projects.length
-                : projects.filter((p) => p.status === opt.value).length
+            const count = statusCount(opt.value)
             if (opt.value !== 'all' && count === 0) return null
+            const active = statusFilter === opt.value
             return (
               <button
                 key={opt.value}
-                onClick={() => setFilter(opt.value)}
+                onClick={() => setStatusFilter(opt.value)}
                 className={cn(
-                  'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium whitespace-nowrap transition-colors',
-                  filter === opt.value
-                    ? 'bg-primary text-primary-foreground'
-                    : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                  'inline-flex items-center gap-1.5 border-b-2 px-3 py-2.5 text-xs font-medium whitespace-nowrap transition-colors',
+                  active
+                    ? 'border-primary text-foreground'
+                    : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
                 )}
               >
                 {opt.label}
                 <span
                   className={cn(
-                    'rounded-full px-1.5 py-0.5 text-[10px] font-semibold',
-                    filter === opt.value ? 'bg-white/20' : 'bg-muted text-muted-foreground'
+                    'rounded-full px-1.5 py-0.5 text-[10px] font-semibold tabular-nums',
+                    active ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
                   )}
                 >
                   {count}
@@ -132,8 +173,31 @@ export function ProjectsListPage() {
             )
           })}
         </div>
+
+        {/* Domain filter — compact button group */}
+        <div className="ml-3 flex shrink-0 items-center gap-1 border-l border-border pl-3 py-2">
+          {DOMAIN_FILTER_OPTIONS.map((opt) => {
+            const count = domainCount(opt.value)
+            if (opt.value !== 'all' && count === 0) return null
+            return (
+              <button
+                key={opt.value}
+                onClick={() => setDomainFilter(opt.value)}
+                className={cn(
+                  'rounded px-2 py-1 text-xs font-medium transition-colors whitespace-nowrap',
+                  domainFilter === opt.value
+                    ? 'bg-muted text-foreground'
+                    : 'text-muted-foreground hover:text-foreground'
+                )}
+              >
+                {opt.label}
+              </button>
+            )
+          })}
+        </div>
+
         {/* Sort */}
-        <div className="ml-2 flex shrink-0 items-center gap-1 border-l border-border pl-3">
+        <div className="ml-2 flex shrink-0 items-center gap-1 border-l border-border pl-3 py-2">
           <ArrowUpDown className="h-3 w-3 text-muted-foreground" />
           {(['status', 'priority', 'updated'] as SortMode[]).map((s) => (
             <button
@@ -163,12 +227,12 @@ export function ProjectsListPage() {
             icon={<FolderKanban className="h-12 w-12" />}
             title="No projects here"
             description={
-              filter === 'all'
+              statusFilter === 'all' && domainFilter === 'all'
                 ? 'Create your first project to get started.'
-                : `No ${filter} projects.`
+                : 'No projects match the current filters.'
             }
             action={
-              filter === 'all' ? (
+              statusFilter === 'all' && domainFilter === 'all' ? (
                 <Link href="/projects/new" className={cn(buttonVariants({ size: 'sm' }))}>
                   <Plus className="mr-1.5 h-3.5 w-3.5" />
                   New Project
@@ -177,7 +241,7 @@ export function ProjectsListPage() {
             }
           />
         ) : (
-          <div className="rounded-none">
+          <div>
             {filtered.map((p) => (
               <ProjectRow key={p.id} project={p} />
             ))}

@@ -2,12 +2,16 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, FolderKanban, Settings } from 'lucide-react'
+import { LayoutDashboard, FolderKanban, CheckSquare, Bot, BookOpen, FileText, Settings } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const NAV_ITEMS = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/projects',  label: 'Projects',  icon: FolderKanban },
+  { href: '/tasks',     label: 'Tasks',     icon: CheckSquare },
+  { href: '/assets',    label: 'AI Assets', icon: Bot },
+  { href: '/decisions', label: 'Decisions', icon: BookOpen },
+  { href: '/knowledge', label: 'Knowledge', icon: FileText },
 ]
 
 const BOTTOM_ITEMS = [

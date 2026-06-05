@@ -1,12 +1,18 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useProjectsStore } from '@/store/projects.store'
+import { useTasksStore } from '@/store/tasks.store'
+import { AssetsRepository } from '@/data/repositories/assets.repository'
+import { DecisionsRepository } from '@/data/repositories/decisions.repository'
+import { KnowledgeRepository } from '@/data/repositories/knowledge.repository'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { PriorityBadge } from '@/components/shared/PriorityBadge'
 import { DomainBadge } from '@/components/shared/DomainBadge'
+import { TaskRow } from '@/features/tasks/components/TaskRow'
+import { TaskForm } from '@/features/tasks/components/TaskForm'
 import { TopBar } from '@/components/layout/TopBar'
 import { Button, buttonVariants } from '@/components/ui/button'
 import {
@@ -31,10 +37,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { ArrowLeft, MoreHorizontal, Pencil, Archive, Trash2, Loader2, AlertTriangle, Target } from 'lucide-react'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
+import {
+  ArrowLeft, MoreHorizontal, Archive, Trash2, Loader2, AlertTriangle, Target,
+  Plus, Check, X, Bot, BookOpen, FileText, ExternalLink, Pencil, ChevronRight,
+} from 'lucide-react'
 import { format } from 'date-fns'
 import { cn } from '@/lib/utils'
-import type { Project, ProjectStatus } from '@/types/entities'
+import type {
+  Project, ProjectStatus, ProjectPriority, ProjectDomain,
+  AIAsset, Decision, KnowledgeItem,
+} from '@/types/entities'
+
+/* ── constants ─────────────────────────────────────────────── */
 
 const STATUS_OPTIONS: { value: ProjectStatus; label: string }[] = [
   { value: 'idea',      label: 'Idea' },
@@ -46,42 +62,181 @@ const STATUS_OPTIONS: { value: ProjectStatus; label: string }[] = [
   { value: 'archived',  label: 'Archived' },
 ]
 
+const PRIORITY_OPTIONS: { value: ProjectPriority; label: string }[] = [
+  { value: 'critical', label: 'Critical' },
+  { value: 'high',     label: 'High' },
+  { value: 'medium',   label: 'Medium' },
+  { value: 'low',      label: 'Low' },
+  { value: 'unset',    label: 'No priority' },
+]
+
+const DOMAIN_OPTIONS: { value: ProjectDomain; label: string }[] = [
+  { value: 'personal', label: 'Personal' },
+  { value: 'work',     label: 'Work' },
+  { value: 'general',  label: 'General' },
+]
+
+/* ── inline editable field ─────────────────────────────────── */
+
+function InlineText({
+  value,
+  placeholder,
+  onSave,
+  multiline,
+  className,
+}: {
+  value: string
+  placeholder: string
+  onSave: (v: string) => void
+  multiline?: boolean
+  className?: string
+}) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(value)
+  const inputRef = useRef<HTMLInputElement & HTMLTextAreaElement>(null)
+
+  useEffect(() => { if (editing) inputRef.current?.focus() }, [editing])
+
+  function commit() {
+    setEditing(false)
+    onSave(draft)
+  }
+
+  function cancel() {
+    setEditing(false)
+    setDraft(value)
+  }
+
+  if (editing) {
+    const sharedProps = {
+      ref: inputRef as never,
+      value: draft,
+      onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setDraft(e.target.value),
+      onKeyDown: (e: React.KeyboardEvent) => {
+        if (e.key === 'Escape') cancel()
+        if (e.key === 'Enter' && !multiline) { e.preventDefault(); commit() }
+        if (e.key === 'Enter' && e.metaKey) commit()
+      },
+      className: cn('w-full text-sm', className),
+    }
+
+    return (
+      <div className="space-y-1.5">
+        {multiline
+          ? <Textarea {...sharedProps} rows={3} />
+          : <Input {...sharedProps} />
+        }
+        <div className="flex gap-1.5">
+          <Button size="sm" onClick={commit} className="h-6 px-2 text-xs">
+            <Check className="mr-1 h-3 w-3" /> Save
+          </Button>
+          <Button size="sm" variant="ghost" onClick={cancel} className="h-6 px-2 text-xs">
+            <X className="h-3 w-3" />
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <button
+      onClick={() => { setDraft(value); setEditing(true) }}
+      className={cn(
+        'group flex w-full items-baseline gap-1.5 rounded px-1 py-0.5 text-left text-sm transition-colors hover:bg-muted/60',
+        !value && 'text-muted-foreground italic',
+        className
+      )}
+    >
+      <span className="flex-1 border-b border-dashed border-muted-foreground/25 pb-0.5 transition-colors group-hover:border-muted-foreground/50">
+        {value || placeholder}
+      </span>
+      <Pencil className="h-3 w-3 shrink-0 text-muted-foreground opacity-25 transition-opacity group-hover:opacity-100" />
+    </button>
+  )
+}
+
+/* ── meta row ──────────────────────────────────────────────── */
+
 function MetaRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex items-start gap-4 border-b border-border py-3 last:border-0">
-      <span className="w-28 shrink-0 pt-0.5 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+      <span className="w-24 shrink-0 pt-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
         {label}
       </span>
-      <div className="flex-1 text-sm">{children}</div>
+      <div className="flex-1 min-w-0">{children}</div>
     </div>
   )
 }
 
+/* ── main component ────────────────────────────────────────── */
+
 interface ProjectDetailPageProps {
   projectId: string
-  activeTab?: string
 }
 
-export function ProjectDetailPage({ projectId, activeTab = 'overview' }: ProjectDetailPageProps) {
+export function ProjectDetailPage({ projectId }: ProjectDetailPageProps) {
   const router = useRouter()
   const { projects, isLoading, load, update, remove } = useProjectsStore()
-  const [deleteOpen,      setDeleteOpen]      = useState(false)
-  const [deleting,        setDeleting]        = useState(false)
-  const [statusChanging,  setStatusChanging]  = useState(false)
-  const [tab,             setTab]             = useState(activeTab)
+  const { tasks, loadByProject } = useTasksStore()
+  const [deleteOpen,     setDeleteOpen]     = useState(false)
+  const [deleting,       setDeleting]       = useState(false)
+  const [statusChanging, setStatusChanging] = useState(false)
+  const [tab,            setTab]            = useState('overview')
+  const [showTaskForm,   setShowTaskForm]   = useState(false)
+
+  const [projectAssets,    setProjectAssets]    = useState<AIAsset[]>([])
+  const [projectDecisions, setProjectDecisions] = useState<Decision[]>([])
+  const [projectKnowledge, setProjectKnowledge] = useState<KnowledgeItem[]>([])
 
   useEffect(() => { if (projects.length === 0) load() }, [projects.length, load])
 
   const project = projects.find((p) => p.id === projectId)
 
+  /* load tasks when tasks tab is opened */
+  useEffect(() => {
+    if (tab === 'tasks' && project) {
+      loadByProject(project.id)
+    }
+  }, [tab, project, loadByProject])
+
+  useEffect(() => {
+    if (tab === 'assets' && project) {
+      AssetsRepository.findByProject(project.id).then(setProjectAssets)
+    }
+  }, [tab, project])
+
+  useEffect(() => {
+    if (tab === 'decisions' && project) {
+      DecisionsRepository.findByProject(project.id).then(setProjectDecisions)
+    }
+  }, [tab, project])
+
+  useEffect(() => {
+    if (tab === 'knowledge' && project) {
+      KnowledgeRepository.findByProject(project.id).then(setProjectKnowledge)
+    }
+  }, [tab, project])
+
+  const projectTasks = tasks.filter((t) => t.project_id === projectId)
+
+  /* ── handlers ─────────────────────────────────────────────── */
+
   async function handleStatusChange(newStatus: ProjectStatus) {
     if (!project || statusChanging) return
     setStatusChanging(true)
     try {
-      await update(project.id, { status: newStatus, blocked_reason: newStatus !== 'blocked' ? '' : project.blocked_reason })
+      await update(project.id, {
+        status: newStatus,
+        blocked_reason: newStatus !== 'blocked' ? '' : project.blocked_reason,
+      })
     } finally {
       setStatusChanging(false)
     }
+  }
+
+  async function handleFieldSave(field: keyof Project, value: string) {
+    if (!project) return
+    await update(project.id, { [field]: value })
   }
 
   async function handleArchive() {
@@ -101,6 +256,8 @@ export function ProjectDetailPage({ projectId, activeTab = 'overview' }: Project
       setDeleteOpen(false)
     }
   }
+
+  /* ── render ───────────────────────────────────────────────── */
 
   if (isLoading && projects.length === 0) {
     return <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">Loading...</div>
@@ -122,23 +279,37 @@ export function ProjectDetailPage({ projectId, activeTab = 'overview' }: Project
   }
 
   const TABS = [
-    { id: 'overview',   label: 'Overview' },
-    { id: 'tasks',      label: 'Tasks' },
-    { id: 'assets',     label: 'AI Assets' },
-    { id: 'decisions',  label: 'Decisions' },
-    { id: 'knowledge',  label: 'Knowledge' },
+    { id: 'overview',  label: 'Overview' },
+    { id: 'tasks',     label: `Tasks${projectTasks.length > 0 ? ` (${projectTasks.length})` : ''}` },
+    { id: 'assets',    label: `AI Assets${projectAssets.length > 0 ? ` (${projectAssets.length})` : ''}` },
+    { id: 'decisions', label: `Decisions${projectDecisions.length > 0 ? ` (${projectDecisions.length})` : ''}` },
+    { id: 'knowledge', label: `Knowledge${projectKnowledge.length > 0 ? ` (${projectKnowledge.length})` : ''}` },
   ]
+
+  const openTasks    = projectTasks.filter((t) => t.status !== 'done')
+  const blockedTasks = projectTasks.filter((t) => t.status === 'blocked')
+  const doneTasks    = projectTasks.filter((t) => t.status === 'done')
 
   return (
     <>
       <div className="flex flex-col overflow-hidden">
         <TopBar
-          title={project.name}
+          title={
+            <span className="flex items-center gap-1.5 text-sm">
+              <Link href="/projects" className="font-normal text-muted-foreground hover:text-foreground transition-colors">
+                Projects
+              </Link>
+              <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60" />
+              <span className="font-semibold text-foreground">{project.name}</span>
+            </span>
+          }
           actions={
             <div className="flex items-center gap-2">
-              <Link href={`/projects/${project.id}/edit`} className={buttonVariants({ variant: 'outline', size: 'sm' })}>
-                <Pencil className="mr-1.5 h-3.5 w-3.5" />
-                Edit
+              <Link
+                href={`/projects/${project.id}/edit`}
+                className={buttonVariants({ variant: 'outline', size: 'sm' })}
+              >
+                Edit all fields
               </Link>
 
               <DropdownMenu>
@@ -201,15 +372,14 @@ export function ProjectDetailPage({ projectId, activeTab = 'overview' }: Project
                 {project.status === 'blocked' && (
                   <div className="flex items-start gap-3 rounded-lg border border-red-200 bg-red-50/50 p-4 dark:border-red-900/30 dark:bg-red-950/20">
                     <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-red-500" />
-                    <div>
+                    <div className="flex-1">
                       <p className="text-sm font-semibold text-red-700 dark:text-red-400">Blocked</p>
-                      {project.blocked_reason ? (
-                        <p className="mt-0.5 text-sm text-red-600/80 dark:text-red-400/80">
-                          {project.blocked_reason}
-                        </p>
-                      ) : (
-                        <p className="mt-0.5 text-sm text-red-500/70 italic">No reason recorded.</p>
-                      )}
+                      <InlineText
+                        value={project.blocked_reason ?? ''}
+                        placeholder="Click to add blocker reason..."
+                        onSave={(v) => handleFieldSave('blocked_reason', v)}
+                        className="text-red-600/80 dark:text-red-400/80"
+                      />
                     </div>
                   </div>
                 )}
@@ -217,77 +387,266 @@ export function ProjectDetailPage({ projectId, activeTab = 'overview' }: Project
                 {tab === 'overview' && (
                   <>
                     {/* Goal */}
-                    {project.goal && (
-                      <section>
-                        <div className="flex items-center gap-2 mb-2">
-                          <Target className="h-4 w-4 text-primary" />
-                          <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Goal</h2>
-                        </div>
-                        <p className="text-sm font-medium text-foreground">{project.goal}</p>
-                      </section>
-                    )}
+                    <section>
+                      <div className="flex items-center gap-2 mb-2">
+                        <Target className="h-4 w-4 text-primary" />
+                        <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Goal</h2>
+                      </div>
+                      <InlineText
+                        value={project.goal ?? ''}
+                        placeholder="Click to add a goal or objective..."
+                        onSave={(v) => handleFieldSave('goal', v)}
+                        className="font-medium text-foreground"
+                      />
+                    </section>
+
+                    {/* Next action */}
+                    <section>
+                      <h2 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                        Next Action
+                      </h2>
+                      <InlineText
+                        value={project.next_action ?? ''}
+                        placeholder="Click to add the immediate next step..."
+                        onSave={(v) => handleFieldSave('next_action', v)}
+                      />
+                    </section>
 
                     {/* Description */}
                     <section>
                       <h2 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                         Description
                       </h2>
-                      {project.description ? (
-                        <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">
-                          {project.description}
-                        </p>
-                      ) : (
-                        <p className="text-sm italic text-muted-foreground">No description yet.</p>
-                      )}
+                      <InlineText
+                        value={project.description ?? ''}
+                        placeholder="Click to add a description..."
+                        onSave={(v) => handleFieldSave('description', v)}
+                        multiline
+                      />
                     </section>
-
-                    {/* Next action */}
-                    {project.next_action && (
-                      <section>
-                        <h2 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                          Next Action
-                        </h2>
-                        <div className="flex items-start gap-2 rounded-md border border-border bg-muted/30 p-3">
-                          <span className="mt-0.5 text-sm font-medium">→</span>
-                          <p className="text-sm">{project.next_action}</p>
-                        </div>
-                      </section>
-                    )}
                   </>
                 )}
 
                 {tab === 'tasks' && (
-                  <div className="rounded-lg border border-dashed border-border p-8 text-center">
-                    <p className="text-sm text-muted-foreground">Tasks coming in Phase 3.</p>
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex gap-4 text-sm text-muted-foreground">
+                        {blockedTasks.length > 0 && (
+                          <span className="text-red-500">{blockedTasks.length} blocked</span>
+                        )}
+                        <span>{openTasks.length} open</span>
+                        {doneTasks.length > 0 && (
+                          <span className="text-muted-foreground">{doneTasks.length} done</span>
+                        )}
+                      </div>
+                      <Button size="sm" variant="outline" onClick={() => setShowTaskForm(true)}>
+                        <Plus className="mr-1.5 h-3.5 w-3.5" />
+                        Add Task
+                      </Button>
+                    </div>
+
+                    {showTaskForm && (
+                      <div className="rounded-lg border border-border bg-card p-4">
+                        <TaskForm
+                          projectId={projectId}
+                          onClose={() => setShowTaskForm(false)}
+                        />
+                      </div>
+                    )}
+
+                    {projectTasks.length === 0 && !showTaskForm ? (
+                      <div className="rounded-lg border border-dashed border-border p-8 text-center">
+                        <p className="text-sm text-muted-foreground">No tasks yet.</p>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="mt-3"
+                          onClick={() => setShowTaskForm(true)}
+                        >
+                          <Plus className="mr-1.5 h-3.5 w-3.5" />
+                          Add first task
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="rounded-lg border border-border bg-card overflow-hidden">
+                        {projectTasks.map((t) => (
+                          <TaskRow key={t.id} task={t} />
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
+
                 {tab === 'assets' && (
-                  <div className="rounded-lg border border-dashed border-border p-8 text-center">
-                    <p className="text-sm text-muted-foreground">AI Assets coming in Phase 4.</p>
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">
+                        {projectAssets.length} linked asset{projectAssets.length !== 1 ? 's' : ''}
+                      </span>
+                      <Link
+                        href="/assets/new"
+                        className={buttonVariants({ variant: 'outline', size: 'sm' })}
+                      >
+                        <Plus className="mr-1.5 h-3.5 w-3.5" />
+                        New asset
+                      </Link>
+                    </div>
+                    {projectAssets.length === 0 ? (
+                      <div className="rounded-lg border border-dashed border-border p-8 text-center">
+                        <Bot className="mx-auto mb-2 h-6 w-6 text-muted-foreground" />
+                        <p className="text-sm text-muted-foreground">No assets linked yet.</p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Create an asset, then link it to this project from the asset detail page.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="rounded-lg border border-border bg-card overflow-hidden divide-y divide-border">
+                        {projectAssets.map((asset) => (
+                          <Link
+                            key={asset.id}
+                            href={`/assets/${asset.id}`}
+                            className="flex items-center gap-3 px-4 py-3 hover:bg-muted/40 transition-colors"
+                          >
+                            <Bot className="h-4 w-4 shrink-0 text-muted-foreground" />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium truncate">{asset.name}</p>
+                              {asset.description && (
+                                <p className="text-xs text-muted-foreground truncate">{asset.description}</p>
+                              )}
+                            </div>
+                            <span className="text-xs text-muted-foreground capitalize shrink-0">
+                              {asset.asset_type}
+                            </span>
+                            <span className={cn(
+                              'text-xs px-1.5 py-0.5 rounded shrink-0',
+                              asset.status === 'active'     && 'bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-400',
+                              asset.status === 'draft'      && 'bg-yellow-100 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-400',
+                              asset.status === 'deprecated' && 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-400',
+                              asset.status === 'idea'       && 'bg-muted text-muted-foreground',
+                            )}>
+                              {asset.status}
+                            </span>
+                            <ExternalLink className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                          </Link>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
+
                 {tab === 'decisions' && (
-                  <div className="rounded-lg border border-dashed border-border p-8 text-center">
-                    <p className="text-sm text-muted-foreground">Decisions coming in Phase 5.</p>
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">
+                        {projectDecisions.length} decision{projectDecisions.length !== 1 ? 's' : ''}
+                      </span>
+                      <Link
+                        href={`/decisions/new?project=${projectId}`}
+                        className={buttonVariants({ variant: 'outline', size: 'sm' })}
+                      >
+                        <Plus className="mr-1.5 h-3.5 w-3.5" />
+                        Log decision
+                      </Link>
+                    </div>
+                    {projectDecisions.length === 0 ? (
+                      <div className="rounded-lg border border-dashed border-border p-8 text-center">
+                        <BookOpen className="mx-auto mb-2 h-6 w-6 text-muted-foreground" />
+                        <p className="text-sm text-muted-foreground">No decisions logged yet.</p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Log key decisions to maintain a record of what was chosen and why.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="rounded-lg border border-border bg-card overflow-hidden divide-y divide-border">
+                        {projectDecisions.map((d) => (
+                          <Link
+                            key={d.id}
+                            href={`/decisions/${d.id}`}
+                            className="flex items-start gap-3 px-4 py-3 hover:bg-muted/40 transition-colors"
+                          >
+                            <BookOpen className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium truncate">{d.title}</p>
+                              {d.decision_made && (
+                                <p className="text-xs text-muted-foreground truncate">{d.decision_made}</p>
+                              )}
+                            </div>
+                            <span className={cn(
+                              'text-xs px-1.5 py-0.5 rounded shrink-0 mt-0.5',
+                              d.status === 'active'     && 'bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-400',
+                              d.status === 'superseded' && 'bg-yellow-100 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-400',
+                              d.status === 'reversed'   && 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-400',
+                            )}>
+                              {d.status}
+                            </span>
+                            <ExternalLink className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                          </Link>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
+
                 {tab === 'knowledge' && (
-                  <div className="rounded-lg border border-dashed border-border p-8 text-center">
-                    <p className="text-sm text-muted-foreground">Knowledge items coming in Phase 5.</p>
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">
+                        {projectKnowledge.length} item{projectKnowledge.length !== 1 ? 's' : ''}
+                      </span>
+                      <Link
+                        href={`/knowledge/new?project=${projectId}`}
+                        className={buttonVariants({ variant: 'outline', size: 'sm' })}
+                      >
+                        <Plus className="mr-1.5 h-3.5 w-3.5" />
+                        Add knowledge
+                      </Link>
+                    </div>
+                    {projectKnowledge.length === 0 ? (
+                      <div className="rounded-lg border border-dashed border-border p-8 text-center">
+                        <FileText className="mx-auto mb-2 h-6 w-6 text-muted-foreground" />
+                        <p className="text-sm text-muted-foreground">No knowledge items yet.</p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Capture notes, learnings, references, and processes related to this project.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="rounded-lg border border-border bg-card overflow-hidden divide-y divide-border">
+                        {projectKnowledge.map((item) => (
+                          <Link
+                            key={item.id}
+                            href={`/knowledge/${item.id}`}
+                            className="flex items-start gap-3 px-4 py-3 hover:bg-muted/40 transition-colors"
+                          >
+                            <FileText className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium truncate">{item.title}</p>
+                              {item.body && (
+                                <p className="text-xs text-muted-foreground truncate">{item.body}</p>
+                              )}
+                            </div>
+                            <span className="text-xs text-muted-foreground capitalize shrink-0 mt-0.5">
+                              {item.item_type}
+                            </span>
+                            <ExternalLink className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                          </Link>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
 
-              {/* Meta panel */}
+              {/* Meta panel — all inline-editable */}
               <div className="lg:col-span-1">
                 <div className="rounded-lg border border-border bg-card p-4">
+                  {/* Status */}
                   <MetaRow label="Status">
                     {statusChanging ? (
                       <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                     ) : (
                       <Select
                         value={project.status}
-                        onValueChange={(v) => handleStatusChange(v as ProjectStatus)}
+                        onValueChange={(v) => v && handleStatusChange(v as ProjectStatus)}
                       >
                         <SelectTrigger className="h-auto border-0 bg-transparent p-0 shadow-none focus:ring-0 [&_svg]:ml-1">
                           <StatusBadge status={project.status} />
@@ -301,28 +660,62 @@ export function ProjectDetailPage({ projectId, activeTab = 'overview' }: Project
                     )}
                   </MetaRow>
 
+                  {/* Priority */}
                   <MetaRow label="Priority">
-                    <PriorityBadge priority={project.priority} />
+                    <Select
+                      value={project.priority}
+                      onValueChange={(v) => v && handleFieldSave('priority', v as ProjectPriority)}
+                    >
+                      <SelectTrigger className="h-auto border-0 bg-transparent p-0 shadow-none focus:ring-0 [&_svg]:ml-1">
+                        <PriorityBadge priority={project.priority} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {PRIORITY_OPTIONS.map((opt) => (
+                          <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </MetaRow>
 
-                  {project.domain && (
-                    <MetaRow label="Domain">
-                      <DomainBadge domain={project.domain} />
-                    </MetaRow>
-                  )}
+                  {/* Domain */}
+                  <MetaRow label="Domain">
+                    <Select
+                      value={project.domain ?? ''}
+                      onValueChange={(v) => handleFieldSave('domain', v as ProjectDomain)}
+                    >
+                      <SelectTrigger className="h-auto border-0 bg-transparent p-0 shadow-none focus:ring-0 [&_svg]:ml-1">
+                        {project.domain
+                          ? <DomainBadge domain={project.domain} />
+                          : <span className="text-xs text-muted-foreground italic">None</span>
+                        }
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="personal">Personal</SelectItem>
+                        <SelectItem value="work">Work</SelectItem>
+                        <SelectItem value="general">General</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </MetaRow>
 
-                  {project.current_phase && (
-                    <MetaRow label="Phase">
-                      <span className="text-sm text-foreground">{project.current_phase}</span>
-                    </MetaRow>
-                  )}
+                  {/* Current Phase */}
+                  <MetaRow label="Phase">
+                    <InlineText
+                      value={project.current_phase ?? ''}
+                      placeholder="Add phase..."
+                      onSave={(v) => handleFieldSave('current_phase', v)}
+                    />
+                  </MetaRow>
 
                   <MetaRow label="Created">
-                    <span className="text-foreground">{format(new Date(project.created_at), 'MMM d, yyyy')}</span>
+                    <span className="text-sm text-foreground">
+                      {format(new Date(project.created_at), 'MMM d, yyyy')}
+                    </span>
                   </MetaRow>
 
                   <MetaRow label="Updated">
-                    <span className="text-foreground">{format(new Date(project.updated_at), 'MMM d, yyyy')}</span>
+                    <span className="text-sm text-foreground">
+                      {format(new Date(project.updated_at), 'MMM d, yyyy')}
+                    </span>
                   </MetaRow>
                 </div>
               </div>

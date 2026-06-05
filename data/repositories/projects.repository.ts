@@ -41,7 +41,13 @@ export const ProjectsRepository = {
   },
 
   async delete(id: string): Promise<void> {
-    await db.projects.delete(id)
+    await db.transaction('rw', [db.projects, db.tasks, db.decisions, db.knowledge, db.project_assets], async () => {
+      await db.projects.delete(id)
+      await db.tasks.where('project_id').equals(id).delete()
+      await db.decisions.where('project_id').equals(id).delete()
+      await db.knowledge.where('project_id').equals(id).delete()
+      await db.project_assets.where('project_id').equals(id).delete()
+    })
   },
 
   async countByStatus(): Promise<Record<string, number>> {
