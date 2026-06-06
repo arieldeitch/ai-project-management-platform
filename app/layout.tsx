@@ -1,14 +1,19 @@
 import type { Metadata } from 'next'
-import { Geist, Geist_Mono } from 'next/font/google'
+import { Heebo, Geist_Mono } from 'next/font/google'
 import { AppShell } from '@/components/layout/AppShell'
 import './globals.css'
 
-const geistSans = Geist({ variable: '--font-geist-sans', subsets: ['latin'] })
+const heebo = Heebo({
+  variable: '--font-heebo',
+  subsets: ['hebrew', 'latin'],
+  weight: ['300', '400', '500', '600', '700'],
+  display: 'swap',
+})
 const geistMono = Geist_Mono({ variable: '--font-geist-mono', subsets: ['latin'] })
 
 export const metadata: Metadata = {
   title: 'AI PM Platform',
-  description: 'Personal AI Project Management Platform',
+  description: 'מערכת ניהול פרויקטי AI אישית',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -16,7 +21,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html
       lang="he"
       dir="rtl"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${heebo.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="h-full overflow-hidden">
         <AppShell>{children}</AppShell>
