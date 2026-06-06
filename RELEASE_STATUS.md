@@ -51,7 +51,7 @@
 |---|---|
 | Latest commit | `b323c6a` feat: apply Helm UI polish |
 | Branch | `main` |
-| Ahead of origin | 1 commit (UI polish, not yet pushed at time of this report) |
+| Ahead of origin | 0 — fully pushed |
 | Release tag | `v1.0.0` (created — see below) |
 | GitHub remote | https://github.com/arieldeitch/ai-project-management-platform |
 
