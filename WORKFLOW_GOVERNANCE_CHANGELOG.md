@@ -64,19 +64,41 @@
 ---
 
 ## Phase 2 — Project Form + Draft Enforcement
-**Status:** Pending
+**Commit:** f133522 | **Build:** ✓
 
 ## Phase 3 — Workflow Progress Panel + GPT Spec Generation
-**Status:** Pending
+**Commit:** f133522 | **Build:** ✓
 
 ## Phase 4 — GPT Setup Tracking UI
-**Status:** Pending
+**Commit:** 6e80dce | **Build:** ✓
 
 ## Phase 5 — Knowledge Readiness Enforcement + Sidebar Governance Alerts
-**Status:** Pending
+**Commit:** c5ee7ca | **Build:** ✓
 
 ## Phase 6 — Task Type: Task / Feature / Bug
-**Status:** Pending
+**Commit:** f87fa1e | **Build:** ✓
 
 ## Phase 7 — Kanban Lifecycle Governance
-**Status:** Pending
+**Date:** 2026-06-06
+**Commit:** (pending)
+**Build:** ✓ 21 routes | `npx tsc --noEmit` → 0 errors
+
+### Changes
+
+#### `features/projects/components/ProjectsListPage.tsx`
+- Added imports: `useTasksStore`, `useKnowledgeStore`, `getDraftCompletionStatus`, `getTransitionBlockers`, `getNextLifecycleStatus`, `LIFECYCLE_SEQUENCE`, `Task`, `KnowledgeItem`, `ChevronRight`, `Loader2`, `X`, `useRef`
+- `ProjectsListPage`: now loads `tasks` and `knowledgeItems` from their stores on mount; passes both down to `KanbanColumn`
+- `KanbanColumn`: accepts `allTasks` and `allKnowledge` props; forwards to each `KanbanTicket`
+- `KanbanTicket`:
+  - **Draft blocker badge** — amber badge showing "N שדות חסרים" on draft cards with incomplete fields (via `getDraftCompletionStatus`)
+  - **Advance button** — hover-revealed `→` button on all lifecycle-sequence cards; runs `getTransitionBlockers` before advancing
+  - **Inline blocker panel** — shows below the card when transition is blocked: lists all failure reasons in Hebrew; auto-dismisses after 6 seconds; has dismiss `×` button
+  - **Optimistic advance** — when no blockers, calls `update(project.id, { status: nextStatus })` immediately
+  - `LIFECYCLE_NEXT_LABELS` — Hebrew tooltip labels per transition ("העבר לממוסגר", "התחל פיתוח", etc.)
+  - Card changed from `<Link>` wrapper to `<div className="flex flex-col gap-1">` wrapping `<Link>` + blocker panel; advance button uses `e.preventDefault()` + `e.stopPropagation()` to avoid navigation
+
+### Behaviour
+- Draft cards always show amber badge when any required field is missing
+- Hovering a lifecycle card reveals a `→` advance arrow in the lower-right corner
+- Clicking advance when requirements are incomplete shows a red panel listing all blockers (auto-clears 6 s)
+- Clicking advance when requirements are met optimistically updates the project status and moves the card to the next column

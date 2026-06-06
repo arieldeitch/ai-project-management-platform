@@ -1,16 +1,24 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useProjectsStore } from '@/store/projects.store'
+import { useTasksStore } from '@/store/tasks.store'
+import { useKnowledgeStore } from '@/store/knowledge.store'
 import { DomainBadge } from '@/components/shared/DomainBadge'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { TopBar } from '@/components/layout/TopBar'
 import { buttonVariants } from '@/components/ui/button'
-import { Plus, FolderKanban, AlertTriangle } from 'lucide-react'
+import { Plus, FolderKanban, AlertTriangle, ChevronRight, Loader2, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import type { Project, ProjectStatus, ProjectDomain, ProjectPriority } from '@/types/entities'
+import type { Project, ProjectStatus, ProjectDomain, ProjectPriority, Task, KnowledgeItem } from '@/types/entities'
 import { formatDistanceToNow } from 'date-fns'
+import {
+  getDraftCompletionStatus,
+  getTransitionBlockers,
+  getNextLifecycleStatus,
+  LIFECYCLE_SEQUENCE,
+} from '@/lib/workflow/governance'
 
 /* ── types ─────────────────────────────────────────────────── */
 
@@ -112,11 +120,38 @@ function PortfolioKPI({ projects }: { projects: Project[] }) {
 
 /* ── KanbanTicket ──────────────────────────────────────────── */
 
-function KanbanTicket({ project }: { project: Project }) {
+const LIFECYCLE_NEXT_LABELS: Partial<Record<ProjectStatus, string>> = {
+  draft:                 'העבר לממוסגר',
+  scoped:                'העבר להגדרת GPT',
+  gpt_setup:             'העבר למוכן לפיתוח',
+  ready_for_development: 'התחל פיתוח',
+  in_development:        'העבר לבדיקות',
+  testing:               'העבר למוצב',
+  deployed:              'סמן כפעיל',
+}
+
+function KanbanTicket({
+  project,
+  allTasks,
+  allKnowledge,
+}: {
+  project:      Project
+  allTasks:     Task[]
+  allKnowledge: KnowledgeItem[]
+}) {
+  const { update } = useProjectsStore()
   const updatedAt = formatDistanceToNow(new Date(project.updated_at), { addSuffix: true })
   const isBlocked = project.status === 'blocked'
   const isDimmed  = project.status === 'completed' || project.status === 'deferred' || project.status === 'archived'
   const isLow     = !isBlocked && !isDimmed && project.priority === 'low'
+
+  const [advancing,   setAdvancing]   = useState(false)
+  const [blockerMsgs, setBlockerMsgs] = useState<string[] | null>(null)
+  const clearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const nextStatus   = getNextLifecycleStatus(project.status)
+  const isDraftCard  = project.status === 'draft'
+  const draftMissing = isDraftCard ? getDraftCompletionStatus(project).missing.length : 0
 
   const cardStyle = isBlocked
     ? 'border-red-200 bg-red-50/60'
@@ -124,46 +159,123 @@ function KanbanTicket({ project }: { project: Project }) {
     ? 'bg-card border-border'
     : PRIORITY_CARD[project.priority]
 
+  async function handleAdvance(e: React.MouseEvent) {
+    e.preventDefault()
+    e.stopPropagation()
+    if (!nextStatus || advancing) return
+
+    const projectTasks = allTasks.filter((t) => t.project_id === project.id)
+    const blockers = getTransitionBlockers(project, projectTasks, allKnowledge, nextStatus)
+
+    if (blockers.length > 0) {
+      setBlockerMsgs(blockers.map((b) => b.reason))
+      if (clearTimerRef.current) clearTimeout(clearTimerRef.current)
+      clearTimerRef.current = setTimeout(() => setBlockerMsgs(null), 6000)
+      return
+    }
+
+    setAdvancing(true)
+    await update(project.id, { status: nextStatus })
+    setAdvancing(false)
+  }
+
+  function dismissBlockers(e: React.MouseEvent) {
+    e.preventDefault()
+    e.stopPropagation()
+    if (clearTimerRef.current) clearTimeout(clearTimerRef.current)
+    setBlockerMsgs(null)
+  }
+
   return (
-    <Link
-      href={`/projects/${project.id}`}
-      className={cn(
-        'group block rounded border p-2.5 transition-colors',
-        'hover:border-primary/40 hover:shadow-sm',
-        cardStyle,
-        isBlocked && 'hover:border-red-300',
-        isLow && 'opacity-70',
-        isDimmed && 'opacity-60',
-      )}
-    >
-      <p className="text-[11px] font-medium leading-snug text-muted-foreground line-clamp-1 transition-colors group-hover:text-primary">
-        {project.name}
-      </p>
-
-      {isBlocked && project.blocked_reason ? (
-        <div className="mt-0.5 flex items-start gap-1">
-          <AlertTriangle className="mt-px h-3 w-3 shrink-0 text-red-500" />
-          <p className="text-[12px] font-medium text-red-600 line-clamp-1">
-            {project.blocked_reason}
-          </p>
-        </div>
-      ) : project.next_action ? (
-        <p className="mt-0.5 text-[12px] font-medium text-foreground line-clamp-1">
-          {project.next_action}
-        </p>
-      ) : null}
-
-      <div className="mt-1.5 flex items-center justify-between gap-1">
-        {project.domain ? (
-          <DomainBadge domain={project.domain} className="px-1.5 py-0 text-[10px]" />
-        ) : (
-          <span />
+    <div className="flex flex-col gap-1">
+      <Link
+        href={`/projects/${project.id}`}
+        className={cn(
+          'group block rounded border p-2.5 transition-colors',
+          'hover:border-primary/40 hover:shadow-sm',
+          cardStyle,
+          isBlocked && 'hover:border-red-300',
+          isLow && 'opacity-70',
+          isDimmed && 'opacity-60',
         )}
-        <span className="shrink-0 tabular-nums text-[10px] text-muted-foreground">
-          {updatedAt}
-        </span>
-      </div>
-    </Link>
+      >
+        {/* Draft blocker badge */}
+        {isDraftCard && draftMissing > 0 && (
+          <div className="mb-1 flex items-center gap-1">
+            <span className="inline-flex items-center gap-0.5 rounded-full bg-amber-100 px-1.5 py-0 text-[10px] font-semibold text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+              <AlertTriangle className="h-2.5 w-2.5" />
+              {draftMissing} שדות חסרים
+            </span>
+          </div>
+        )}
+
+        <p className="text-[11px] font-medium leading-snug text-muted-foreground line-clamp-1 transition-colors group-hover:text-primary">
+          {project.name}
+        </p>
+
+        {isBlocked && project.blocked_reason ? (
+          <div className="mt-0.5 flex items-start gap-1">
+            <AlertTriangle className="mt-px h-3 w-3 shrink-0 text-red-500" />
+            <p className="text-[12px] font-medium text-red-600 line-clamp-1">
+              {project.blocked_reason}
+            </p>
+          </div>
+        ) : project.next_action ? (
+          <p className="mt-0.5 text-[12px] font-medium text-foreground line-clamp-1">
+            {project.next_action}
+          </p>
+        ) : null}
+
+        <div className="mt-1.5 flex items-center justify-between gap-1">
+          {project.domain ? (
+            <DomainBadge domain={project.domain} className="px-1.5 py-0 text-[10px]" />
+          ) : (
+            <span />
+          )}
+          <div className="flex shrink-0 items-center gap-1">
+            <span className="tabular-nums text-[10px] text-muted-foreground">{updatedAt}</span>
+            {nextStatus && LIFECYCLE_SEQUENCE.includes(project.status as typeof LIFECYCLE_SEQUENCE[number]) && (
+              <button
+                onClick={handleAdvance}
+                disabled={advancing}
+                title={LIFECYCLE_NEXT_LABELS[project.status] ?? 'קדם סטטוס'}
+                className={cn(
+                  'flex h-4 w-4 items-center justify-center rounded transition-colors',
+                  'opacity-0 group-hover:opacity-100',
+                  'bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground',
+                )}
+              >
+                {advancing
+                  ? <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                  : <ChevronRight className="h-2.5 w-2.5" />
+                }
+              </button>
+            )}
+          </div>
+        </div>
+      </Link>
+
+      {/* Inline blocker error panel */}
+      {blockerMsgs && (
+        <div className="rounded border border-red-200 bg-red-50 p-2 dark:border-red-900/40 dark:bg-red-950/20">
+          <div className="mb-1 flex items-center justify-between gap-1">
+            <span className="text-[10px] font-semibold text-red-700 dark:text-red-400">
+              לא ניתן לקדם
+            </span>
+            <button onClick={dismissBlockers} className="text-red-400 hover:text-red-600">
+              <X className="h-3 w-3" />
+            </button>
+          </div>
+          <ul className="space-y-0.5">
+            {blockerMsgs.map((msg, i) => (
+              <li key={i} className="text-[10px] leading-snug text-red-600 dark:text-red-400">
+                • {msg}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -174,11 +286,15 @@ function KanbanColumn({
   projects,
   sort,
   maxCount,
+  allTasks,
+  allKnowledge,
 }: {
-  config:   ColumnConfig
-  projects: Project[]
-  sort:     SortMode
-  maxCount: number
+  config:       ColumnConfig
+  projects:     Project[]
+  sort:         SortMode
+  maxCount:     number
+  allTasks:     Task[]
+  allKnowledge: KnowledgeItem[]
 }) {
   const isEmpty   = projects.length === 0
   const isActive  = config.status === 'active'
@@ -246,7 +362,7 @@ function KanbanColumn({
 
       <div className="flex flex-col gap-2 p-2.5">
         {sorted.map((p) => (
-          <KanbanTicket key={p.id} project={p} />
+          <KanbanTicket key={p.id} project={p} allTasks={allTasks} allKnowledge={allKnowledge} />
         ))}
       </div>
     </div>
@@ -262,12 +378,16 @@ interface ProjectsListPageProps {
 
 export function ProjectsListPage({ initialDomain }: ProjectsListPageProps) {
   const { projects, isLoading, load } = useProjectsStore()
+  const { tasks, load: loadTasks }    = useTasksStore()
+  const { items: knowledgeItems, load: loadKnowledge } = useKnowledgeStore()
   const [domainFilter, setDomainFilter] = useState<DomainFilter>(initialDomain ?? 'all')
   const [sort, setSort] = useState<SortMode>('priority')
 
   useEffect(() => {
     load()
-  }, [load])
+    loadTasks()
+    loadKnowledge()
+  }, [load, loadTasks, loadKnowledge])
 
   const visible =
     domainFilter === 'all' ? projects : projects.filter((p) => p.domain === domainFilter)
@@ -374,6 +494,8 @@ export function ProjectsListPage({ initialDomain }: ProjectsListPageProps) {
                 projects={visible.filter((p) => p.status === col.status)}
                 sort={sort}
                 maxCount={maxCount}
+                allTasks={tasks}
+                allKnowledge={knowledgeItems}
               />
             ))}
           </div>
