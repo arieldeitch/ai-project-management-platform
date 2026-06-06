@@ -18,22 +18,28 @@ import { cn } from '@/lib/utils'
 import type { KnowledgeType, DocRole, DocStatus } from '@/types/entities'
 
 const TYPE_CONFIG: Record<KnowledgeType, { label: string; color: string }> = {
-  note:      { label: 'Note',      color: 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400' },
-  reference: { label: 'Reference', color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400' },
-  learning:  { label: 'Learning',  color: 'bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-400' },
-  process:   { label: 'Process',   color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400' },
-  research:  { label: 'Research',  color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400' },
+  note:      { label: 'הערה',   color: 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400' },
+  reference: { label: 'הפניה',  color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400' },
+  learning:  { label: 'למידה',  color: 'bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-400' },
+  process:   { label: 'תהליך',  color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400' },
+  research:  { label: 'מחקר',   color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400' },
 }
 
 const DOC_ROLE_LABELS: Record<DocRole, string> = {
-  handoff_document:         'Handoff Document',
-  implementation_blueprint: 'Implementation Blueprint',
-  ux_notes:                 'UX Notes',
-  decisions_log:            'Decisions Log',
-  execution_board:          'Execution Board',
-  release_notes:            'Release Notes',
-  deployment_report:        'Deployment Report',
-  recovery_report:          'Recovery Report',
+  handoff_document:         'מסמך מסירה',
+  implementation_blueprint: 'תכנית מימוש',
+  ux_notes:                 'הערות UX',
+  decisions_log:            'יומן החלטות',
+  execution_board:          'לוח ביצוע',
+  release_notes:            'הערות גרסה',
+  deployment_report:        'דו"ח פריסה',
+  recovery_report:          'דו"ח שחזור',
+}
+
+const DOC_STATUS_LABEL: Record<DocStatus, string> = {
+  current:  'עדכני',
+  draft:    'טיוטה',
+  outdated: 'ישן',
 }
 
 const DOC_STATUS_STYLE: Record<DocStatus, string> = {
@@ -74,17 +80,17 @@ export function KnowledgeDetailPage({ itemId }: { itemId: string }) {
   }
 
   if (isLoading && items.length === 0) {
-    return <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">Loading...</div>
+    return <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">טוען...</div>
   }
 
   if (!item) {
     return (
       <div className="flex flex-col overflow-hidden">
-        <TopBar title="Item not found" />
+        <TopBar title="פריט לא נמצא" />
         <div className="flex flex-1 flex-col items-center justify-center gap-4 p-8">
-          <p className="text-sm text-muted-foreground">This knowledge item does not exist.</p>
+          <p className="text-sm text-muted-foreground">פריט הידע הזה אינו קיים.</p>
           <Link href="/knowledge" className={buttonVariants({ variant: 'outline', size: 'sm' })}>
-            <ArrowLeft className="mr-1.5 h-3.5 w-3.5" /> Back
+            <ArrowLeft className="me-1.5 h-3.5 w-3.5" /> חזרה לידע
           </Link>
         </div>
       </div>
@@ -100,7 +106,7 @@ export function KnowledgeDetailPage({ itemId }: { itemId: string }) {
           title={
             <span className="flex items-center gap-1.5 text-sm">
               <Link href="/knowledge" className="font-normal text-muted-foreground hover:text-foreground transition-colors">
-                Knowledge
+                ידע
               </Link>
               <span className="text-muted-foreground/50 select-none">/</span>
               <span className="font-semibold text-foreground">{item.title}</span>
@@ -108,19 +114,19 @@ export function KnowledgeDetailPage({ itemId }: { itemId: string }) {
           }
           actions={
             <div className="flex items-center gap-2">
-              <Link href={`/knowledge/${item.id}/edit`} className={buttonVariants({ variant: 'outline', size: 'sm' })}>Edit</Link>
+              <Link href={`/knowledge/${item.id}/edit`} className={buttonVariants({ variant: 'outline', size: 'sm' })}>ערוך</Link>
               <DropdownMenu>
                 <DropdownMenuTrigger className={cn(buttonVariants({ variant: 'ghost', size: 'icon' }), 'h-8 w-8')}>
                   <MoreHorizontal className="h-4 w-4" />
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                   <DropdownMenuItem onClick={() => setDeleteOpen(true)} className="text-destructive focus:text-destructive">
-                    <Trash2 className="mr-2 h-4 w-4" /> Delete
+                    <Trash2 className="me-2 h-4 w-4" /> מחק
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
               <Link href="/knowledge" className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
-                <ArrowLeft className="mr-1.5 h-3.5 w-3.5" /> Knowledge
+                <ArrowLeft className="me-1.5 h-3.5 w-3.5" /> ידע
               </Link>
             </div>
           }
@@ -137,9 +143,9 @@ export function KnowledgeDetailPage({ itemId }: { itemId: string }) {
                 ) : (
                   <div className="rounded-lg border border-dashed border-border p-8 text-center">
                     <p className="text-sm text-muted-foreground">
-                      No content yet.{' '}
+                      אין תוכן עדיין.{' '}
                       <Link href={`/knowledge/${item.id}/edit`} className="text-primary hover:underline">
-                        Add content →
+                        הוסף תוכן
                       </Link>
                     </p>
                   </div>
@@ -148,14 +154,14 @@ export function KnowledgeDetailPage({ itemId }: { itemId: string }) {
 
               <div className="lg:col-span-1">
                 <div className="rounded-lg border border-border bg-card p-4">
-                  <MetaRow label="Type">
+                  <MetaRow label="סוג">
                     <span className={cn('inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium', cfg.color)}>
                       {cfg.label}
                     </span>
                   </MetaRow>
 
                   {item.doc_role && (
-                    <MetaRow label="Doc Role">
+                    <MetaRow label="תפקיד">
                       <span className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
                         {DOC_ROLE_LABELS[item.doc_role]}
                       </span>
@@ -163,32 +169,32 @@ export function KnowledgeDetailPage({ itemId }: { itemId: string }) {
                   )}
 
                   {item.doc_status && (
-                    <MetaRow label="Doc Status">
+                    <MetaRow label="סטטוס">
                       <span className={cn(
                         'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium',
                         DOC_STATUS_STYLE[item.doc_status],
                       )}>
-                        {item.doc_status.charAt(0).toUpperCase() + item.doc_status.slice(1)}
+                        {DOC_STATUS_LABEL[item.doc_status]}
                       </span>
                     </MetaRow>
                   )}
 
                   {item.source_url && (
-                    <MetaRow label="Source">
+                    <MetaRow label="מקור">
                       <a
                         href={item.source_url}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="flex items-center gap-1 text-sm text-primary hover:underline"
                       >
-                        Open source <ExternalLink className="h-3 w-3" />
+                        פתח מקור <ExternalLink className="h-3 w-3" />
                       </a>
                     </MetaRow>
                   )}
-                  <MetaRow label="Created">
+                  <MetaRow label="נוצר">
                     <span className="text-sm">{format(new Date(item.created_at), 'MMM d, yyyy')}</span>
                   </MetaRow>
-                  <MetaRow label="Updated">
+                  <MetaRow label="עודכן">
                     <span className="text-sm">{format(new Date(item.updated_at), 'MMM d, yyyy')}</span>
                   </MetaRow>
                 </div>
@@ -200,12 +206,12 @@ export function KnowledgeDetailPage({ itemId }: { itemId: string }) {
 
       <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Delete knowledge item?</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>מחק פריט ידע?</DialogTitle></DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteOpen(false)} disabled={deleting}>Cancel</Button>
+            <Button variant="outline" onClick={() => setDeleteOpen(false)} disabled={deleting}>ביטול</Button>
             <Button variant="destructive" onClick={handleDelete} disabled={deleting}>
-              {deleting && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
-              Delete
+              {deleting && <Loader2 className="me-1.5 h-3.5 w-3.5 animate-spin" />}
+              מחק
             </Button>
           </DialogFooter>
         </DialogContent>

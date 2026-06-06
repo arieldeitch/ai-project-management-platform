@@ -13,11 +13,11 @@ import { cn } from '@/lib/utils'
 import type { SearchResultType } from '@/store/search.store'
 
 const TYPE_CONFIG: Record<SearchResultType, { label: string; icon: React.ElementType; color: string }> = {
-  project:   { label: 'Project',   icon: FolderKanban, color: 'text-blue-500' },
-  task:      { label: 'Task',      icon: CheckSquare,  color: 'text-emerald-500' },
-  asset:     { label: 'Asset',     icon: Bot,          color: 'text-violet-500' },
-  decision:  { label: 'Decision',  icon: BookOpen,     color: 'text-amber-500' },
-  knowledge: { label: 'Knowledge', icon: FileText,     color: 'text-zinc-500' },
+  project:   { label: 'פרויקט', icon: FolderKanban, color: 'text-blue-500' },
+  task:      { label: 'משימה',  icon: CheckSquare,  color: 'text-emerald-500' },
+  asset:     { label: 'נכס',    icon: Bot,          color: 'text-violet-500' },
+  decision:  { label: 'החלטה',  icon: BookOpen,     color: 'text-amber-500' },
+  knowledge: { label: 'ידע',    icon: FileText,     color: 'text-zinc-500' },
 }
 
 export function CommandPalette() {
@@ -86,7 +86,7 @@ export function CommandPalette() {
             ref={inputRef}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search projects, tasks, assets, decisions, knowledge..."
+            placeholder="חיפוש פרויקטים, משימות, נכסים, החלטות, ידע..."
             className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none"
           />
           {query && (
@@ -103,21 +103,21 @@ export function CommandPalette() {
         <div className="max-h-[60vh] overflow-y-auto py-2">
           {query && results.length === 0 && (
             <p className="px-4 py-6 text-center text-sm text-muted-foreground">
-              No results for &ldquo;{query}&rdquo;
+              אין תוצאות עבור &ldquo;{query}&rdquo;
             </p>
           )}
 
           {!query && (
             <div className="space-y-1 px-2 py-2">
               <p className="px-2 pb-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                Quick navigation
+                ניווט מהיר
               </p>
               {[
-                { label: 'Projects',  href: '/projects',  icon: FolderKanban },
-                { label: 'Tasks',     href: '/tasks',     icon: CheckSquare },
-                { label: 'AI Assets', href: '/assets',    icon: Bot },
-                { label: 'Decisions', href: '/decisions', icon: BookOpen },
-                { label: 'Knowledge', href: '/knowledge', icon: FileText },
+                { label: 'פרויקטים', href: '/projects',  icon: FolderKanban },
+                { label: 'משימות',   href: '/tasks',     icon: CheckSquare },
+                { label: 'נכסי AI',  href: '/assets',    icon: Bot },
+                { label: 'החלטות',   href: '/decisions', icon: BookOpen },
+                { label: 'ידע',      href: '/knowledge', icon: FileText },
               ].map((item) => (
                 <button
                   key={item.href}
@@ -140,7 +140,7 @@ export function CommandPalette() {
                   <button
                     key={`${result.type}-${result.id}`}
                     onClick={() => navigate(result.href)}
-                    className="flex w-full items-start gap-3 rounded-md px-3 py-2.5 text-left transition-colors hover:bg-muted"
+                    className="flex w-full items-start gap-3 rounded-md px-3 py-2.5 text-start transition-colors hover:bg-muted"
                   >
                     <Icon className={cn('mt-0.5 h-4 w-4 shrink-0', cfg.color)} />
                     <div className="min-w-0 flex-1">

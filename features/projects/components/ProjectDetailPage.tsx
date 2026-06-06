@@ -55,54 +55,60 @@ import type {
 /* ── constants ─────────────────────────────────────────────── */
 
 const STATUS_OPTIONS: { value: ProjectStatus; label: string }[] = [
-  { value: 'idea',      label: 'Idea' },
-  { value: 'scoped',    label: 'Scoped' },
-  { value: 'active',    label: 'Active' },
-  { value: 'blocked',   label: 'Blocked' },
-  { value: 'completed', label: 'Completed' },
-  { value: 'deferred',  label: 'Deferred' },
-  { value: 'archived',  label: 'Archived' },
+  { value: 'idea',      label: 'רעיון' },
+  { value: 'scoped',    label: 'באפיון' },
+  { value: 'active',    label: 'פעיל' },
+  { value: 'blocked',   label: 'חסום' },
+  { value: 'completed', label: 'הושלם' },
+  { value: 'deferred',  label: 'נדחה' },
+  { value: 'archived',  label: 'בארכיון' },
 ]
 
 const PRIORITY_OPTIONS: { value: ProjectPriority; label: string }[] = [
-  { value: 'critical', label: 'Critical' },
-  { value: 'high',     label: 'High' },
-  { value: 'medium',   label: 'Medium' },
-  { value: 'low',      label: 'Low' },
-  { value: 'unset',    label: 'No priority' },
+  { value: 'critical', label: 'קריטי' },
+  { value: 'high',     label: 'גבוה' },
+  { value: 'medium',   label: 'בינוני' },
+  { value: 'low',      label: 'נמוך' },
+  { value: 'unset',    label: 'ללא עדיפות' },
 ]
 
 const DOMAIN_OPTIONS: { value: ProjectDomain; label: string }[] = [
-  { value: 'personal', label: 'Personal' },
-  { value: 'work',     label: 'Work' },
-  { value: 'general',  label: 'General' },
+  { value: 'personal', label: 'אישי' },
+  { value: 'work',     label: 'עבודה' },
+  { value: 'general',  label: 'כללי' },
 ]
 
 const PROJECT_TYPE_OPTIONS: { value: ProjectType; label: string }[] = [
-  { value: 'software',       label: 'Software' },
-  { value: 'ai_agent',       label: 'AI Agent' },
-  { value: 'automation',     label: 'Automation' },
-  { value: 'operations',     label: 'Operations' },
-  { value: 'research',       label: 'Research' },
-  { value: 'personal',       label: 'Personal' },
-  { value: 'infrastructure', label: 'Infrastructure' },
+  { value: 'software',       label: 'תוכנה' },
+  { value: 'ai_agent',       label: 'סוכן AI' },
+  { value: 'automation',     label: 'אוטומציה' },
+  { value: 'operations',     label: 'תפעול' },
+  { value: 'research',       label: 'מחקר' },
+  { value: 'personal',       label: 'אישי' },
+  { value: 'infrastructure', label: 'תשתיות' },
 ]
 
 const DOC_ROLE_CONFIG: { role: DocRole; label: string; critical: boolean }[] = [
-  { role: 'handoff_document',         label: 'Handoff Document',       critical: true },
-  { role: 'implementation_blueprint', label: 'Implementation Blueprint', critical: true },
-  { role: 'ux_notes',                 label: 'UX Notes',               critical: false },
-  { role: 'decisions_log',            label: 'Decisions Log',          critical: false },
-  { role: 'execution_board',          label: 'Execution Board',        critical: false },
-  { role: 'release_notes',            label: 'Release Notes',          critical: false },
-  { role: 'deployment_report',        label: 'Deployment Report',      critical: false },
-  { role: 'recovery_report',          label: 'Recovery Report',        critical: false },
+  { role: 'handoff_document',         label: 'מסמך מסירה',    critical: true },
+  { role: 'implementation_blueprint', label: 'תכנית מימוש',   critical: true },
+  { role: 'ux_notes',                 label: 'הערות UX',      critical: false },
+  { role: 'decisions_log',            label: 'יומן החלטות',   critical: false },
+  { role: 'execution_board',          label: 'לוח ביצוע',     critical: false },
+  { role: 'release_notes',            label: 'הערות גרסה',    critical: false },
+  { role: 'deployment_report',        label: 'דו"ח פריסה',    critical: false },
+  { role: 'recovery_report',          label: 'דו"ח שחזור',    critical: false },
 ]
 
 const DOC_STATUS_STYLE: Record<DocStatus, string> = {
   current:  'bg-emerald-50 text-emerald-700',
   draft:    'bg-amber-50 text-amber-700',
   outdated: 'bg-red-50 text-red-700',
+}
+
+const DOC_STATUS_LABEL: Record<DocStatus, string> = {
+  current:  'עדכני',
+  draft:    'טיוטה',
+  outdated: 'ישן',
 }
 
 /* ── inline editable field ─────────────────────────────────── */
@@ -157,7 +163,7 @@ function InlineText({
         }
         <div className="flex gap-1.5">
           <Button size="sm" onClick={commit} className="h-6 px-2 text-xs">
-            <Check className="mr-1 h-3 w-3" /> Save
+            <Check className="me-1 h-3 w-3" /> שמור
           </Button>
           <Button size="sm" variant="ghost" onClick={cancel} className="h-6 px-2 text-xs">
             <X className="h-3 w-3" />
@@ -171,7 +177,7 @@ function InlineText({
     <button
       onClick={() => { setDraft(value); setEditing(true) }}
       className={cn(
-        'group flex w-full items-baseline gap-1.5 rounded px-1 py-0.5 text-left text-sm transition-colors hover:bg-muted/60',
+        'group flex w-full items-baseline gap-1.5 rounded px-1 py-0.5 text-start text-sm transition-colors hover:bg-muted/60',
         !value && 'text-muted-foreground italic',
         className
       )}
@@ -184,7 +190,7 @@ function InlineText({
   )
 }
 
-/* ── InlineUrl: editable text + external link icon when set ─── */
+/* ── InlineUrl ─────────────────────────────────────────────── */
 
 function InlineUrl({
   value,
@@ -206,7 +212,7 @@ function InlineUrl({
           target="_blank"
           rel="noopener noreferrer"
           className="shrink-0 rounded p-0.5 text-muted-foreground hover:text-primary transition-colors"
-          title="Open in browser"
+          title="פתח בדפדפן"
         >
           <ExternalLink className="h-3 w-3" />
         </a>
@@ -228,7 +234,7 @@ function MetaRow({ label, children }: { label: string; children: React.ReactNode
   )
 }
 
-/* ── ExecRow: compact label + value for execution context ────── */
+/* ── ExecRow ───────────────────────────────────────────────── */
 
 function ExecRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -266,7 +272,6 @@ export function ProjectDetailPage({ projectId }: ProjectDetailPageProps) {
 
   const project = projects.find((p) => p.id === projectId)
 
-  /* open exec context panel when project has data */
   useEffect(() => {
     if (project) {
       const hasData = !!(
@@ -341,18 +346,18 @@ export function ProjectDetailPage({ projectId }: ProjectDetailPageProps) {
   /* ── render ───────────────────────────────────────────────── */
 
   if (isLoading && projects.length === 0) {
-    return <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">Loading...</div>
+    return <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">טוען...</div>
   }
 
   if (!project) {
     return (
       <div className="flex flex-col overflow-hidden">
-        <TopBar title="Project not found" />
+        <TopBar title="פרויקט לא נמצא" />
         <div className="flex flex-1 flex-col items-center justify-center gap-4 p-8">
-          <p className="text-sm text-muted-foreground">This project does not exist.</p>
+          <p className="text-sm text-muted-foreground">פרויקט זה אינו קיים.</p>
           <Link href="/projects" className={buttonVariants({ variant: 'outline', size: 'sm' })}>
-            <ArrowLeft className="mr-1.5 h-3.5 w-3.5" />
-            Back to Projects
+            <ArrowLeft className="me-1.5 h-3.5 w-3.5" />
+            חזרה לפרויקטים
           </Link>
         </div>
       </div>
@@ -360,18 +365,17 @@ export function ProjectDetailPage({ projectId }: ProjectDetailPageProps) {
   }
 
   const TABS = [
-    { id: 'overview',  label: 'Overview' },
-    { id: 'tasks',     label: `Tasks${projectTasks.length > 0 ? ` (${projectTasks.length})` : ''}` },
-    { id: 'assets',    label: `AI Assets${projectAssets.length > 0 ? ` (${projectAssets.length})` : ''}` },
-    { id: 'decisions', label: `Decisions${projectDecisions.length > 0 ? ` (${projectDecisions.length})` : ''}` },
-    { id: 'knowledge', label: `Knowledge${projectKnowledge.length > 0 ? ` (${projectKnowledge.length})` : ''}` },
+    { id: 'overview',  label: 'סקירה' },
+    { id: 'tasks',     label: `משימות${projectTasks.length > 0 ? ` (${projectTasks.length})` : ''}` },
+    { id: 'assets',    label: `נכסי AI${projectAssets.length > 0 ? ` (${projectAssets.length})` : ''}` },
+    { id: 'decisions', label: `החלטות${projectDecisions.length > 0 ? ` (${projectDecisions.length})` : ''}` },
+    { id: 'knowledge', label: `ידע${projectKnowledge.length > 0 ? ` (${projectKnowledge.length})` : ''}` },
   ]
 
   const openTasks    = projectTasks.filter((t) => t.status !== 'done')
   const blockedTasks = projectTasks.filter((t) => t.status === 'blocked')
   const doneTasks    = projectTasks.filter((t) => t.status === 'done')
 
-  /* ── execution context filled check ─────────────────────── */
   const hasExecData = !!(
     project.assigned_gpt || project.primary_workspace || project.repository_url ||
     project.github_project_name || project.local_folder_path || project.production_url ||
@@ -385,7 +389,7 @@ export function ProjectDetailPage({ projectId }: ProjectDetailPageProps) {
           title={
             <span className="flex items-center gap-1.5 text-sm">
               <Link href="/projects" className="font-normal text-muted-foreground hover:text-foreground transition-colors">
-                Projects
+                פרויקטים
               </Link>
               <span className="text-muted-foreground/50 select-none">/</span>
               <span className="font-semibold text-foreground">{project.name}</span>
@@ -397,35 +401,35 @@ export function ProjectDetailPage({ projectId }: ProjectDetailPageProps) {
                 href={`/projects/${project.id}/edit`}
                 className={buttonVariants({ variant: 'outline', size: 'sm' })}
               >
-                Edit all fields
+                ערוך הכל
               </Link>
 
               <DropdownMenu>
                 <DropdownMenuTrigger
                   className={cn(buttonVariants({ variant: 'ghost', size: 'icon' }), 'h-8 w-8')}
-                  aria-label="More options"
+                  aria-label="אפשרויות נוספות"
                 >
                   <MoreHorizontal className="h-4 w-4" />
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                   <DropdownMenuItem onClick={handleArchive} disabled={project.status === 'archived'}>
-                    <Archive className="mr-2 h-4 w-4" />
-                    Archive
+                    <Archive className="me-2 h-4 w-4" />
+                    ארכיון
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
                     onClick={() => setDeleteOpen(true)}
                     className="text-destructive focus:text-destructive"
                   >
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    Delete
+                    <Trash2 className="me-2 h-4 w-4" />
+                    מחק
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
 
               <Link href="/projects" className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
-                <ArrowLeft className="mr-1.5 h-3.5 w-3.5" />
-                Projects
+                <ArrowLeft className="me-1.5 h-3.5 w-3.5" />
+                פרויקטים
               </Link>
             </div>
           }
@@ -461,10 +465,10 @@ export function ProjectDetailPage({ projectId }: ProjectDetailPageProps) {
                   <div className="flex items-start gap-3 rounded-lg border border-red-200 bg-red-50/50 p-4 dark:border-red-900/30 dark:bg-red-950/20">
                     <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-red-500" />
                     <div className="flex-1">
-                      <p className="text-sm font-semibold text-red-700 dark:text-red-400">Blocked</p>
+                      <p className="text-sm font-semibold text-red-700 dark:text-red-400">חסום</p>
                       <InlineText
                         value={project.blocked_reason ?? ''}
-                        placeholder="Click to add blocker reason..."
+                        placeholder="לחץ להוספת סיבת חסימה..."
                         onSave={(v) => handleFieldSave('blocked_reason', v)}
                         className="text-red-600/80 dark:text-red-400/80"
                       />
@@ -478,11 +482,11 @@ export function ProjectDetailPage({ projectId }: ProjectDetailPageProps) {
                     <section>
                       <div className="flex items-center gap-2 mb-2">
                         <Target className="h-4 w-4 text-primary" />
-                        <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Goal</h2>
+                        <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">מטרה</h2>
                       </div>
                       <InlineText
                         value={project.goal ?? ''}
-                        placeholder="Click to add a goal or objective..."
+                        placeholder="לחץ להוספת מטרה או יעד..."
                         onSave={(v) => handleFieldSave('goal', v)}
                         className="font-medium text-foreground"
                       />
@@ -491,11 +495,11 @@ export function ProjectDetailPage({ projectId }: ProjectDetailPageProps) {
                     {/* Next action */}
                     <section>
                       <h2 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                        Next Action
+                        פעולה הבאה
                       </h2>
                       <InlineText
                         value={project.next_action ?? ''}
-                        placeholder="Click to add the immediate next step..."
+                        placeholder="לחץ להוספת הצעד הבא המיידי..."
                         onSave={(v) => handleFieldSave('next_action', v)}
                       />
                     </section>
@@ -503,11 +507,11 @@ export function ProjectDetailPage({ projectId }: ProjectDetailPageProps) {
                     {/* Description */}
                     <section>
                       <h2 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                        Description
+                        תיאור
                       </h2>
                       <InlineText
                         value={project.description ?? ''}
-                        placeholder="Click to add a description..."
+                        placeholder="לחץ להוספת תיאור..."
                         onSave={(v) => handleFieldSave('description', v)}
                         multiline
                       />
@@ -520,16 +524,16 @@ export function ProjectDetailPage({ projectId }: ProjectDetailPageProps) {
                     <div className="flex items-center justify-between">
                       <div className="flex gap-4 text-sm text-muted-foreground">
                         {blockedTasks.length > 0 && (
-                          <span className="text-red-500">{blockedTasks.length} blocked</span>
+                          <span className="text-red-500">{blockedTasks.length} חסומות</span>
                         )}
-                        <span>{openTasks.length} open</span>
+                        <span>{openTasks.length} פתוחות</span>
                         {doneTasks.length > 0 && (
-                          <span className="text-muted-foreground">{doneTasks.length} done</span>
+                          <span className="text-muted-foreground">{doneTasks.length} הושלמו</span>
                         )}
                       </div>
                       <Button size="sm" variant="outline" onClick={() => setShowTaskForm(true)}>
-                        <Plus className="mr-1.5 h-3.5 w-3.5" />
-                        Add Task
+                        <Plus className="me-1.5 h-3.5 w-3.5" />
+                        הוסף משימה
                       </Button>
                     </div>
 
@@ -544,15 +548,15 @@ export function ProjectDetailPage({ projectId }: ProjectDetailPageProps) {
 
                     {projectTasks.length === 0 && !showTaskForm ? (
                       <div className="rounded-lg border border-dashed border-border p-8 text-center">
-                        <p className="text-sm text-muted-foreground">No tasks yet.</p>
+                        <p className="text-sm text-muted-foreground">אין משימות עדיין.</p>
                         <Button
                           size="sm"
                           variant="outline"
                           className="mt-3"
                           onClick={() => setShowTaskForm(true)}
                         >
-                          <Plus className="mr-1.5 h-3.5 w-3.5" />
-                          Add first task
+                          <Plus className="me-1.5 h-3.5 w-3.5" />
+                          הוסף משימה ראשונה
                         </Button>
                       </div>
                     ) : (
@@ -569,22 +573,22 @@ export function ProjectDetailPage({ projectId }: ProjectDetailPageProps) {
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-muted-foreground">
-                        {projectAssets.length} linked asset{projectAssets.length !== 1 ? 's' : ''}
+                        {projectAssets.length} נכסים מקושרים
                       </span>
                       <Link
                         href="/assets/new"
                         className={buttonVariants({ variant: 'outline', size: 'sm' })}
                       >
-                        <Plus className="mr-1.5 h-3.5 w-3.5" />
-                        New asset
+                        <Plus className="me-1.5 h-3.5 w-3.5" />
+                        נכס חדש
                       </Link>
                     </div>
                     {projectAssets.length === 0 ? (
                       <div className="rounded-lg border border-dashed border-border p-8 text-center">
                         <Bot className="mx-auto mb-2 h-6 w-6 text-muted-foreground" />
-                        <p className="text-sm text-muted-foreground">No assets linked yet.</p>
+                        <p className="text-sm text-muted-foreground">אין נכסים מקושרים עדיין.</p>
                         <p className="mt-1 text-xs text-muted-foreground">
-                          Create an asset, then link it to this project from the asset detail page.
+                          צור נכס ולאחר מכן קשר אותו לפרויקט זה מדף פרטי הנכס.
                         </p>
                       </div>
                     ) : (
@@ -626,22 +630,22 @@ export function ProjectDetailPage({ projectId }: ProjectDetailPageProps) {
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-muted-foreground">
-                        {projectDecisions.length} decision{projectDecisions.length !== 1 ? 's' : ''}
+                        {projectDecisions.length} החלטות
                       </span>
                       <Link
                         href={`/decisions/new?project=${projectId}`}
                         className={buttonVariants({ variant: 'outline', size: 'sm' })}
                       >
-                        <Plus className="mr-1.5 h-3.5 w-3.5" />
-                        Log decision
+                        <Plus className="me-1.5 h-3.5 w-3.5" />
+                        תעד החלטה
                       </Link>
                     </div>
                     {projectDecisions.length === 0 ? (
                       <div className="rounded-lg border border-dashed border-border p-8 text-center">
                         <BookOpen className="mx-auto mb-2 h-6 w-6 text-muted-foreground" />
-                        <p className="text-sm text-muted-foreground">No decisions logged yet.</p>
+                        <p className="text-sm text-muted-foreground">אין החלטות רשומות עדיין.</p>
                         <p className="mt-1 text-xs text-muted-foreground">
-                          Log key decisions to maintain a record of what was chosen and why.
+                          תעד החלטות מפתח לשמירת רשומה של מה שנבחר ומדוע.
                         </p>
                       </div>
                     ) : (
@@ -680,7 +684,7 @@ export function ProjectDetailPage({ projectId }: ProjectDetailPageProps) {
                     {/* Documentation Health checklist */}
                     <div className="rounded-lg border border-border bg-card p-4">
                       <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                        Documentation Health
+                        בריאות התיעוד
                       </h3>
                       <div className="space-y-1">
                         {DOC_ROLE_CONFIG.map(({ role, label, critical }) => {
@@ -691,7 +695,7 @@ export function ProjectDetailPage({ projectId }: ProjectDetailPageProps) {
                             <div key={role} className="flex items-center justify-between gap-2 py-1">
                               <div className="flex items-center gap-1.5 min-w-0">
                                 {critical && (
-                                  <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" title="Critical" />
+                                  <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" title="קריטי" />
                                 )}
                                 <span className={cn(
                                   'text-xs truncate',
@@ -706,7 +710,7 @@ export function ProjectDetailPage({ projectId }: ProjectDetailPageProps) {
                                   href={`/knowledge/new?project=${projectId}&doc_role=${role}`}
                                   className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground hover:text-primary hover:bg-muted/60 transition-colors"
                                 >
-                                  + Add
+                                  + הוסף
                                 </Link>
                               ) : (
                                 <Link
@@ -716,7 +720,7 @@ export function ProjectDetailPage({ projectId }: ProjectDetailPageProps) {
                                     status ? DOC_STATUS_STYLE[status] : 'bg-muted text-muted-foreground',
                                   )}
                                 >
-                                  {status ?? 'unset'}
+                                  {status ? DOC_STATUS_LABEL[status] : 'לא מוגדר'}
                                 </Link>
                               )}
                             </div>
@@ -728,22 +732,22 @@ export function ProjectDetailPage({ projectId }: ProjectDetailPageProps) {
                     {/* Knowledge items list */}
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-muted-foreground">
-                        {projectKnowledge.length} item{projectKnowledge.length !== 1 ? 's' : ''}
+                        {projectKnowledge.length} פריטים
                       </span>
                       <Link
                         href={`/knowledge/new?project=${projectId}`}
                         className={buttonVariants({ variant: 'outline', size: 'sm' })}
                       >
-                        <Plus className="mr-1.5 h-3.5 w-3.5" />
-                        Add knowledge
+                        <Plus className="me-1.5 h-3.5 w-3.5" />
+                        הוסף ידע
                       </Link>
                     </div>
                     {projectKnowledge.length === 0 ? (
                       <div className="rounded-lg border border-dashed border-border p-8 text-center">
                         <FileText className="mx-auto mb-2 h-6 w-6 text-muted-foreground" />
-                        <p className="text-sm text-muted-foreground">No knowledge items yet.</p>
+                        <p className="text-sm text-muted-foreground">אין פריטי ידע עדיין.</p>
                         <p className="mt-1 text-xs text-muted-foreground">
-                          Capture notes, learnings, references, and processes related to this project.
+                          תעד הערות, תובנות, הפניות ותהליכים הקשורים לפרויקט זה.
                         </p>
                       </div>
                     ) : (
@@ -772,7 +776,7 @@ export function ProjectDetailPage({ projectId }: ProjectDetailPageProps) {
                                   'text-[10px] px-1.5 py-0.5 rounded font-medium',
                                   DOC_STATUS_STYLE[item.doc_status],
                                 )}>
-                                  {item.doc_status}
+                                  {DOC_STATUS_LABEL[item.doc_status]}
                                 </span>
                               )}
                               <span className="text-xs text-muted-foreground capitalize">
@@ -794,7 +798,7 @@ export function ProjectDetailPage({ projectId }: ProjectDetailPageProps) {
                 {/* Main meta card */}
                 <div className="rounded-lg border border-border bg-card p-4">
                   {/* Status */}
-                  <MetaRow label="Status">
+                  <MetaRow label="סטטוס">
                     {statusChanging ? (
                       <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                     ) : (
@@ -802,7 +806,7 @@ export function ProjectDetailPage({ projectId }: ProjectDetailPageProps) {
                         value={project.status}
                         onValueChange={(v) => v && handleStatusChange(v as ProjectStatus)}
                       >
-                        <SelectTrigger className="h-auto border-0 bg-transparent p-0 shadow-none focus:ring-0 [&_svg]:ml-1">
+                        <SelectTrigger className="h-auto border-0 bg-transparent p-0 shadow-none focus:ring-0 [&_svg]:ms-1">
                           <StatusBadge status={project.status} />
                         </SelectTrigger>
                         <SelectContent>
@@ -815,12 +819,12 @@ export function ProjectDetailPage({ projectId }: ProjectDetailPageProps) {
                   </MetaRow>
 
                   {/* Priority */}
-                  <MetaRow label="Priority">
+                  <MetaRow label="עדיפות">
                     <Select
                       value={project.priority}
                       onValueChange={(v) => v && handleFieldSave('priority', v as ProjectPriority)}
                     >
-                      <SelectTrigger className="h-auto border-0 bg-transparent p-0 shadow-none focus:ring-0 [&_svg]:ml-1">
+                      <SelectTrigger className="h-auto border-0 bg-transparent p-0 shadow-none focus:ring-0 [&_svg]:ms-1">
                         <PriorityBadge priority={project.priority} />
                       </SelectTrigger>
                       <SelectContent>
@@ -832,22 +836,22 @@ export function ProjectDetailPage({ projectId }: ProjectDetailPageProps) {
                   </MetaRow>
 
                   {/* Type */}
-                  <MetaRow label="Type">
+                  <MetaRow label="סוג">
                     <Select
                       value={project.project_type ?? ''}
                       onValueChange={(v) => handleProjectType(v ?? '')}
                     >
-                      <SelectTrigger className="h-auto border-0 bg-transparent p-0 shadow-none focus:ring-0 [&_svg]:ml-1">
+                      <SelectTrigger className="h-auto border-0 bg-transparent p-0 shadow-none focus:ring-0 [&_svg]:ms-1">
                         {project.project_type ? (
                           <span className="text-sm capitalize">
                             {PROJECT_TYPE_OPTIONS.find((o) => o.value === project.project_type)?.label ?? project.project_type}
                           </span>
                         ) : (
-                          <span className="text-xs text-muted-foreground italic">None</span>
+                          <span className="text-xs text-muted-foreground italic">ללא</span>
                         )}
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">No type</SelectItem>
+                        <SelectItem value="">ללא סוג</SelectItem>
                         {PROJECT_TYPE_OPTIONS.map((opt) => (
                           <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
                         ))}
@@ -856,41 +860,41 @@ export function ProjectDetailPage({ projectId }: ProjectDetailPageProps) {
                   </MetaRow>
 
                   {/* Domain */}
-                  <MetaRow label="Domain">
+                  <MetaRow label="תחום">
                     <Select
                       value={project.domain ?? ''}
                       onValueChange={(v) => handleFieldSave('domain', v as ProjectDomain)}
                     >
-                      <SelectTrigger className="h-auto border-0 bg-transparent p-0 shadow-none focus:ring-0 [&_svg]:ml-1">
+                      <SelectTrigger className="h-auto border-0 bg-transparent p-0 shadow-none focus:ring-0 [&_svg]:ms-1">
                         {project.domain
                           ? <DomainBadge domain={project.domain} />
-                          : <span className="text-xs text-muted-foreground italic">None</span>
+                          : <span className="text-xs text-muted-foreground italic">ללא</span>
                         }
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="personal">Personal</SelectItem>
-                        <SelectItem value="work">Work</SelectItem>
-                        <SelectItem value="general">General</SelectItem>
+                        {DOMAIN_OPTIONS.map((opt) => (
+                          <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </MetaRow>
 
                   {/* Current Phase */}
-                  <MetaRow label="Phase">
+                  <MetaRow label="שלב">
                     <InlineText
                       value={project.current_phase ?? ''}
-                      placeholder="Add phase..."
+                      placeholder="הוסף שלב..."
                       onSave={(v) => handleFieldSave('current_phase', v)}
                     />
                   </MetaRow>
 
-                  <MetaRow label="Created">
+                  <MetaRow label="נוצר">
                     <span className="text-sm text-foreground">
                       {format(new Date(project.created_at), 'MMM d, yyyy')}
                     </span>
                   </MetaRow>
 
-                  <MetaRow label="Updated">
+                  <MetaRow label="עודכן">
                     <span className="text-sm text-foreground">
                       {format(new Date(project.updated_at), 'MMM d, yyyy')}
                     </span>
@@ -901,10 +905,10 @@ export function ProjectDetailPage({ projectId }: ProjectDetailPageProps) {
                 <div className="rounded-lg border border-border bg-card">
                   <button
                     onClick={() => setExecContextOpen(!execContextOpen)}
-                    className="flex w-full items-center justify-between px-4 py-3 text-left"
+                    className="flex w-full items-center justify-between px-4 py-3 text-start"
                   >
                     <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                      Execution Context
+                      הקשר ביצוע
                     </span>
                     <div className="flex items-center gap-1.5">
                       {!execContextOpen && hasExecData && (
@@ -913,7 +917,7 @@ export function ProjectDetailPage({ projectId }: ProjectDetailPageProps) {
                             project.assigned_gpt, project.primary_workspace, project.repository_url,
                             project.local_folder_path, project.production_url, project.lovable_url,
                             project.vercel_url, project.current_execution_path,
-                          ].filter(Boolean).length} fields
+                          ].filter(Boolean).length} שדות
                         </span>
                       )}
                       {execContextOpen
@@ -928,18 +932,18 @@ export function ProjectDetailPage({ projectId }: ProjectDetailPageProps) {
                       <ExecRow label="GPT">
                         <InlineText
                           value={project.assigned_gpt ?? ''}
-                          placeholder="AI assistant..."
+                          placeholder="עוזר AI..."
                           onSave={(v) => handleFieldSave('assigned_gpt', v)}
                         />
                       </ExecRow>
-                      <ExecRow label="Workspace">
+                      <ExecRow label="סביבה">
                         <InlineText
                           value={project.primary_workspace ?? ''}
-                          placeholder="IDE or tool..."
+                          placeholder="IDE או כלי..."
                           onSave={(v) => handleFieldSave('primary_workspace', v)}
                         />
                       </ExecRow>
-                      <ExecRow label="Repo URL">
+                      <ExecRow label="ריפו">
                         <InlineUrl
                           value={project.repository_url ?? ''}
                           placeholder="https://github.com/..."
@@ -953,14 +957,14 @@ export function ProjectDetailPage({ projectId }: ProjectDetailPageProps) {
                           onSave={(v) => handleFieldSave('github_project_name', v)}
                         />
                       </ExecRow>
-                      <ExecRow label="Local Dir">
+                      <ExecRow label="תיקיה">
                         <InlineText
                           value={project.local_folder_path ?? ''}
                           placeholder="C:/Users/..."
                           onSave={(v) => handleFieldSave('local_folder_path', v)}
                         />
                       </ExecRow>
-                      <ExecRow label="Production">
+                      <ExecRow label="ייצור">
                         <InlineUrl
                           value={project.production_url ?? ''}
                           placeholder="https://..."
@@ -981,10 +985,10 @@ export function ProjectDetailPage({ projectId }: ProjectDetailPageProps) {
                           onSave={(v) => handleFieldSave('vercel_url', v)}
                         />
                       </ExecRow>
-                      <ExecRow label="Exec Path">
+                      <ExecRow label="נתיב">
                         <InlineText
                           value={project.current_execution_path ?? ''}
-                          placeholder="Active session description..."
+                          placeholder="תיאור ישיבה פעילה..."
                           onSave={(v) => handleFieldSave('current_execution_path', v)}
                         />
                       </ExecRow>
@@ -1003,18 +1007,18 @@ export function ProjectDetailPage({ projectId }: ProjectDetailPageProps) {
       <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Delete project?</DialogTitle>
+            <DialogTitle>מחק פרויקט?</DialogTitle>
             <DialogDescription>
-              <strong>{project.name}</strong> will be permanently deleted. This cannot be undone.
+              <strong>{project.name}</strong> יימחק לצמיתות. לא ניתן לבטל פעולה זו.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDeleteOpen(false)} disabled={deleting}>
-              Cancel
+              ביטול
             </Button>
             <Button variant="destructive" onClick={handleDelete} disabled={deleting}>
-              {deleting && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
-              Delete
+              {deleting && <Loader2 className="me-1.5 h-3.5 w-3.5 animate-spin" />}
+              מחק
             </Button>
           </DialogFooter>
         </DialogContent>

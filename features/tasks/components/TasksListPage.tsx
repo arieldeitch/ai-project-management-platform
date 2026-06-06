@@ -15,10 +15,10 @@ import type { TaskStatus } from '@/types/entities'
 type ViewMode = 'all' | 'todo' | 'blocked' | 'done'
 
 const VIEW_OPTIONS: { value: ViewMode; label: string }[] = [
-  { value: 'all',     label: 'All' },
-  { value: 'todo',    label: 'Open' },
-  { value: 'blocked', label: 'Blocked' },
-  { value: 'done',    label: 'Done' },
+  { value: 'all',     label: 'הכל' },
+  { value: 'todo',    label: 'פתוח' },
+  { value: 'blocked', label: 'חסום' },
+  { value: 'done',    label: 'הושלם' },
 ]
 
 export function TasksListPage() {
@@ -41,7 +41,6 @@ export function TasksListPage() {
     return true
   })
 
-  /* Group open tasks by project */
   const projectGroups = new Map<string | null, typeof filtered>()
   filtered.forEach((t) => {
     const key = t.project_id
@@ -55,16 +54,16 @@ export function TasksListPage() {
   return (
     <div className="flex flex-col overflow-hidden">
       <TopBar
-        title="Tasks"
+        title="משימות"
         actions={
           <Button size="sm" onClick={() => setShowForm(true)}>
-            <Plus className="mr-1.5 h-3.5 w-3.5" />
-            New Task
+            <Plus className="me-1.5 h-3.5 w-3.5" />
+            משימה חדשה
           </Button>
         }
       />
 
-      {/* View filter — underline style, consistent with Dashboard and Projects List */}
+      {/* View filter */}
       <div className="flex items-stretch border-b border-border bg-background px-6">
         {VIEW_OPTIONS.map((opt) => {
           const count =
@@ -101,7 +100,6 @@ export function TasksListPage() {
       <div className="flex-1 overflow-y-auto">
         <div className="mx-auto max-w-5xl px-6 py-4 space-y-4">
 
-          {/* Inline new task form */}
           {showForm && (
             <div className="rounded-lg border border-border bg-card p-4">
               <TaskForm onClose={() => setShowForm(false)} />
@@ -109,17 +107,17 @@ export function TasksListPage() {
           )}
 
           {isLoading ? (
-            <div className="flex items-center justify-center py-16 text-sm text-muted-foreground">Loading...</div>
+            <div className="flex items-center justify-center py-16 text-sm text-muted-foreground">טוען...</div>
           ) : filtered.length === 0 ? (
             <EmptyState
               icon={<CheckSquare className="h-12 w-12" />}
-              title={view === 'done' ? 'No completed tasks' : 'No tasks here'}
-              description={view === 'todo' ? 'Create your first task to get started.' : undefined}
+              title={view === 'done' ? 'אין משימות שהושלמו' : 'אין משימות כאן'}
+              description={view === 'todo' ? 'צור את המשימה הראשונה שלך.' : undefined}
               action={
                 view === 'todo' ? (
                   <Button size="sm" onClick={() => setShowForm(true)}>
-                    <Plus className="mr-1.5 h-3.5 w-3.5" />
-                    New Task
+                    <Plus className="me-1.5 h-3.5 w-3.5" />
+                    משימה חדשה
                   </Button>
                 ) : undefined
               }
@@ -131,10 +129,10 @@ export function TasksListPage() {
                 <div key={projectId ?? 'unlinked'} className="rounded-lg border border-border bg-card overflow-hidden">
                   <div className="border-b border-border bg-muted/30 px-4 py-2">
                     <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                      {project ? project.name : 'No Project'}
+                      {project ? project.name : 'ללא פרויקט'}
                     </span>
-                    <span className="ml-2 text-xs text-muted-foreground">
-                      {groupTasks.length} task{groupTasks.length !== 1 ? 's' : ''}
+                    <span className="ms-2 text-xs text-muted-foreground">
+                      {groupTasks.length === 1 ? 'משימה' : `${groupTasks.length} משימות`}
                     </span>
                   </div>
                   {groupTasks.map((t) => (

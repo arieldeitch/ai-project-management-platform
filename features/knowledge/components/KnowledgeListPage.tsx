@@ -12,22 +12,22 @@ import { formatDistanceToNow } from 'date-fns'
 import type { KnowledgeType } from '@/types/entities'
 
 const TYPE_CONFIG: Record<KnowledgeType, { label: string; color: string }> = {
-  note:      { label: 'Note',      color: 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400' },
-  reference: { label: 'Reference', color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400' },
-  learning:  { label: 'Learning',  color: 'bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-400' },
-  process:   { label: 'Process',   color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400' },
-  research:  { label: 'Research',  color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400' },
+  note:      { label: 'הערה',   color: 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400' },
+  reference: { label: 'הפניה',  color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400' },
+  learning:  { label: 'למידה',  color: 'bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-400' },
+  process:   { label: 'תהליך',  color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400' },
+  research:  { label: 'מחקר',   color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400' },
 }
 
 type TypeFilter = 'all' | KnowledgeType
 
 const TYPE_TABS: { value: TypeFilter; label: string }[] = [
-  { value: 'all',       label: 'All' },
-  { value: 'note',      label: 'Notes' },
-  { value: 'reference', label: 'References' },
-  { value: 'learning',  label: 'Learnings' },
-  { value: 'process',   label: 'Processes' },
-  { value: 'research',  label: 'Research' },
+  { value: 'all',       label: 'הכל' },
+  { value: 'note',      label: 'הערות' },
+  { value: 'reference', label: 'הפניות' },
+  { value: 'learning',  label: 'למידה' },
+  { value: 'process',   label: 'תהליכים' },
+  { value: 'research',  label: 'מחקר' },
 ]
 
 function TypeBadge({ type }: { type: KnowledgeType }) {
@@ -55,11 +55,11 @@ export function KnowledgeListPage() {
   return (
     <div className="flex flex-col overflow-hidden">
       <TopBar
-        title="Knowledge"
+        title="ידע"
         actions={
           <Link href="/knowledge/new" className={cn(buttonVariants({ size: 'sm' }))}>
-            <Plus className="mr-1.5 h-3.5 w-3.5" />
-            New Item
+            <Plus className="me-1.5 h-3.5 w-3.5" />
+            פריט חדש
           </Link>
         }
       />
@@ -92,15 +92,15 @@ export function KnowledgeListPage() {
 
       <div className="flex-1 overflow-y-auto">
         {isLoading ? (
-          <div className="flex items-center justify-center py-16 text-sm text-muted-foreground">Loading...</div>
+          <div className="flex items-center justify-center py-16 text-sm text-muted-foreground">טוען...</div>
         ) : filtered.length === 0 ? (
           <EmptyState
             icon={<FileText className="h-12 w-12" />}
-            title="No knowledge items yet"
-            description="Capture notes, references, learnings, processes, and research."
+            title="אין פריטי ידע עדיין"
+            description="תעד הערות, הפניות, תובנות, תהליכים ומחקרים."
             action={
               <Link href="/knowledge/new" className={cn(buttonVariants({ size: 'sm' }))}>
-                <Plus className="mr-1.5 h-3.5 w-3.5" /> New Item
+                <Plus className="me-1.5 h-3.5 w-3.5" /> פריט חדש
               </Link>
             }
           />
@@ -123,7 +123,7 @@ export function KnowledgeListPage() {
                       )}
                     </div>
                     <div className="flex shrink-0 items-center gap-3">
-                      <span className="hidden text-xs text-muted-foreground sm:block w-24 text-right">{updatedAt}</span>
+                      <span className="hidden text-xs text-muted-foreground sm:block w-24 text-end">{updatedAt}</span>
                       <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                     </div>
                   </Link>

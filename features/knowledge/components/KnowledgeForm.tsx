@@ -17,28 +17,28 @@ import Link from 'next/link'
 import type { KnowledgeItem, KnowledgeType, DocRole, DocStatus } from '@/types/entities'
 
 const TYPE_OPTIONS: { value: KnowledgeType; label: string }[] = [
-  { value: 'note',      label: 'Note' },
-  { value: 'reference', label: 'Reference' },
-  { value: 'learning',  label: 'Learning' },
-  { value: 'process',   label: 'Process' },
-  { value: 'research',  label: 'Research' },
+  { value: 'note',      label: 'הערה' },
+  { value: 'reference', label: 'הפניה' },
+  { value: 'learning',  label: 'למידה' },
+  { value: 'process',   label: 'תהליך' },
+  { value: 'research',  label: 'מחקר' },
 ]
 
 const DOC_ROLE_OPTIONS: { value: DocRole; label: string }[] = [
-  { value: 'handoff_document',         label: 'Handoff Document' },
-  { value: 'implementation_blueprint', label: 'Implementation Blueprint' },
-  { value: 'ux_notes',                 label: 'UX Notes' },
-  { value: 'decisions_log',            label: 'Decisions Log' },
-  { value: 'execution_board',          label: 'Execution Board' },
-  { value: 'release_notes',            label: 'Release Notes' },
-  { value: 'deployment_report',        label: 'Deployment Report' },
-  { value: 'recovery_report',          label: 'Recovery Report' },
+  { value: 'handoff_document',         label: 'מסמך מסירה' },
+  { value: 'implementation_blueprint', label: 'תכנית מימוש' },
+  { value: 'ux_notes',                 label: 'הערות UX' },
+  { value: 'decisions_log',            label: 'יומן החלטות' },
+  { value: 'execution_board',          label: 'לוח ביצוע' },
+  { value: 'release_notes',            label: 'הערות גרסה' },
+  { value: 'deployment_report',        label: 'דו"ח פריסה' },
+  { value: 'recovery_report',          label: 'דו"ח שחזור' },
 ]
 
 const DOC_STATUS_OPTIONS: { value: DocStatus; label: string }[] = [
-  { value: 'draft',    label: 'Draft' },
-  { value: 'current',  label: 'Current' },
-  { value: 'outdated', label: 'Outdated' },
+  { value: 'draft',    label: 'טיוטה' },
+  { value: 'current',  label: 'עדכני' },
+  { value: 'outdated', label: 'ישן' },
 ]
 
 interface KnowledgeFormProps {
@@ -68,7 +68,7 @@ export function KnowledgeForm({ mode, item, defaultProjectId, defaultDocRole }: 
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!title.trim()) { setError('Title is required.'); return }
+    if (!title.trim()) { setError('כותרת נדרשת.'); return }
 
     setSaving(true)
     setError(null)
@@ -98,10 +98,10 @@ export function KnowledgeForm({ mode, item, defaultProjectId, defaultDocRole }: 
   return (
     <div className="flex flex-col overflow-hidden">
       <TopBar
-        title={isEdit ? 'Edit Knowledge Item' : 'New Knowledge Item'}
+        title={isEdit ? 'ערוך פריט ידע' : 'פריט ידע חדש'}
         actions={
           <Link href={backUrl} className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
-            <ArrowLeft className="mr-1.5 h-3.5 w-3.5" /> Back
+            <ArrowLeft className="me-1.5 h-3.5 w-3.5" /> חזרה
           </Link>
         }
       />
@@ -111,15 +111,15 @@ export function KnowledgeForm({ mode, item, defaultProjectId, defaultDocRole }: 
           <form onSubmit={handleSubmit} className="space-y-6">
 
             <div className="space-y-1.5">
-              <Label htmlFor="title">Title <span className="text-destructive">*</span></Label>
+              <Label htmlFor="title">כותרת <span className="text-destructive">*</span></Label>
               <Input id="title" value={title} onChange={(e) => setTitle(e.target.value)}
-                placeholder="e.g. Deployment checklist for Vercel" autoFocus />
+                placeholder="לדוג' רשימת בדיקות לפריסה ב-Vercel" autoFocus />
             </div>
 
             {/* Type + Project */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <Label>Type</Label>
+                <Label>סוג</Label>
                 <Select value={itemType} onValueChange={(v) => v && setItemType(v as KnowledgeType)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -128,11 +128,11 @@ export function KnowledgeForm({ mode, item, defaultProjectId, defaultDocRole }: 
                 </Select>
               </div>
               <div className="space-y-1.5">
-                <Label>Project (optional)</Label>
+                <Label>פרויקט (אופציונלי)</Label>
                 <Select value={linkedProject} onValueChange={(v) => setLinkedProject(v ?? '')}>
-                  <SelectTrigger><SelectValue placeholder="No project" /></SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder="ללא פרויקט" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">No project</SelectItem>
+                    <SelectItem value="">ללא פרויקט</SelectItem>
                     {projects.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
@@ -142,20 +142,20 @@ export function KnowledgeForm({ mode, item, defaultProjectId, defaultDocRole }: 
             {/* Doc Role + Doc Status */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <Label>Document Role</Label>
+                <Label>תפקיד מסמך</Label>
                 <Select value={docRole} onValueChange={(v) => setDocRole((v as DocRole) ?? '')}>
-                  <SelectTrigger><SelectValue placeholder="No role" /></SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder="ללא תפקיד" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">No role</SelectItem>
+                    <SelectItem value="">ללא תפקיד</SelectItem>
                     {DOC_ROLE_OPTIONS.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
               {docRole && (
                 <div className="space-y-1.5">
-                  <Label>Status</Label>
+                  <Label>סטטוס</Label>
                   <Select value={docStatus} onValueChange={(v) => setDocStatus((v as DocStatus) ?? '')}>
-                    <SelectTrigger><SelectValue placeholder="No status" /></SelectTrigger>
+                    <SelectTrigger><SelectValue placeholder="ללא סטטוס" /></SelectTrigger>
                     <SelectContent>
                       {DOC_STATUS_OPTIONS.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
                     </SelectContent>
@@ -165,13 +165,13 @@ export function KnowledgeForm({ mode, item, defaultProjectId, defaultDocRole }: 
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="body">Body</Label>
+              <Label htmlFor="body">תוכן</Label>
               <Textarea id="body" value={body} onChange={(e) => setBody(e.target.value)}
-                placeholder="Notes, content, or details..." rows={10} />
+                placeholder="הערות, תוכן או פרטים..." rows={10} />
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="source_url">Source URL (optional)</Label>
+              <Label htmlFor="source_url">כתובת מקור (אופציונלי)</Label>
               <Input id="source_url" value={sourceUrl} onChange={(e) => setSourceUrl(e.target.value)}
                 placeholder="https://..." type="url" />
             </div>
@@ -182,10 +182,10 @@ export function KnowledgeForm({ mode, item, defaultProjectId, defaultDocRole }: 
 
             <div className="flex items-center gap-3 pt-2">
               <Button type="submit" disabled={saving}>
-                {saving && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
-                {isEdit ? 'Save Changes' : 'Save Item'}
+                {saving && <Loader2 className="me-1.5 h-3.5 w-3.5 animate-spin" />}
+                {isEdit ? 'שמור שינויים' : 'שמור פריט'}
               </Button>
-              <Link href={backUrl} className={buttonVariants({ variant: 'ghost' })}>Cancel</Link>
+              <Link href={backUrl} className={buttonVariants({ variant: 'ghost' })}>ביטול</Link>
             </div>
           </form>
         </div>

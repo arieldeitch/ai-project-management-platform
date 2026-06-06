@@ -24,7 +24,7 @@ export function TopBar({ title, actions }: TopBarProps) {
           )}
         >
           <Search className="h-3.5 w-3.5" />
-          <span className="hidden sm:inline">Search</span>
+          <span className="hidden sm:inline">חיפוש</span>
           <kbd className="hidden rounded bg-background border border-border px-1 py-0.5 text-[10px] sm:inline">⌘K</kbd>
         </button>
         {actions}

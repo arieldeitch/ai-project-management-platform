@@ -37,11 +37,18 @@ function daysAgo(dateString: string): number {
 type DomainFilter = 'all' | ProjectDomain
 
 const DOMAIN_TABS: { value: DomainFilter; label: string }[] = [
-  { value: 'all',      label: 'All' },
-  { value: 'personal', label: 'Personal' },
-  { value: 'work',     label: 'Work' },
-  { value: 'general',  label: 'General' },
+  { value: 'all',      label: 'הכל' },
+  { value: 'personal', label: 'אישי' },
+  { value: 'work',     label: 'עבודה' },
+  { value: 'general',  label: 'כללי' },
 ]
+
+const DOMAIN_EMPTY_LABEL: Record<DomainFilter, string> = {
+  all:      'הפורטפוליו ריק',
+  personal: 'אין פרויקטים אישיים',
+  work:     'אין פרויקטים מעבודה',
+  general:  'אין פרויקטים כלליים',
+}
 
 /* ── sub-components ────────────────────────────────────────── */
 
@@ -91,7 +98,7 @@ function FocusCard({ project }: { project: Project }) {
           </h3>
           {project.goal && (
             <p className="mt-1 text-sm font-medium text-primary/80">
-              Goal: {project.goal}
+              מטרה: {project.goal}
             </p>
           )}
           {project.description && !project.goal && (
@@ -123,7 +130,7 @@ function ProjectRow({ project, showDomain }: { project: Project; showDomain?: bo
           {project.name}
         </p>
         {project.next_action && (
-          <p className="truncate text-xs text-muted-foreground">→ {project.next_action}</p>
+          <p className="truncate text-xs text-muted-foreground">{project.next_action}</p>
         )}
       </div>
       <div className="flex shrink-0 items-center gap-2.5">
@@ -155,9 +162,9 @@ function BlockedRow({ project }: { project: Project }) {
             {project.blocked_reason}
           </p>
         ) : project.next_action ? (
-          <p className="mt-0.5 text-xs text-muted-foreground">Needs: {project.next_action}</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">דרוש: {project.next_action}</p>
         ) : (
-          <p className="mt-0.5 text-xs text-red-500/60 italic">No blocker reason recorded</p>
+          <p className="mt-0.5 text-xs text-red-500/60 italic">לא נרשמה סיבת חסימה</p>
         )}
       </div>
       <div className="flex shrink-0 flex-col items-end gap-1">
@@ -165,7 +172,7 @@ function BlockedRow({ project }: { project: Project }) {
         {days > 0 && (
           <span className="flex items-center gap-1 text-[10px] text-red-500/70">
             <Clock className="h-3 w-3" />
-            {days}d blocked
+            חסום {days}י
           </span>
         )}
       </div>
@@ -199,7 +206,7 @@ function SectionHeader({
       </div>
       {href && (
         <Link href={href} className="text-xs text-muted-foreground hover:text-foreground">
-          View all →
+          הצג הכל
         </Link>
       )}
     </div>
@@ -216,24 +223,20 @@ export function DashboardPage() {
     load()
   }, [load])
 
-  /* apply domain filter */
   const visible =
     domainFilter === 'all'
       ? projects
       : projects.filter((p) => p.domain === domainFilter)
 
-  /* derived data */
   const active    = visible.filter((p) => p.status === 'active').sort(byPriority)
   const blocked   = visible.filter((p) => p.status === 'blocked').sort(byPriority)
   const scoped    = visible.filter((p) => p.status === 'scoped').sort(byPriority)
   const ideas     = visible.filter((p) => p.status === 'idea' && p.priority !== 'unset' && p.priority !== 'low').sort(byPriority)
   const completed = visible.filter((p) => p.status === 'completed').length
 
-  /* Focus: top active project, or top scoped if no active */
   const focusProject = active[0] ?? scoped[0] ?? null
   const remainActive = focusProject?.status === 'active' ? active.slice(1, 6) : active.slice(0, 5)
 
-  /* domain tab counts (always from all projects, not filtered) */
   const domainCounts: Record<DomainFilter, number> = {
     all:      projects.length,
     personal: projects.filter((p) => p.domain === 'personal').length,
@@ -246,7 +249,7 @@ export function DashboardPage() {
   if (isLoading) {
     return (
       <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
-        Loading portfolio...
+        טוען פורטפוליו...
       </div>
     )
   }
@@ -254,16 +257,16 @@ export function DashboardPage() {
   return (
     <div className="flex flex-col overflow-hidden">
       <TopBar
-        title="Dashboard"
+        title="לוח בקרה"
         actions={
           <Link href="/projects/new" className={cn(buttonVariants({ size: 'sm' }))}>
-            <Plus className="mr-1.5 h-3.5 w-3.5" />
-            New Project
+            <Plus className="me-1.5 h-3.5 w-3.5" />
+            פרויקט חדש
           </Link>
         }
       />
 
-      {/* Domain filter tabs — underline style */}
+      {/* Domain filter tabs */}
       <div className="flex items-stretch border-b border-border bg-background px-6">
         {DOMAIN_TABS.map((tab) => {
           const count = domainCounts[tab.value]
@@ -300,24 +303,24 @@ export function DashboardPage() {
           {/* Stats */}
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <StatCard
-              label="Total"
+              label='סה"כ'
               value={visible.length}
               href={domainFilter === 'all' ? '/projects' : `/projects?domain=${domainFilter}`}
             />
             <StatCard
-              label="Active"
+              label="פעיל"
               value={active.length}
               accent="text-emerald-600 dark:text-emerald-400"
               href="/projects?status=active"
             />
             <StatCard
-              label="Blocked"
+              label="חסום"
               value={blocked.length}
               accent={blocked.length > 0 ? 'text-red-600 dark:text-red-400' : undefined}
               href={blocked.length > 0 ? '/projects?status=blocked' : undefined}
             />
             <StatCard
-              label="Completed"
+              label="הושלם"
               value={completed}
               accent="text-violet-600 dark:text-violet-400"
               href="/projects?status=completed"
@@ -329,17 +332,17 @@ export function DashboardPage() {
             <div className="flex flex-col items-center justify-center py-16 text-center">
               <div className="text-5xl">🗂</div>
               <h2 className="mt-4 text-base font-semibold">
-                {domainFilter === 'all' ? 'Portfolio is empty' : `No ${domainFilter} projects`}
+                {DOMAIN_EMPTY_LABEL[domainFilter]}
               </h2>
               <p className="mt-1 text-sm text-muted-foreground">
                 {domainFilter === 'all'
-                  ? 'Create your first project to start tracking your work.'
-                  : 'Switch to All or create a project in this domain.'}
+                  ? 'צור את הפרויקט הראשון שלך למעקב אחר העבודה.'
+                  : 'עבור להכל או צור פרויקט בתחום זה.'}
               </p>
               {domainFilter === 'all' && (
                 <Link href="/projects/new" className={cn(buttonVariants(), 'mt-4')}>
-                  <Plus className="mr-1.5 h-4 w-4" />
-                  New Project
+                  <Plus className="me-1.5 h-4 w-4" />
+                  פרויקט חדש
                 </Link>
               )}
             </div>
@@ -350,12 +353,12 @@ export function DashboardPage() {
             <section>
               <SectionHeader
                 icon={AlertTriangle}
-                title="Blocked"
+                title="חסום"
                 count={blocked.length}
                 href="/projects?status=blocked"
                 accentClass="text-red-500"
               />
-              <div className="overflow-hidden rounded-lg border border-red-200 border-l-4 border-l-red-500 bg-red-50/40 shadow-card dark:border-red-900/30 dark:border-l-red-600 dark:bg-red-950/10">
+              <div className="overflow-hidden rounded-lg border border-red-200 border-s-4 border-s-red-500 bg-red-50/40 shadow-card dark:border-red-900/30 dark:border-s-red-600 dark:bg-red-950/10">
                 {blocked.map((p) => (
                   <BlockedRow key={p.id} project={p} />
                 ))}
@@ -368,7 +371,7 @@ export function DashboardPage() {
             <section>
               <SectionHeader
                 icon={Target}
-                title="Focus Now"
+                title="פוקוס עכשיו"
                 accentClass="text-primary"
               />
               <FocusCard project={focusProject} />
@@ -380,7 +383,7 @@ export function DashboardPage() {
             <section>
               <SectionHeader
                 icon={Play}
-                title="Active"
+                title="פעיל"
                 count={active.length}
                 href={active.length > 5 ? '/projects?status=active' : undefined}
                 accentClass="text-emerald-500"
@@ -398,7 +401,7 @@ export function DashboardPage() {
             <section>
               <SectionHeader
                 icon={ArrowRight}
-                title="Ready to Start"
+                title="מוכן להתחיל"
                 count={scoped.length}
                 href={scoped.length > 4 ? '/projects?status=scoped' : undefined}
                 accentClass="text-blue-500"
@@ -416,7 +419,7 @@ export function DashboardPage() {
             <section>
               <SectionHeader
                 icon={Lightbulb}
-                title="High-Priority Ideas"
+                title="רעיונות עם עדיפות גבוהה"
                 count={ideas.length}
                 href={ideas.length > 4 ? '/projects?status=idea' : undefined}
                 accentClass="text-amber-500"

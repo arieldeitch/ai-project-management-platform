@@ -18,9 +18,9 @@ import { Loader2 } from 'lucide-react'
 import type { Task, TaskPriority } from '@/types/entities'
 
 const PRIORITY_OPTIONS: { value: TaskPriority; label: string }[] = [
-  { value: 'high',   label: 'High' },
-  { value: 'medium', label: 'Medium' },
-  { value: 'low',    label: 'Low' },
+  { value: 'high',   label: 'גבוה' },
+  { value: 'medium', label: 'בינוני' },
+  { value: 'low',    label: 'נמוך' },
 ]
 
 interface TaskFormProps {
@@ -44,7 +44,7 @@ export function TaskForm({ projectId, task, onClose }: TaskFormProps) {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!title.trim()) { setError('Task title is required.'); return }
+    if (!title.trim()) { setError('כותרת המשימה נדרשת.'); return }
 
     setSaving(true)
     setError(null)
@@ -77,12 +77,12 @@ export function TaskForm({ projectId, task, onClose }: TaskFormProps) {
     <form onSubmit={handleSubmit} className="space-y-4">
       {/* Title */}
       <div className="space-y-1.5">
-        <Label htmlFor="task-title">Task <span className="text-destructive">*</span></Label>
+        <Label htmlFor="task-title">משימה <span className="text-destructive">*</span></Label>
         <Input
           id="task-title"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          placeholder="What needs to be done?"
+          placeholder="מה צריך לעשות?"
           autoFocus
         />
       </div>
@@ -90,13 +90,13 @@ export function TaskForm({ projectId, task, onClose }: TaskFormProps) {
       {/* Project + Priority */}
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1.5">
-          <Label htmlFor="task-project">Project</Label>
+          <Label htmlFor="task-project">פרויקט</Label>
           <Select value={linkedProject} onValueChange={(v) => setLinkedProject(v ?? '')}>
             <SelectTrigger id="task-project">
-              <SelectValue placeholder="No project" />
+              <SelectValue placeholder="ללא פרויקט" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">No project</SelectItem>
+              <SelectItem value="">ללא פרויקט</SelectItem>
               {projects.map((p) => (
                 <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
               ))}
@@ -104,7 +104,7 @@ export function TaskForm({ projectId, task, onClose }: TaskFormProps) {
           </Select>
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="task-priority">Priority</Label>
+          <Label htmlFor="task-priority">עדיפות</Label>
           <Select value={priority} onValueChange={(v) => setPriority(v as TaskPriority)}>
             <SelectTrigger id="task-priority"><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -118,12 +118,12 @@ export function TaskForm({ projectId, task, onClose }: TaskFormProps) {
 
       {/* Notes */}
       <div className="space-y-1.5">
-        <Label htmlFor="task-notes">Notes</Label>
+        <Label htmlFor="task-notes">הערות</Label>
         <Textarea
           id="task-notes"
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
-          placeholder="Additional context..."
+          placeholder="הקשר נוסף..."
           rows={2}
         />
       </div>
@@ -134,11 +134,11 @@ export function TaskForm({ projectId, task, onClose }: TaskFormProps) {
 
       <div className="flex items-center gap-2 pt-1">
         <Button type="submit" size="sm" disabled={saving}>
-          {saving && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
-          {isEdit ? 'Save' : 'Add Task'}
+          {saving && <Loader2 className="me-1.5 h-3.5 w-3.5 animate-spin" />}
+          {isEdit ? 'שמור' : 'הוסף משימה'}
         </Button>
         <Button type="button" size="sm" variant="ghost" onClick={onClose}>
-          Cancel
+          ביטול
         </Button>
       </div>
     </form>

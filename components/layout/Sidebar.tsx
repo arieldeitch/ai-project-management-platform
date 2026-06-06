@@ -15,16 +15,16 @@ import type { ProjectPriority, DocRole } from '@/types/entities'
 /* ── nav config ────────────────────────────────────────────── */
 
 const NAV_ITEMS = [
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/projects',  label: 'Projects',  icon: FolderKanban },
-  { href: '/tasks',     label: 'Tasks',     icon: CheckSquare },
-  { href: '/assets',    label: 'AI Assets', icon: Bot },
-  { href: '/decisions', label: 'Decisions', icon: BookOpen },
-  { href: '/knowledge', label: 'Knowledge', icon: FileText },
+  { href: '/dashboard', label: 'לוח בקרה', icon: LayoutDashboard },
+  { href: '/projects',  label: 'פרויקטים', icon: FolderKanban },
+  { href: '/tasks',     label: 'משימות',    icon: CheckSquare },
+  { href: '/assets',    label: 'נכסי AI',   icon: Bot },
+  { href: '/decisions', label: 'החלטות',    icon: BookOpen },
+  { href: '/knowledge', label: 'ידע',       icon: FileText },
 ]
 
 const BOTTOM_ITEMS = [
-  { href: '/settings', label: 'Settings', icon: Settings },
+  { href: '/settings', label: 'הגדרות', icon: Settings },
 ]
 
 const PRIORITY_ORDER: ProjectPriority[] = ['critical', 'high', 'medium', 'low', 'unset']
@@ -32,14 +32,14 @@ const PRIORITY_ORDER: ProjectPriority[] = ['critical', 'high', 'medium', 'low', 
 const CRITICAL_DOC_ROLES: DocRole[] = ['handoff_document', 'implementation_blueprint']
 
 const CRITICAL_ROLE_LABELS: Record<DocRole, string> = {
-  handoff_document:         'handoff',
-  implementation_blueprint: 'blueprint',
-  ux_notes:                 'UX notes',
-  decisions_log:            'decisions',
-  execution_board:          'exec board',
-  release_notes:            'release notes',
-  deployment_report:        'deployment',
-  recovery_report:          'recovery',
+  handoff_document:         'מסירה',
+  implementation_blueprint: 'תכנית',
+  ux_notes:                 'הערות UX',
+  decisions_log:            'החלטות',
+  execution_board:          'לוח ביצוע',
+  release_notes:            'הערות גרסה',
+  deployment_report:        'פריסה',
+  recovery_report:          'שחזור',
 }
 
 /* ── NavItem ───────────────────────────────────────────────── */
@@ -98,7 +98,6 @@ export function Sidebar() {
     loadKnowledge().then(() => setKnowledgeInitialized(true))
   }, [loadKnowledge])
 
-  /* Command center derived data — no new queries, all from store state */
   const activeCount  = projects.filter((p) => p.status === 'active').length
   const blockedCount = projects.filter((p) => p.status === 'blocked').length
 
@@ -121,7 +120,6 @@ export function Sidebar() {
     )
     .slice(0, 4)
 
-  /* Docs Missing — active/scoped projects missing critical doc roles */
   const docsMissingProjects = knowledgeInitialized
     ? projects
         .filter((p) => p.status === 'active' || p.status === 'scoped')
@@ -141,7 +139,7 @@ export function Sidebar() {
   const hasCommandData = projects.length > 0
 
   return (
-    <aside className="flex h-full w-60 shrink-0 flex-col border-r border-sidebar-border bg-sidebar">
+    <aside className="flex h-full w-60 shrink-0 flex-col border-e border-sidebar-border bg-sidebar">
       {/* Brand */}
       <div className="flex h-12 shrink-0 items-center gap-2 border-b border-sidebar-border px-3">
         <div className="flex h-6 w-6 items-center justify-center rounded-md bg-primary text-primary-foreground">
@@ -150,7 +148,7 @@ export function Sidebar() {
         <span className="text-[13px] font-semibold tracking-tight">PM Platform</span>
       </div>
 
-      {/* Core navigation — shrink-0 so command center can grow below */}
+      {/* Core navigation */}
       <nav className="flex shrink-0 flex-col gap-px p-2">
         {NAV_ITEMS.map((item) => (
           <NavItem
@@ -161,24 +159,24 @@ export function Sidebar() {
         ))}
       </nav>
 
-      {/* Portfolio Command Center — flex-1 fills remaining space, scrolls if needed */}
+      {/* Portfolio Command Center */}
       {hasCommandData && (
         <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto border-t border-sidebar-border px-3 py-3">
           {/* Portfolio pulse */}
           <div>
-            <SectionLabel>Portfolio</SectionLabel>
+            <SectionLabel>פורטפוליו</SectionLabel>
             <div className="flex gap-3 text-[11px] text-muted-foreground">
               <span>
                 <span className="font-semibold text-foreground">{projects.length}</span>{' '}
-                total
+                סה&quot;כ
               </span>
               <span>
                 <span className="font-semibold text-emerald-700">{activeCount}</span>{' '}
-                active
+                פעיל
               </span>
               <span>
                 <span className="font-semibold text-red-600">{blockedCount}</span>{' '}
-                blocked
+                חסום
               </span>
             </div>
           </div>
@@ -186,7 +184,7 @@ export function Sidebar() {
           {/* High-priority projects */}
           {hotProjects.length > 0 && (
             <div>
-              <SectionLabel>High Priority</SectionLabel>
+              <SectionLabel>עדיפות גבוהה</SectionLabel>
               <div className="flex flex-col gap-0.5">
                 {hotProjects.map((p) => (
                   <Link
@@ -199,7 +197,7 @@ export function Sidebar() {
                     </p>
                     {p.next_action && (
                       <p className="mt-0.5 text-[10px] leading-snug text-muted-foreground line-clamp-1">
-                        → {p.next_action}
+                        {p.next_action}
                       </p>
                     )}
                   </Link>
@@ -213,7 +211,7 @@ export function Sidebar() {
             <div>
               <div className="mb-1.5 flex items-center gap-1">
                 <AlertTriangle className="h-2.5 w-2.5 text-red-500" />
-                <SectionLabel className="mb-0 text-red-600">Blocked</SectionLabel>
+                <SectionLabel className="mb-0 text-red-600">חסום</SectionLabel>
               </div>
               <div className="flex flex-col gap-0.5">
                 {blockedProjects.map((p) => (
@@ -241,7 +239,7 @@ export function Sidebar() {
             <div>
               <div className="mb-1.5 flex items-center gap-1">
                 <FileX className="h-2.5 w-2.5 text-amber-500" />
-                <SectionLabel className="mb-0 text-amber-600">Docs Missing</SectionLabel>
+                <SectionLabel className="mb-0 text-amber-600">מסמכים חסרים</SectionLabel>
               </div>
               <div className="flex flex-col gap-0.5">
                 {docsMissingProjects.map(({ project, missing }) => (
@@ -254,7 +252,7 @@ export function Sidebar() {
                       {project.name}
                     </p>
                     <p className="mt-0.5 text-[10px] leading-snug text-amber-600/80 line-clamp-1">
-                      Missing: {missing.map((r) => CRITICAL_ROLE_LABELS[r]).join(', ')}
+                      חסרים: {missing.map((r) => CRITICAL_ROLE_LABELS[r]).join(', ')}
                     </p>
                   </Link>
                 ))}
@@ -265,7 +263,7 @@ export function Sidebar() {
           {/* Next actions */}
           {nextActionItems.length > 0 && (
             <div>
-              <SectionLabel>Next Actions</SectionLabel>
+              <SectionLabel>פעולות הבאות</SectionLabel>
               <div className="flex flex-col gap-0.5">
                 {nextActionItems.map((p) => (
                   <Link

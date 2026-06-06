@@ -27,37 +27,37 @@ import type {
 } from '@/types/entities'
 
 const STATUS_OPTIONS: { value: ProjectStatus; label: string }[] = [
-  { value: 'idea',      label: 'Idea' },
-  { value: 'scoped',    label: 'Scoped' },
-  { value: 'active',    label: 'Active' },
-  { value: 'blocked',   label: 'Blocked' },
-  { value: 'completed', label: 'Completed' },
-  { value: 'deferred',  label: 'Deferred' },
-  { value: 'archived',  label: 'Archived' },
+  { value: 'idea',      label: 'רעיון' },
+  { value: 'scoped',    label: 'באפיון' },
+  { value: 'active',    label: 'פעיל' },
+  { value: 'blocked',   label: 'חסום' },
+  { value: 'completed', label: 'הושלם' },
+  { value: 'deferred',  label: 'נדחה' },
+  { value: 'archived',  label: 'בארכיון' },
 ]
 
 const PRIORITY_OPTIONS: { value: ProjectPriority; label: string }[] = [
-  { value: 'critical', label: 'Critical' },
-  { value: 'high',     label: 'High' },
-  { value: 'medium',   label: 'Medium' },
-  { value: 'low',      label: 'Low' },
-  { value: 'unset',    label: 'No priority' },
+  { value: 'critical', label: 'קריטי' },
+  { value: 'high',     label: 'גבוה' },
+  { value: 'medium',   label: 'בינוני' },
+  { value: 'low',      label: 'נמוך' },
+  { value: 'unset',    label: 'ללא עדיפות' },
 ]
 
 const DOMAIN_OPTIONS: { value: ProjectDomain; label: string }[] = [
-  { value: 'personal', label: 'Personal' },
-  { value: 'work',     label: 'Work' },
-  { value: 'general',  label: 'General' },
+  { value: 'personal', label: 'אישי' },
+  { value: 'work',     label: 'עבודה' },
+  { value: 'general',  label: 'כללי' },
 ]
 
 const PROJECT_TYPE_OPTIONS: { value: ProjectType; label: string }[] = [
-  { value: 'software',       label: 'Software' },
-  { value: 'ai_agent',       label: 'AI Agent' },
-  { value: 'automation',     label: 'Automation' },
-  { value: 'operations',     label: 'Operations' },
-  { value: 'research',       label: 'Research' },
-  { value: 'personal',       label: 'Personal' },
-  { value: 'infrastructure', label: 'Infrastructure' },
+  { value: 'software',       label: 'תוכנה' },
+  { value: 'ai_agent',       label: 'סוכן AI' },
+  { value: 'automation',     label: 'אוטומציה' },
+  { value: 'operations',     label: 'תפעול' },
+  { value: 'research',       label: 'מחקר' },
+  { value: 'personal',       label: 'אישי' },
+  { value: 'infrastructure', label: 'תשתיות' },
 ]
 
 interface ProjectFormProps {
@@ -79,7 +79,6 @@ export function ProjectForm({ mode, project }: ProjectFormProps) {
   const [currentPhase,         setCurrentPhase]       = useState(project?.current_phase ?? '')
   const [nextAction,           setNextAction]         = useState(project?.next_action ?? '')
   const [blockedReason,        setBlockedReason]      = useState(project?.blocked_reason ?? '')
-  /* Execution Context */
   const [assignedGpt,          setAssignedGpt]        = useState(project?.assigned_gpt ?? '')
   const [primaryWorkspace,     setPrimaryWorkspace]   = useState(project?.primary_workspace ?? '')
   const [repositoryUrl,        setRepositoryUrl]      = useState(project?.repository_url ?? '')
@@ -98,13 +97,13 @@ export function ProjectForm({ mode, project }: ProjectFormProps) {
 
   const isEdit  = mode === 'edit' && !!project
   const backUrl = isEdit ? `/projects/${project.id}` : '/projects'
-  const title   = isEdit ? 'Edit Project' : 'New Project'
+  const title   = isEdit ? 'ערוך פרויקט' : 'פרויקט חדש'
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!name.trim()) { setError('Project name is required.'); return }
+    if (!name.trim()) { setError('שם הפרויקט נדרש.'); return }
     if (status === 'blocked' && !blockedReason.trim()) {
-      setError('Please describe why this project is blocked.')
+      setError('אנא תאר מדוע פרויקט זה חסום.')
       return
     }
 
@@ -151,8 +150,8 @@ export function ProjectForm({ mode, project }: ProjectFormProps) {
         title={title}
         actions={
           <Link href={backUrl} className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
-            <ArrowLeft className="mr-1.5 h-3.5 w-3.5" />
-            Back
+            <ArrowLeft className="me-1.5 h-3.5 w-3.5" />
+            חזרה
           </Link>
         }
       />
@@ -163,35 +162,35 @@ export function ProjectForm({ mode, project }: ProjectFormProps) {
 
             {/* Name */}
             <div className="space-y-1.5">
-              <Label htmlFor="name">Project Name <span className="text-destructive">*</span></Label>
+              <Label htmlFor="name">שם הפרויקט <span className="text-destructive">*</span></Label>
               <Input
                 id="name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="e.g. Habit Tracker App"
+                placeholder="לדוג' אפליקציית מעקב הרגלים"
                 autoFocus
               />
             </div>
 
             {/* Goal */}
             <div className="space-y-1.5">
-              <Label htmlFor="goal">Goal / Objective</Label>
+              <Label htmlFor="goal">מטרה / יעד</Label>
               <Input
                 id="goal"
                 value={goal}
                 onChange={(e) => setGoal(e.target.value)}
-                placeholder="What does success look like?"
+                placeholder="איך נראה הצלחה?"
               />
             </div>
 
             {/* Description */}
             <div className="space-y-1.5">
-              <Label htmlFor="description">Description</Label>
+              <Label htmlFor="description">תיאור</Label>
               <Textarea
                 id="description"
                 value={description}
                 onChange={(e) => setDesc(e.target.value)}
-                placeholder="Context, ideas, relevant details..."
+                placeholder="הקשר, רעיונות, פרטים רלוונטיים..."
                 rows={4}
               />
             </div>
@@ -199,7 +198,7 @@ export function ProjectForm({ mode, project }: ProjectFormProps) {
             {/* Status + Priority */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <Label htmlFor="status">Status</Label>
+                <Label htmlFor="status">סטטוס</Label>
                 <Select value={status} onValueChange={(v) => setStatus(v as ProjectStatus)}>
                   <SelectTrigger id="status"><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -210,7 +209,7 @@ export function ProjectForm({ mode, project }: ProjectFormProps) {
                 </Select>
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="priority">Priority</Label>
+                <Label htmlFor="priority">עדיפות</Label>
                 <Select value={priority} onValueChange={(v) => setPriority(v as ProjectPriority)}>
                   <SelectTrigger id="priority"><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -225,10 +224,10 @@ export function ProjectForm({ mode, project }: ProjectFormProps) {
             {/* Type + Domain */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <Label htmlFor="project_type">Type</Label>
+                <Label htmlFor="project_type">סוג</Label>
                 <Select value={projectType} onValueChange={(v) => setProjectType(v as ProjectType)}>
                   <SelectTrigger id="project_type">
-                    <SelectValue placeholder="Select type" />
+                    <SelectValue placeholder="בחר סוג" />
                   </SelectTrigger>
                   <SelectContent>
                     {PROJECT_TYPE_OPTIONS.map((opt) => (
@@ -238,10 +237,10 @@ export function ProjectForm({ mode, project }: ProjectFormProps) {
                 </Select>
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="domain">Domain</Label>
+                <Label htmlFor="domain">תחום</Label>
                 <Select value={domain} onValueChange={(v) => setDomain(v as ProjectDomain)}>
                   <SelectTrigger id="domain">
-                    <SelectValue placeholder="Select domain" />
+                    <SelectValue placeholder="בחר תחום" />
                   </SelectTrigger>
                   <SelectContent>
                     {DOMAIN_OPTIONS.map((opt) => (
@@ -254,37 +253,37 @@ export function ProjectForm({ mode, project }: ProjectFormProps) {
 
             {/* Current Phase */}
             <div className="space-y-1.5">
-              <Label htmlFor="current_phase">Current Phase</Label>
+              <Label htmlFor="current_phase">שלב נוכחי</Label>
               <Input
                 id="current_phase"
                 value={currentPhase}
                 onChange={(e) => setCurrentPhase(e.target.value)}
-                placeholder="e.g. Design, Development, Operational"
+                placeholder="לדוג' עיצוב, פיתוח, תפעולי"
               />
             </div>
 
             {/* Next action */}
             <div className="space-y-1.5">
-              <Label htmlFor="next_action">Next Action</Label>
+              <Label htmlFor="next_action">פעולה הבאה</Label>
               <Input
                 id="next_action"
                 value={nextAction}
                 onChange={(e) => setNextAction(e.target.value)}
-                placeholder="The immediate next step"
+                placeholder="הצעד הבא המיידי"
               />
             </div>
 
-            {/* Blocked reason — only shown when status is blocked */}
+            {/* Blocked reason */}
             {status === 'blocked' && (
               <div className="space-y-1.5 rounded-lg border border-red-200 bg-red-50/50 p-4 dark:border-red-900/30 dark:bg-red-950/20">
                 <Label htmlFor="blocked_reason" className="text-red-700 dark:text-red-400">
-                  Blocked Reason <span className="text-destructive">*</span>
+                  סיבת חסימה <span className="text-destructive">*</span>
                 </Label>
                 <Textarea
                   id="blocked_reason"
                   value={blockedReason}
                   onChange={(e) => setBlockedReason(e.target.value)}
-                  placeholder="What is blocking this project? What needs to happen to unblock it?"
+                  placeholder="מה חוסם את הפרויקט? מה צריך לקרות כדי לבטל את החסימה?"
                   rows={3}
                 />
               </div>
@@ -295,13 +294,13 @@ export function ProjectForm({ mode, project }: ProjectFormProps) {
               <button
                 type="button"
                 onClick={() => setExecContextOpen(!execContextOpen)}
-                className="flex w-full items-center justify-between px-4 py-3 text-left"
+                className="flex w-full items-center justify-between px-4 py-3 text-start"
               >
-                <span className="text-sm font-medium">Execution Context</span>
+                <span className="text-sm font-medium">הקשר ביצוע</span>
                 <span className="flex items-center gap-1 text-xs text-muted-foreground">
                   {!execContextOpen && (assignedGpt || primaryWorkspace || repositoryUrl) && (
-                    <span className="mr-1 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
-                      filled
+                    <span className="me-1 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+                      ממולא
                     </span>
                   )}
                   {execContextOpen
@@ -315,28 +314,28 @@ export function ProjectForm({ mode, project }: ProjectFormProps) {
                 <div className={cn('space-y-4 border-t border-border px-4 pb-4 pt-4')}>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1.5">
-                      <Label htmlFor="assigned_gpt">Assigned GPT</Label>
+                      <Label htmlFor="assigned_gpt">GPT משויך</Label>
                       <Input
                         id="assigned_gpt"
                         value={assignedGpt}
                         onChange={(e) => setAssignedGpt(e.target.value)}
-                        placeholder="e.g. Claude Sonnet 4.6"
+                        placeholder="לדוג' Claude Sonnet 4.6"
                       />
                     </div>
                     <div className="space-y-1.5">
-                      <Label htmlFor="primary_workspace">Primary Workspace</Label>
+                      <Label htmlFor="primary_workspace">סביבת עבודה</Label>
                       <Input
                         id="primary_workspace"
                         value={primaryWorkspace}
                         onChange={(e) => setPrimaryWorkspace(e.target.value)}
-                        placeholder="e.g. Claude Code CLI"
+                        placeholder="לדוג' Claude Code CLI"
                       />
                     </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1.5">
-                      <Label htmlFor="repository_url">Repository URL</Label>
+                      <Label htmlFor="repository_url">כתובת ריפו</Label>
                       <Input
                         id="repository_url"
                         value={repositoryUrl}
@@ -345,7 +344,7 @@ export function ProjectForm({ mode, project }: ProjectFormProps) {
                       />
                     </div>
                     <div className="space-y-1.5">
-                      <Label htmlFor="github_project_name">GitHub Project Name</Label>
+                      <Label htmlFor="github_project_name">שם פרויקט GitHub</Label>
                       <Input
                         id="github_project_name"
                         value={githubProjectName}
@@ -356,7 +355,7 @@ export function ProjectForm({ mode, project }: ProjectFormProps) {
                   </div>
 
                   <div className="space-y-1.5">
-                    <Label htmlFor="local_folder_path">Local Folder Path</Label>
+                    <Label htmlFor="local_folder_path">נתיב תיקייה מקומית</Label>
                     <Input
                       id="local_folder_path"
                       value={localFolderPath}
@@ -367,7 +366,7 @@ export function ProjectForm({ mode, project }: ProjectFormProps) {
 
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1.5">
-                      <Label htmlFor="production_url">Production URL</Label>
+                      <Label htmlFor="production_url">כתובת ייצור</Label>
                       <Input
                         id="production_url"
                         value={productionUrl}
@@ -376,7 +375,7 @@ export function ProjectForm({ mode, project }: ProjectFormProps) {
                       />
                     </div>
                     <div className="space-y-1.5">
-                      <Label htmlFor="vercel_url">Vercel URL</Label>
+                      <Label htmlFor="vercel_url">כתובת Vercel</Label>
                       <Input
                         id="vercel_url"
                         value={vercelUrl}
@@ -387,7 +386,7 @@ export function ProjectForm({ mode, project }: ProjectFormProps) {
                   </div>
 
                   <div className="space-y-1.5">
-                    <Label htmlFor="lovable_url">Lovable URL</Label>
+                    <Label htmlFor="lovable_url">כתובת Lovable</Label>
                     <Input
                       id="lovable_url"
                       value={lovableUrl}
@@ -397,33 +396,31 @@ export function ProjectForm({ mode, project }: ProjectFormProps) {
                   </div>
 
                   <div className="space-y-1.5">
-                    <Label htmlFor="current_execution_path">Current Execution Path</Label>
+                    <Label htmlFor="current_execution_path">נתיב ביצוע נוכחי</Label>
                     <Input
                       id="current_execution_path"
                       value={currentExecutionPath}
                       onChange={(e) => setCurrentExecutionPath(e.target.value)}
-                      placeholder="Active working session description..."
+                      placeholder="תיאור ישיבת עבודה פעילה..."
                     />
                   </div>
                 </div>
               )}
             </div>
 
-            {/* Error */}
             {error && (
               <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
                 {error}
               </p>
             )}
 
-            {/* Actions */}
             <div className="flex items-center gap-3 pt-2">
               <Button type="submit" disabled={saving}>
-                {saving && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
-                {isEdit ? 'Save Changes' : 'Create Project'}
+                {saving && <Loader2 className="me-1.5 h-3.5 w-3.5 animate-spin" />}
+                {isEdit ? 'שמור שינויים' : 'צור פרויקט'}
               </Button>
               <Link href={backUrl} className={buttonVariants({ variant: 'ghost' })}>
-                Cancel
+                ביטול
               </Link>
             </div>
           </form>
