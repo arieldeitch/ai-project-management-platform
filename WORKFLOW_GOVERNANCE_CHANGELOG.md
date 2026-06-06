@@ -2,7 +2,7 @@
 
 ## Phase 1 — Data Model + Validation Engine
 **Date:** 2026-06-06
-**Commit:** (pending)
+**Commit:** 41e65de
 **Build:** ✓ 21 routes | `npx tsc --noEmit` → 0 errors
 
 ### Changes
@@ -80,7 +80,7 @@
 
 ## Phase 7 — Kanban Lifecycle Governance
 **Date:** 2026-06-06
-**Commit:** (pending)
+**Commit:** f9871b4
 **Build:** ✓ 21 routes | `npx tsc --noEmit` → 0 errors
 
 ### Changes
