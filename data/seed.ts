@@ -52,7 +52,7 @@ export const SEED_PROJECTS: ProjectCreateInput[] = [
     status: 'scoped',
     priority: 'high',
     domain: 'general',
-    goal: 'אוטומציה של כתיבת boilerplate לאפליקציות לקיצור זמן-עד-גרסה-ראשונה-עובדת ב-50%',
+    goal: 'אוטומציה של כתיבת קוד תשתית לאפליקציות לקיצור זמן-עד-גרסה-ראשונה-עובדת ב-50%',
     next_action: 'הגדרת פורמט קלט הסוכן: מה נראה כמו מפרט שלם, ואיזו איכות פלט מקובלת עבור v1',
     current_phase: 'אפיון',
     project_type: 'ai_agent',
