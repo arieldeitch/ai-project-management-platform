@@ -42,7 +42,12 @@
 - All three sections are data-driven: render only when the relevant signal has items.
 
 ## Phase 5 — Knowledge Visibility
-**Status:** Pending
+**Status:** ✅ Complete
+- **Health panel**: Compact bar above tabs showing doc_status counts (✓ עדכני / ! מיושן / ~ טיוטה) for items with `doc_role` set. Only visible when doc-tagged items exist.
+- **"מסמכים" tab**: New filter tab showing items where `doc_role` is set (hides when count is 0).
+- **Project name subtitle**: Each row shows the linked project name (via `useProjectsStore`) when `project_id` is set. Falls back to body excerpt if no project link.
+- **`doc_status` badge**: Items with `doc_status` show a colored badge (emerald=עדכני, red=מיושן, zinc=טיוטה) next to the type badge.
+- `TypeFilter` type extended with `'docs'` discriminant.
 
 ## Phase 6 — Visual Polish & Consistency
 **Status:** Pending
