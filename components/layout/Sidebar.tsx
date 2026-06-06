@@ -1,9 +1,17 @@
 'use client'
 
+import { useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, FolderKanban, CheckSquare, Bot, BookOpen, FileText, Settings, Sparkles } from 'lucide-react'
+import { useProjectsStore } from '@/store/projects.store'
+import {
+  LayoutDashboard, FolderKanban, CheckSquare, Bot,
+  BookOpen, FileText, Settings, Sparkles, AlertTriangle,
+} from 'lucide-react'
 import { cn } from '@/lib/utils'
+import type { ProjectPriority } from '@/types/entities'
+
+/* ── nav config ────────────────────────────────────────────── */
 
 const NAV_ITEMS = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -17,6 +25,10 @@ const NAV_ITEMS = [
 const BOTTOM_ITEMS = [
   { href: '/settings', label: 'Settings', icon: Settings },
 ]
+
+const PRIORITY_ORDER: ProjectPriority[] = ['critical', 'high', 'medium', 'low', 'unset']
+
+/* ── NavItem ───────────────────────────────────────────────── */
 
 function NavItem({
   href,
@@ -36,7 +48,7 @@ function NavItem({
         'flex items-center gap-2.5 rounded-md px-2 py-1.5 text-[13px] transition-colors',
         active
           ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
-          : 'text-sidebar-foreground hover:bg-sidebar-accent/60'
+          : 'text-sidebar-foreground hover:bg-sidebar-accent/60',
       )}
     >
       <Icon className="h-3.5 w-3.5 shrink-0 opacity-80" />
@@ -45,21 +57,66 @@ function NavItem({
   )
 }
 
+/* ── SectionLabel ──────────────────────────────────────────── */
+
+function SectionLabel({ children, className }: { children: React.ReactNode; className?: string }) {
+  return (
+    <p className={cn(
+      'mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground',
+      className,
+    )}>
+      {children}
+    </p>
+  )
+}
+
+/* ── Sidebar ───────────────────────────────────────────────── */
+
 export function Sidebar() {
   const pathname = usePathname()
+  const { projects, load } = useProjectsStore()
+
+  useEffect(() => {
+    load()
+  }, [load])
+
+  /* Command center derived data — no new queries, all from store state */
+  const activeCount  = projects.filter((p) => p.status === 'active').length
+  const blockedCount = projects.filter((p) => p.status === 'blocked').length
+
+  const hotProjects = projects
+    .filter(
+      (p) =>
+        (p.priority === 'critical' || p.priority === 'high') &&
+        (p.status === 'active' || p.status === 'scoped'),
+    )
+    .slice(0, 4)
+
+  const blockedProjects = projects
+    .filter((p) => p.status === 'blocked')
+    .slice(0, 4)
+
+  const nextActionItems = projects
+    .filter((p) => p.next_action && (p.status === 'active' || p.status === 'scoped'))
+    .sort(
+      (a, b) => PRIORITY_ORDER.indexOf(a.priority) - PRIORITY_ORDER.indexOf(b.priority),
+    )
+    .slice(0, 4)
+
+  const hasCommandData = projects.length > 0
 
   return (
-    <aside className="flex h-full w-60 shrink-0 flex-col border-r border-border bg-sidebar">
+    <aside className="flex h-full w-60 shrink-0 flex-col border-r border-sidebar-border bg-sidebar">
       {/* Brand */}
-      <div className="flex h-12 items-center gap-2 border-b border-sidebar-border px-3">
+      <div className="flex h-12 shrink-0 items-center gap-2 border-b border-sidebar-border px-3">
         <div className="flex h-6 w-6 items-center justify-center rounded-md bg-primary text-primary-foreground">
           <Sparkles className="h-3.5 w-3.5" />
         </div>
         <span className="text-[13px] font-semibold tracking-tight">PM Platform</span>
       </div>
 
-      {/* Core navigation */}
-      <nav className="flex flex-1 flex-col gap-px p-2">
+      {/* Core navigation — shrink-0 so command center can grow below */}
+      <nav className="flex shrink-0 flex-col gap-px p-2">
         {NAV_ITEMS.map((item) => (
           <NavItem
             key={item.href}
@@ -69,8 +126,108 @@ export function Sidebar() {
         ))}
       </nav>
 
-      {/* Bottom */}
-      <div className="border-t border-sidebar-border p-2">
+      {/* Portfolio Command Center — flex-1 fills remaining space, scrolls if needed */}
+      {hasCommandData && (
+        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto border-t border-sidebar-border px-3 py-3">
+          {/* Portfolio pulse */}
+          <div>
+            <SectionLabel>Portfolio</SectionLabel>
+            <div className="flex gap-3 text-[11px] text-muted-foreground">
+              <span>
+                <span className="font-semibold text-foreground">{projects.length}</span>{' '}
+                total
+              </span>
+              <span>
+                <span className="font-semibold text-emerald-700">{activeCount}</span>{' '}
+                active
+              </span>
+              <span>
+                <span className="font-semibold text-red-600">{blockedCount}</span>{' '}
+                blocked
+              </span>
+            </div>
+          </div>
+
+          {/* High-priority projects */}
+          {hotProjects.length > 0 && (
+            <div>
+              <SectionLabel>High Priority</SectionLabel>
+              <div className="flex flex-col gap-0.5">
+                {hotProjects.map((p) => (
+                  <Link
+                    key={p.id}
+                    href={`/projects/${p.id}`}
+                    className="group rounded px-1.5 py-1 transition-colors hover:bg-sidebar-accent/60"
+                  >
+                    <p className="text-[11px] font-medium leading-snug text-foreground line-clamp-1 transition-colors group-hover:text-primary">
+                      {p.name}
+                    </p>
+                    {p.next_action && (
+                      <p className="mt-0.5 text-[10px] leading-snug text-muted-foreground line-clamp-1">
+                        → {p.next_action}
+                      </p>
+                    )}
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Blocked projects */}
+          {blockedProjects.length > 0 && (
+            <div>
+              <div className="mb-1.5 flex items-center gap-1">
+                <AlertTriangle className="h-2.5 w-2.5 text-red-500" />
+                <SectionLabel className="mb-0 text-red-600">Blocked</SectionLabel>
+              </div>
+              <div className="flex flex-col gap-0.5">
+                {blockedProjects.map((p) => (
+                  <Link
+                    key={p.id}
+                    href={`/projects/${p.id}`}
+                    className="group rounded px-1.5 py-1 transition-colors hover:bg-sidebar-accent/60"
+                  >
+                    <p className="text-[11px] font-medium leading-snug text-foreground line-clamp-1 transition-colors group-hover:text-primary">
+                      {p.name}
+                    </p>
+                    {p.blocked_reason && (
+                      <p className="mt-0.5 text-[10px] leading-snug text-red-600/80 line-clamp-1">
+                        {p.blocked_reason}
+                      </p>
+                    )}
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Next actions */}
+          {nextActionItems.length > 0 && (
+            <div>
+              <SectionLabel>Next Actions</SectionLabel>
+              <div className="flex flex-col gap-0.5">
+                {nextActionItems.map((p) => (
+                  <Link
+                    key={p.id}
+                    href={`/projects/${p.id}`}
+                    className="group rounded px-1.5 py-1 transition-colors hover:bg-sidebar-accent/60"
+                  >
+                    <p className="text-[11px] font-medium leading-snug text-foreground line-clamp-1 transition-colors group-hover:text-primary">
+                      {p.next_action}
+                    </p>
+                    <p className="mt-0.5 text-[10px] leading-snug text-muted-foreground line-clamp-1">
+                      {p.name}
+                    </p>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Bottom — settings, always pinned */}
+      <div className="shrink-0 border-t border-sidebar-border p-2">
         {BOTTOM_ITEMS.map((item) => (
           <NavItem
             key={item.href}
