@@ -6,7 +6,7 @@ import { useAssetsStore } from '@/store/assets.store'
 import { TopBar } from '@/components/layout/TopBar'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { buttonVariants } from '@/components/ui/button'
-import { Bot, Plus, ChevronRight, Copy, Trash2 } from 'lucide-react'
+import { Bot, Plus, ChevronLeft, Copy, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { formatDistanceToNow } from 'date-fns'
 import type { AIAsset, AssetType, AssetStatus } from '@/types/entities'
@@ -81,7 +81,7 @@ function AssetRow({ asset, onDuplicate, onDelete }: {
           <TypeBadge type={asset.asset_type} />
           <StatusDot status={asset.status} />
           <span className="hidden text-xs text-muted-foreground sm:block w-24 text-end">{updatedAt}</span>
-          <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+          <ChevronLeft className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
         </div>
       </Link>
 

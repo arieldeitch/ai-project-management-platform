@@ -149,7 +149,7 @@ export function DecisionForm({ mode, decision, defaultProjectId }: DecisionFormP
 
             <div className="flex items-center gap-3 pt-2">
               <Button type="submit" disabled={saving}>
-                {saving && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
+                {saving && <Loader2 className="me-1.5 h-3.5 w-3.5 animate-spin" />}
                 {isEdit ? 'שמור שינויים' : 'רשום החלטה'}
               </Button>
               <Link href={backUrl} className={buttonVariants({ variant: 'ghost' })}>ביטול</Link>

@@ -158,7 +158,7 @@ export function DecisionDetailPage({ decisionId }: { decisionId: string }) {
                       value={decision.status}
                       onValueChange={(v) => v && update(decision.id, { status: v as DecisionStatus })}
                     >
-                      <SelectTrigger className="h-auto border-0 bg-transparent p-0 shadow-none focus:ring-0 [&_svg]:ml-1">
+                      <SelectTrigger className="h-auto border-0 bg-transparent p-0 shadow-none focus:ring-0 [&_svg]:ms-1">
                         <span className={cn('text-sm font-medium', STATUS_COLORS[decision.status])}>
                           {STATUS_OPTIONS.find((o) => o.value === decision.status)?.label}
                         </span>

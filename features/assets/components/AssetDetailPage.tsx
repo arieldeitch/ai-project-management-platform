@@ -262,7 +262,7 @@ export function AssetDetailPage({ assetId }: AssetDetailPageProps) {
                       value={asset.asset_type}
                       onValueChange={(v) => v && update(asset.id, { asset_type: v as AssetType })}
                     >
-                      <SelectTrigger className="h-auto border-0 bg-transparent p-0 shadow-none focus:ring-0 [&_svg]:ml-1">
+                      <SelectTrigger className="h-auto border-0 bg-transparent p-0 shadow-none focus:ring-0 [&_svg]:ms-1">
                         <TypeBadge type={asset.asset_type} />
                       </SelectTrigger>
                       <SelectContent>
@@ -276,7 +276,7 @@ export function AssetDetailPage({ assetId }: AssetDetailPageProps) {
                       value={asset.status}
                       onValueChange={(v) => v && update(asset.id, { status: v as AssetStatus })}
                     >
-                      <SelectTrigger className="h-auto border-0 bg-transparent p-0 shadow-none focus:ring-0 [&_svg]:ml-1">
+                      <SelectTrigger className="h-auto border-0 bg-transparent p-0 shadow-none focus:ring-0 [&_svg]:ms-1">
                         <span className="text-sm">{STATUS_OPTIONS.find((o) => o.value === asset.status)?.label}</span>
                       </SelectTrigger>
                       <SelectContent>

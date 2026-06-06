@@ -153,7 +153,7 @@ export function AssetForm({ mode, asset }: AssetFormProps) {
 
             <div className="flex items-center gap-3 pt-2">
               <Button type="submit" disabled={saving}>
-                {saving && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
+                {saving && <Loader2 className="me-1.5 h-3.5 w-3.5 animate-spin" />}
                 {isEdit ? 'שמור שינויים' : 'צור נכס'}
               </Button>
               <Link href={backUrl} className={buttonVariants({ variant: 'ghost' })}>ביטול</Link>

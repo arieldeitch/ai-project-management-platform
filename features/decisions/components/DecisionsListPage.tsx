@@ -6,7 +6,7 @@ import { useDecisionsStore } from '@/store/decisions.store'
 import { TopBar } from '@/components/layout/TopBar'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { buttonVariants } from '@/components/ui/button'
-import { BookOpen, Plus, ChevronRight, Trash2 } from 'lucide-react'
+import { BookOpen, Plus, ChevronLeft, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { formatDistanceToNow } from 'date-fns'
 import type { DecisionStatus } from '@/types/entities'
@@ -112,7 +112,7 @@ export function DecisionsListPage() {
                     </div>
                     <div className="flex shrink-0 items-center gap-3">
                       <span className="hidden text-xs text-muted-foreground sm:block w-24 text-end">{updatedAt}</span>
-                      <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                      <ChevronLeft className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                     </div>
                   </Link>
                   <button

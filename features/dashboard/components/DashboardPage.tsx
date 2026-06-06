@@ -10,7 +10,7 @@ import { TopBar } from '@/components/layout/TopBar'
 import { buttonVariants } from '@/components/ui/button'
 import {
   AlertTriangle,
-  ArrowRight,
+  ArrowLeft,
   Lightbulb,
   Play,
   Target,
@@ -113,7 +113,7 @@ function FocusCard({ project }: { project: Project }) {
             </div>
           )}
         </div>
-        <ArrowRight className="mt-1 h-4 w-4 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+        <ArrowLeft className="mt-1 h-4 w-4 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
       </div>
     </Link>
   )
@@ -400,7 +400,7 @@ export function DashboardPage() {
           {scoped.length > 0 && (
             <section>
               <SectionHeader
-                icon={ArrowRight}
+                icon={Play}
                 title="מוכן להתחיל"
                 count={scoped.length}
                 href={scoped.length > 4 ? '/projects?status=scoped' : undefined}

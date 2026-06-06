@@ -22,7 +22,17 @@
 - RTL logical properties: replaced `mr-`/`ml-` with `me-`/`ms-`, `text-right` with `text-end` throughout
 
 ## Phase 3 — RTL Layout Fixes
-**Status:** Pending
+**Status:** ✅ Complete
+- **DashboardPage**: `ArrowRight` → `ArrowLeft` for FocusCard nav; "מוכן להתחיל" section icon `ArrowRight` → `Play` (direction-agnostic)
+- **AssetsListPage**: Row nav `ChevronRight` → `ChevronLeft`
+- **DecisionsListPage**: Row nav `ChevronRight` → `ChevronLeft`
+- **KnowledgeListPage**: Row nav `ChevronRight` → `ChevronLeft`
+- **dropdown-menu.tsx**: `ml-auto` → `ms-auto` in SubTrigger and Shortcut
+- **AssetDetailPage**: `[&_svg]:ml-1` → `[&_svg]:ms-1` in SelectTrigger (×2)
+- **AssetForm**: Loader2 `mr-1.5` → `me-1.5`
+- **DecisionDetailPage**: `[&_svg]:ml-1` → `[&_svg]:ms-1` in SelectTrigger
+- **DecisionForm**: Loader2 `mr-1.5` → `me-1.5`
+- ProjectsListPage line 250 `ChevronRight` intentionally kept — Kanban advance action, not navigation
 
 ## Phase 4 — Dashboard Command Center
 **Status:** Pending
