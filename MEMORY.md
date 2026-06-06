@@ -356,4 +356,96 @@ fb8f1b2  feat: redesign Projects as portfolio Kanban board
 
 ---
 
-*עודכן לאחרונה: 2026-06-06 | סשן: Localization Pass #1 — הושלם*
+---
+
+## 16. Latest Session Summary — Hebrew Content / Usage Stop Point
+
+### Current Project State
+
+The AI Project Management Platform is operational and deployed.
+
+The system now includes:
+- Hebrew UI
+- RTL support
+- Heebo typography
+- Portfolio Kanban
+- Workflow Governance across all 7 phases
+- Project lifecycle validation
+- GPT Specification flow
+- GPT setup tracking
+- Knowledge readiness enforcement
+- Task / Feature / Bug model
+- Local-first Dexie/IndexedDB persistence
+- GitHub repository
+- Vercel deployment
+- Import/export
+- Dashboard, Projects, Tasks, AI Assets, Decisions, Knowledge, Settings, Command palette/search
+
+### Important Latest Issue — Hebrew Content in Browser
+
+The UI was translated, but visible project content appeared in English because the browser was showing stale Dexie/IndexedDB data from an older import.
+
+**Root cause:**
+- Runtime UI reads from Dexie only. seed.ts is used only when importing projects manually from Settings. The Excel file is not read at runtime.
+- Existing browser data must be cleared and re-imported to reflect updated Hebrew seed content.
+
+**Code path (confirmed):**
+```
+UI → useProjectsStore.load() → ProjectsRepository.findAll() → db.projects (Dexie) only
+seed.ts → only consumed by Settings → handleImportSeed()
+```
+
+**User action already taken:**
+- User deleted existing browser data.
+- Next step: re-import 27 projects from Settings and verify Hebrew content.
+
+### Verification Needed Next Session
+
+1. Open deployed app
+2. Go to Settings / הגדרות
+3. Click import 27 projects / ייבא 27 פרויקטים
+4. Check sample projects and confirm Hebrew content:
+
+| Project | Goal (expected) |
+|---------|----------------|
+| פלטפורמת ניהול למידת AI | למידת AI מובנית לכל המשפחה |
+| אפליקציית הזדמנויות תעסוקה | אוטומציה של סריקת שוק העבודה עבור שני פרופילי קריירה |
+| סוכן כתיבת אפליקציות | אוטומציה של כתיבת קוד תשתית לאפליקציות לקיצור זמן-עד-גרסה-ראשונה-עובדת ב-50% |
+
+5. If English remains after re-import — inspect `data/seed.ts` and the Settings import path again.
+
+**Note:** "Family Flow" does not exist in `data/seed.ts` under any name. If it appears in the browser, it was created manually in Dexie. It will not appear after a clean reseed.
+
+### Important Rule
+
+Do not continue feature development until Hebrew content import is verified.
+
+### Current Product Decision — 30-Day Usage Mode
+
+Development stops after Hebrew content verification. Platform enters Usage Mode.
+
+**Usage Mode means:**
+- No new features
+- No new entities
+- No architecture changes
+- Use the platform daily
+- Track friction points in real use
+
+**Potential future improvements — only after real usage confirms them:**
+- Faster inline creation of decisions/knowledge from project context
+- Project staleness indicators (last updated X days ago)
+- Simplified Kanban if lifecycle columns are too heavy for mixed portfolios
+- Better GPT management linked to AI Assets (currently disconnected)
+- "Today's one thing" dashboard synthesis
+
+### Validation Artifacts Created This Session
+
+| File | Purpose |
+|------|---------|
+| `VERIFICATION_REPORT.md` | Data source trace, extracted seed values, English content scan results |
+| `scripts/validate-seed.mts` | Runnable tsx script: `npx tsx scripts/validate-seed.mts` — extracts seed values and scans for English |
+| `CONTENT_LOCALIZATION_REPORT.md` | Field-by-field audit of all 23 projects in seed.ts |
+
+---
+
+*עודכן לאחרונה: 2026-06-06 | סשן: Hebrew Content Verification + Usage Mode*
