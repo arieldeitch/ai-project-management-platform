@@ -13,6 +13,13 @@ export const SEED_PROJECTS: ProjectCreateInput[] = [
     goal: 'Run the full personal portfolio from a single reliable tool',
     next_action: 'Transition to daily operational use — stop thinking of this as a project being built',
     current_phase: 'Operational',
+    project_type: 'software',
+    assigned_gpt: 'Claude Sonnet 4.6 (Claude Code CLI)',
+    primary_workspace: 'Claude Code CLI',
+    repository_url: 'https://github.com/arieldeitch/ai-project-management-platform',
+    github_project_name: 'arieldeitch/ai-project-management-platform',
+    local_folder_path: 'C:/Users/user/Desktop/AI/ניהול פרויקטים/platform',
+    current_execution_path: 'Governance implementation — Phase 1 (Execution Context) + Phase 2 (Doc Health)',
   },
   {
     name: 'Personal Habits App',
@@ -23,6 +30,7 @@ export const SEED_PROJECTS: ProjectCreateInput[] = [
     goal: 'Track daily habits with minimal friction',
     next_action: 'Add sleep duration reporting and alarm sync',
     current_phase: 'Advanced development',
+    project_type: 'software',
   },
   {
     name: 'Project Specification Format',
@@ -33,6 +41,7 @@ export const SEED_PROJECTS: ProjectCreateInput[] = [
     goal: 'Standardize project specs to reduce rework and misalignment across all projects',
     next_action: 'Document lessons learned from last 3 projects — capture what went wrong and what the spec should have caught',
     current_phase: 'Iteration',
+    project_type: 'personal',
   },
 
   // ── SCOPED ─────────────────────────────────────────────────────────────
@@ -46,6 +55,7 @@ export const SEED_PROJECTS: ProjectCreateInput[] = [
     goal: 'Automate boilerplate app writing to cut time-to-first-working-version by 50%',
     next_action: 'Define agent input format: what does a complete spec look like, and what output quality is acceptable for v1',
     current_phase: 'Scoping',
+    project_type: 'ai_agent',
   },
   {
     name: 'Material Management Platform',
@@ -56,6 +66,7 @@ export const SEED_PROJECTS: ProjectCreateInput[] = [
     goal: 'Centralize material planning and automate Sveta communications',
     next_action: 'Confirm workflow with Sveta: which planning files does she work with, what is the most painful part of the current process, what does a useful email from the system look like',
     current_phase: 'Scoping',
+    project_type: 'automation',
   },
 
   // ── BLOCKED ────────────────────────────────────────────────────────────
@@ -69,6 +80,7 @@ export const SEED_PROJECTS: ProjectCreateInput[] = [
     goal: 'Streamline India returns process and reduce manual tracking',
     next_action: 'Send structured requirements request to India team: (1) Walk me through a typical return — what triggers it? (2) What data exists when a return is initiated? (3) Who needs to act on it and in what sequence? (4) What is currently tracked manually vs. lost? Request written answers by end of next week.',
     blocked_reason: 'Waiting on India team to define exact return workflow requirements',
+    project_type: 'software',
   },
   {
     name: 'Weekly Reporting Platform',
@@ -79,6 +91,7 @@ export const SEED_PROJECTS: ProjectCreateInput[] = [
     goal: 'Cut weekly report preparation time by 80%',
     next_action: 'Schedule 30-minute conversation with Zvika: (1) What should the weekly report contain? (2) Who reads it and when? (3) What format does it need to be in? Note: this same conversation scopes the Zvika Operations Platform — combine both into one session.',
     blocked_reason: 'Report format not yet standardized — need stakeholder alignment with Zvika',
+    project_type: 'automation',
   },
   {
     name: 'Home Task Management App',
@@ -89,6 +102,7 @@ export const SEED_PROJECTS: ProjectCreateInput[] = [
     goal: 'Replace informal household task tracking',
     next_action: 'Decide on ONE use case for v1: either (A) chore rotation and completion tracking for Tom and Roni, or (B) household maintenance task assignment for adults. Everything else is out of scope until v1 ships.',
     blocked_reason: 'Scope too broad — need to pick a single use case before any development can begin',
+    project_type: 'software',
   },
 
   // ── IDEA ───────────────────────────────────────────────────────────────
@@ -102,6 +116,7 @@ export const SEED_PROJECTS: ProjectCreateInput[] = [
     goal: 'Structured operational tracking with Zvika, replacing ad-hoc coordination',
     next_action: 'Scope during the same Zvika conversation that unblocks Weekly Reporting Platform — both projects share the same stakeholder input session',
     current_phase: 'Scoping',
+    project_type: 'operations',
   },
   {
     name: 'Monday.com Alternative',
@@ -112,6 +127,7 @@ export const SEED_PROJECTS: ProjectCreateInput[] = [
     goal: 'Replace Monday.com with a purpose-built tool that fits actual work patterns',
     next_action: 'Document Monday.com pain points — list the top 5 things it does wrong or that you work around regularly',
     current_phase: 'Scoping',
+    project_type: 'software',
   },
   {
     name: 'India Joint Task Management',
@@ -121,6 +137,7 @@ export const SEED_PROJECTS: ProjectCreateInput[] = [
     domain: 'work',
     goal: 'Replace WhatsApp/email task coordination with India team',
     next_action: 'Assess India team tool preferences and constraints — add to India Returns App requirements conversation',
+    project_type: 'operations',
   },
   {
     name: 'India Packing Orders Tool',
@@ -130,6 +147,7 @@ export const SEED_PROJECTS: ProjectCreateInput[] = [
     domain: 'work',
     goal: 'Replace manual packing order tracking with a structured tool',
     next_action: 'Document current packing order process — wait for India Returns App collaboration to establish the working pattern first',
+    project_type: 'operations',
   },
   {
     name: 'App Testing Agent',
@@ -140,6 +158,7 @@ export const SEED_PROJECTS: ProjectCreateInput[] = [
     goal: 'Achieve consistent automated testing coverage across all personal apps',
     next_action: 'Blocked on App Writing Agent — revisit once writing agent is active and producing consistent app outputs with testable structure',
     current_phase: 'Scoping',
+    project_type: 'ai_agent',
   },
   {
     name: 'Expense Optimization App',
@@ -150,6 +169,7 @@ export const SEED_PROJECTS: ProjectCreateInput[] = [
     goal: 'Full visibility into personal finances — find and eliminate unnecessary expenses through AI-powered analysis of invoices, insurance, and recurring costs',
     next_action: 'Prototype invoice parsing for supermarket receipts as the first concrete module',
     current_phase: 'Scoping',
+    project_type: 'software',
   },
   {
     name: 'Travel Optimization Platform',
@@ -160,6 +180,7 @@ export const SEED_PROJECTS: ProjectCreateInput[] = [
     goal: 'Maximize travel value through AI-powered deal discovery and personalized planning',
     next_action: 'When activating: start with the deal-scouting module only (Booking/Skyscanner search + dynamic weighting). Loyalty club integration and full personalization are v2+.',
     current_phase: 'Scoping',
+    project_type: 'software',
   },
   {
     name: 'Employment Opportunities App',
@@ -170,6 +191,7 @@ export const SEED_PROJECTS: ProjectCreateInput[] = [
     goal: 'Automate job market scanning for both career profiles',
     next_action: 'Activate only when actively looking — first step is defining career criteria for both profiles: role type, industry, compensation range, location preferences',
     current_phase: 'Scoping',
+    project_type: 'ai_agent',
   },
   {
     name: 'AI Learning Management Platform',
@@ -179,6 +201,7 @@ export const SEED_PROJECTS: ProjectCreateInput[] = [
     domain: 'personal',
     goal: 'Structured AI learning for the whole family',
     next_action: 'Define learning tracks for each family member — what should each person know at 3 months, 6 months, 1 year',
+    project_type: 'software',
   },
   {
     name: 'Shopping Management App',
@@ -188,6 +211,7 @@ export const SEED_PROJECTS: ProjectCreateInput[] = [
     domain: 'personal',
     goal: 'Reduce friction in weekly grocery planning',
     next_action: 'Define core features and differentiation from existing apps',
+    project_type: 'software',
   },
   {
     name: 'OCD Support App',
@@ -197,6 +221,7 @@ export const SEED_PROJECTS: ProjectCreateInput[] = [
     domain: 'personal',
     goal: 'Reduce OCD checking anxiety with a minimal tracking tool',
     next_action: 'Define core interaction model — what does one "check" event look like and what is the user supposed to feel after logging it',
+    project_type: 'software',
   },
   {
     name: "Tom's Personal Development App",
@@ -206,6 +231,7 @@ export const SEED_PROJECTS: ProjectCreateInput[] = [
     domain: 'personal',
     goal: "Build Tom's curiosity and self-directed learning habit",
     next_action: 'Define age-appropriate learning framework',
+    project_type: 'software',
   },
   {
     name: "Roni's Personal Development App",
@@ -215,6 +241,7 @@ export const SEED_PROJECTS: ProjectCreateInput[] = [
     domain: 'personal',
     goal: "Support Roni's personal growth and learning",
     next_action: "Define scope based on Roni's current interests",
+    project_type: 'software',
   },
 
   // ── COMPLETED ──────────────────────────────────────────────────────────
@@ -228,6 +255,7 @@ export const SEED_PROJECTS: ProjectCreateInput[] = [
     goal: 'Track workouts and progressive overload for Tom',
     next_action: 'Routine version updates only',
     current_phase: 'Maintenance',
+    project_type: 'software',
   },
   {
     name: "Roni's Training App",
@@ -238,6 +266,7 @@ export const SEED_PROJECTS: ProjectCreateInput[] = [
     goal: 'Track workouts and progressive overload for Roni',
     next_action: 'Routine version updates only',
     current_phase: 'Maintenance',
+    project_type: 'software',
   },
 
   // ── ARCHIVED ───────────────────────────────────────────────────────────
@@ -250,6 +279,7 @@ export const SEED_PROJECTS: ProjectCreateInput[] = [
     domain: 'personal',
     goal: 'Full visibility into personal finances',
     next_action: '',
+    project_type: 'software',
   },
   {
     name: 'Trips and Vacations App',
@@ -259,6 +289,7 @@ export const SEED_PROJECTS: ProjectCreateInput[] = [
     domain: 'personal',
     goal: 'Automate vacation research and deal finding',
     next_action: '',
+    project_type: 'software',
   },
   {
     name: 'Travel Expense Reimbursement Platform',
@@ -268,6 +299,7 @@ export const SEED_PROJECTS: ProjectCreateInput[] = [
     domain: 'work',
     goal: 'Eliminate manual expense report preparation',
     next_action: '',
+    project_type: 'operations',
   },
   {
     name: 'Development Projects Management Platform',
@@ -277,5 +309,6 @@ export const SEED_PROJECTS: ProjectCreateInput[] = [
     domain: 'work',
     goal: 'Better visibility into development project status and blockers',
     next_action: '',
+    project_type: 'software',
   },
 ]

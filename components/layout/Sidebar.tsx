@@ -1,15 +1,16 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useProjectsStore } from '@/store/projects.store'
+import { useKnowledgeStore } from '@/store/knowledge.store'
 import {
   LayoutDashboard, FolderKanban, CheckSquare, Bot,
-  BookOpen, FileText, Settings, Sparkles, AlertTriangle,
+  BookOpen, FileText, Settings, Sparkles, AlertTriangle, FileX,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import type { ProjectPriority } from '@/types/entities'
+import type { ProjectPriority, DocRole } from '@/types/entities'
 
 /* ── nav config ────────────────────────────────────────────── */
 
@@ -27,6 +28,19 @@ const BOTTOM_ITEMS = [
 ]
 
 const PRIORITY_ORDER: ProjectPriority[] = ['critical', 'high', 'medium', 'low', 'unset']
+
+const CRITICAL_DOC_ROLES: DocRole[] = ['handoff_document', 'implementation_blueprint']
+
+const CRITICAL_ROLE_LABELS: Record<DocRole, string> = {
+  handoff_document:         'handoff',
+  implementation_blueprint: 'blueprint',
+  ux_notes:                 'UX notes',
+  decisions_log:            'decisions',
+  execution_board:          'exec board',
+  release_notes:            'release notes',
+  deployment_report:        'deployment',
+  recovery_report:          'recovery',
+}
 
 /* ── NavItem ───────────────────────────────────────────────── */
 
@@ -75,10 +89,14 @@ function SectionLabel({ children, className }: { children: React.ReactNode; clas
 export function Sidebar() {
   const pathname = usePathname()
   const { projects, load } = useProjectsStore()
+  const { items: knowledgeItems, load: loadKnowledge } = useKnowledgeStore()
+  const [knowledgeInitialized, setKnowledgeInitialized] = useState(false)
+
+  useEffect(() => { load() }, [load])
 
   useEffect(() => {
-    load()
-  }, [load])
+    loadKnowledge().then(() => setKnowledgeInitialized(true))
+  }, [loadKnowledge])
 
   /* Command center derived data — no new queries, all from store state */
   const activeCount  = projects.filter((p) => p.status === 'active').length
@@ -102,6 +120,23 @@ export function Sidebar() {
       (a, b) => PRIORITY_ORDER.indexOf(a.priority) - PRIORITY_ORDER.indexOf(b.priority),
     )
     .slice(0, 4)
+
+  /* Docs Missing — active/scoped projects missing critical doc roles */
+  const docsMissingProjects = knowledgeInitialized
+    ? projects
+        .filter((p) => p.status === 'active' || p.status === 'scoped')
+        .map((p) => {
+          const projectDocs = knowledgeItems.filter(
+            (k) => k.project_id === p.id && k.doc_role,
+          )
+          const missing = CRITICAL_DOC_ROLES.filter(
+            (role) => !projectDocs.some((k) => k.doc_role === role),
+          )
+          return { project: p, missing }
+        })
+        .filter((x) => x.missing.length > 0)
+        .slice(0, 3)
+    : []
 
   const hasCommandData = projects.length > 0
 
@@ -195,6 +230,32 @@ export function Sidebar() {
                         {p.blocked_reason}
                       </p>
                     )}
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Docs Missing */}
+          {docsMissingProjects.length > 0 && (
+            <div>
+              <div className="mb-1.5 flex items-center gap-1">
+                <FileX className="h-2.5 w-2.5 text-amber-500" />
+                <SectionLabel className="mb-0 text-amber-600">Docs Missing</SectionLabel>
+              </div>
+              <div className="flex flex-col gap-0.5">
+                {docsMissingProjects.map(({ project, missing }) => (
+                  <Link
+                    key={project.id}
+                    href={`/projects/${project.id}?tab=knowledge`}
+                    className="group rounded px-1.5 py-1 transition-colors hover:bg-sidebar-accent/60"
+                  >
+                    <p className="text-[11px] font-medium leading-snug text-foreground line-clamp-1 transition-colors group-hover:text-primary">
+                      {project.name}
+                    </p>
+                    <p className="mt-0.5 text-[10px] leading-snug text-amber-600/80 line-clamp-1">
+                      Missing: {missing.map((r) => CRITICAL_ROLE_LABELS[r]).join(', ')}
+                    </p>
                   </Link>
                 ))}
               </div>

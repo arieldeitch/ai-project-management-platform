@@ -33,6 +33,16 @@ class AppDatabase extends Dexie {
       decisions:      'id, project_id, status, created_at, updated_at',
       knowledge:      'id, project_id, item_type, created_at, updated_at',
     })
+
+    /* v4 — governance: project_type index on projects, doc_role index on knowledge */
+    this.version(4).stores({
+      projects:       'id, name, status, priority, domain, project_type, created_at, updated_at',
+      tasks:          'id, project_id, status, priority, created_at, updated_at',
+      assets:         'id, name, asset_type, status, created_at, updated_at',
+      project_assets: '[project_id+asset_id], project_id, asset_id',
+      decisions:      'id, project_id, status, created_at, updated_at',
+      knowledge:      'id, project_id, item_type, doc_role, created_at, updated_at',
+    })
   }
 }
 

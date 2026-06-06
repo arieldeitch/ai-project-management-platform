@@ -11,6 +11,27 @@ export type ProjectPriority = 'critical' | 'high' | 'medium' | 'low' | 'unset'
 
 export type ProjectDomain = 'personal' | 'work' | 'general'
 
+export type ProjectType =
+  | 'software'
+  | 'ai_agent'
+  | 'automation'
+  | 'operations'
+  | 'research'
+  | 'personal'
+  | 'infrastructure'
+
+export type DocRole =
+  | 'handoff_document'
+  | 'implementation_blueprint'
+  | 'ux_notes'
+  | 'decisions_log'
+  | 'execution_board'
+  | 'release_notes'
+  | 'deployment_report'
+  | 'recovery_report'
+
+export type DocStatus = 'draft' | 'current' | 'outdated'
+
 export interface Project {
   id: string
   name: string
@@ -23,6 +44,17 @@ export interface Project {
   goal?: string
   current_phase?: string
   blocked_reason?: string
+  /* Governance — Project classification + Execution Context */
+  project_type?: ProjectType
+  assigned_gpt?: string
+  primary_workspace?: string
+  repository_url?: string
+  github_project_name?: string
+  local_folder_path?: string
+  production_url?: string
+  lovable_url?: string
+  vercel_url?: string
+  current_execution_path?: string
   created_at: string
   updated_at: string
 }
@@ -102,6 +134,9 @@ export interface KnowledgeItem {
   item_type: KnowledgeType
   body: string
   source_url: string
+  /* Governance — Documentation Progress */
+  doc_role?: DocRole
+  doc_status?: DocStatus
   created_at: string
   updated_at: string
 }

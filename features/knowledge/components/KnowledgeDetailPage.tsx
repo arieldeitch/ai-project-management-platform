@@ -15,7 +15,7 @@ import {
 import { ArrowLeft, MoreHorizontal, Trash2, Loader2, ExternalLink } from 'lucide-react'
 import { format } from 'date-fns'
 import { cn } from '@/lib/utils'
-import type { KnowledgeType } from '@/types/entities'
+import type { KnowledgeType, DocRole, DocStatus } from '@/types/entities'
 
 const TYPE_CONFIG: Record<KnowledgeType, { label: string; color: string }> = {
   note:      { label: 'Note',      color: 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400' },
@@ -23,6 +23,23 @@ const TYPE_CONFIG: Record<KnowledgeType, { label: string; color: string }> = {
   learning:  { label: 'Learning',  color: 'bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-400' },
   process:   { label: 'Process',   color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400' },
   research:  { label: 'Research',  color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400' },
+}
+
+const DOC_ROLE_LABELS: Record<DocRole, string> = {
+  handoff_document:         'Handoff Document',
+  implementation_blueprint: 'Implementation Blueprint',
+  ux_notes:                 'UX Notes',
+  decisions_log:            'Decisions Log',
+  execution_board:          'Execution Board',
+  release_notes:            'Release Notes',
+  deployment_report:        'Deployment Report',
+  recovery_report:          'Recovery Report',
+}
+
+const DOC_STATUS_STYLE: Record<DocStatus, string> = {
+  current:  'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400',
+  draft:    'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400',
+  outdated: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400',
 }
 
 function MetaRow({ label, children }: { label: string; children: React.ReactNode }) {
@@ -136,6 +153,26 @@ export function KnowledgeDetailPage({ itemId }: { itemId: string }) {
                       {cfg.label}
                     </span>
                   </MetaRow>
+
+                  {item.doc_role && (
+                    <MetaRow label="Doc Role">
+                      <span className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
+                        {DOC_ROLE_LABELS[item.doc_role]}
+                      </span>
+                    </MetaRow>
+                  )}
+
+                  {item.doc_status && (
+                    <MetaRow label="Doc Status">
+                      <span className={cn(
+                        'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium',
+                        DOC_STATUS_STYLE[item.doc_status],
+                      )}>
+                        {item.doc_status.charAt(0).toUpperCase() + item.doc_status.slice(1)}
+                      </span>
+                    </MetaRow>
+                  )}
+
                   {item.source_url && (
                     <MetaRow label="Source">
                       <a

@@ -42,11 +42,13 @@ import { Textarea } from '@/components/ui/textarea'
 import {
   ArrowLeft, MoreHorizontal, Archive, Trash2, Loader2, AlertTriangle, Target,
   Plus, Check, X, Bot, BookOpen, FileText, ExternalLink, Pencil,
+  ChevronDown, ChevronUp,
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { cn } from '@/lib/utils'
 import type {
-  Project, ProjectStatus, ProjectPriority, ProjectDomain,
+  Project, ProjectStatus, ProjectPriority, ProjectDomain, ProjectType,
+  DocRole, DocStatus,
   AIAsset, Decision, KnowledgeItem,
 } from '@/types/entities'
 
@@ -75,6 +77,33 @@ const DOMAIN_OPTIONS: { value: ProjectDomain; label: string }[] = [
   { value: 'work',     label: 'Work' },
   { value: 'general',  label: 'General' },
 ]
+
+const PROJECT_TYPE_OPTIONS: { value: ProjectType; label: string }[] = [
+  { value: 'software',       label: 'Software' },
+  { value: 'ai_agent',       label: 'AI Agent' },
+  { value: 'automation',     label: 'Automation' },
+  { value: 'operations',     label: 'Operations' },
+  { value: 'research',       label: 'Research' },
+  { value: 'personal',       label: 'Personal' },
+  { value: 'infrastructure', label: 'Infrastructure' },
+]
+
+const DOC_ROLE_CONFIG: { role: DocRole; label: string; critical: boolean }[] = [
+  { role: 'handoff_document',         label: 'Handoff Document',       critical: true },
+  { role: 'implementation_blueprint', label: 'Implementation Blueprint', critical: true },
+  { role: 'ux_notes',                 label: 'UX Notes',               critical: false },
+  { role: 'decisions_log',            label: 'Decisions Log',          critical: false },
+  { role: 'execution_board',          label: 'Execution Board',        critical: false },
+  { role: 'release_notes',            label: 'Release Notes',          critical: false },
+  { role: 'deployment_report',        label: 'Deployment Report',      critical: false },
+  { role: 'recovery_report',          label: 'Recovery Report',        critical: false },
+]
+
+const DOC_STATUS_STYLE: Record<DocStatus, string> = {
+  current:  'bg-emerald-50 text-emerald-700',
+  draft:    'bg-amber-50 text-amber-700',
+  outdated: 'bg-red-50 text-red-700',
+}
 
 /* ── inline editable field ─────────────────────────────────── */
 
@@ -155,12 +184,56 @@ function InlineText({
   )
 }
 
+/* ── InlineUrl: editable text + external link icon when set ─── */
+
+function InlineUrl({
+  value,
+  placeholder,
+  onSave,
+}: {
+  value: string
+  placeholder: string
+  onSave: (v: string) => void
+}) {
+  return (
+    <div className="flex items-center gap-1 min-w-0">
+      <div className="flex-1 min-w-0">
+        <InlineText value={value} placeholder={placeholder} onSave={onSave} />
+      </div>
+      {value && (
+        <a
+          href={value}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="shrink-0 rounded p-0.5 text-muted-foreground hover:text-primary transition-colors"
+          title="Open in browser"
+        >
+          <ExternalLink className="h-3 w-3" />
+        </a>
+      )}
+    </div>
+  )
+}
+
 /* ── meta row ──────────────────────────────────────────────── */
 
 function MetaRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex items-start gap-4 border-b border-border py-3 last:border-0">
       <span className="w-24 shrink-0 pt-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+        {label}
+      </span>
+      <div className="flex-1 min-w-0">{children}</div>
+    </div>
+  )
+}
+
+/* ── ExecRow: compact label + value for execution context ────── */
+
+function ExecRow({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex items-start gap-3 py-2 border-b border-border/50 last:border-0">
+      <span className="w-20 shrink-0 pt-0.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
         {label}
       </span>
       <div className="flex-1 min-w-0">{children}</div>
@@ -178,11 +251,12 @@ export function ProjectDetailPage({ projectId }: ProjectDetailPageProps) {
   const router = useRouter()
   const { projects, isLoading, load, update, remove } = useProjectsStore()
   const { tasks, loadByProject } = useTasksStore()
-  const [deleteOpen,     setDeleteOpen]     = useState(false)
-  const [deleting,       setDeleting]       = useState(false)
-  const [statusChanging, setStatusChanging] = useState(false)
-  const [tab,            setTab]            = useState('overview')
-  const [showTaskForm,   setShowTaskForm]   = useState(false)
+  const [deleteOpen,      setDeleteOpen]     = useState(false)
+  const [deleting,        setDeleting]       = useState(false)
+  const [statusChanging,  setStatusChanging] = useState(false)
+  const [tab,             setTab]            = useState('overview')
+  const [showTaskForm,    setShowTaskForm]   = useState(false)
+  const [execContextOpen, setExecContextOpen] = useState(false)
 
   const [projectAssets,    setProjectAssets]    = useState<AIAsset[]>([])
   const [projectDecisions, setProjectDecisions] = useState<Decision[]>([])
@@ -192,29 +266,31 @@ export function ProjectDetailPage({ projectId }: ProjectDetailPageProps) {
 
   const project = projects.find((p) => p.id === projectId)
 
-  /* load tasks when tasks tab is opened */
+  /* open exec context panel when project has data */
   useEffect(() => {
-    if (tab === 'tasks' && project) {
-      loadByProject(project.id)
+    if (project) {
+      const hasData = !!(
+        project.assigned_gpt || project.primary_workspace || project.repository_url ||
+        project.local_folder_path || project.production_url
+      )
+      setExecContextOpen(hasData)
     }
+  }, [project?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (tab === 'tasks' && project) loadByProject(project.id)
   }, [tab, project, loadByProject])
 
   useEffect(() => {
-    if (tab === 'assets' && project) {
-      AssetsRepository.findByProject(project.id).then(setProjectAssets)
-    }
+    if (tab === 'assets' && project) AssetsRepository.findByProject(project.id).then(setProjectAssets)
   }, [tab, project])
 
   useEffect(() => {
-    if (tab === 'decisions' && project) {
-      DecisionsRepository.findByProject(project.id).then(setProjectDecisions)
-    }
+    if (tab === 'decisions' && project) DecisionsRepository.findByProject(project.id).then(setProjectDecisions)
   }, [tab, project])
 
   useEffect(() => {
-    if (tab === 'knowledge' && project) {
-      KnowledgeRepository.findByProject(project.id).then(setProjectKnowledge)
-    }
+    if (tab === 'knowledge' && project) KnowledgeRepository.findByProject(project.id).then(setProjectKnowledge)
   }, [tab, project])
 
   const projectTasks = tasks.filter((t) => t.project_id === projectId)
@@ -236,7 +312,12 @@ export function ProjectDetailPage({ projectId }: ProjectDetailPageProps) {
 
   async function handleFieldSave(field: keyof Project, value: string) {
     if (!project) return
-    await update(project.id, { [field]: value })
+    await update(project.id, { [field]: value } as never)
+  }
+
+  async function handleProjectType(v: string) {
+    if (!project) return
+    await update(project.id, { project_type: v ? (v as ProjectType) : undefined })
   }
 
   async function handleArchive() {
@@ -289,6 +370,13 @@ export function ProjectDetailPage({ projectId }: ProjectDetailPageProps) {
   const openTasks    = projectTasks.filter((t) => t.status !== 'done')
   const blockedTasks = projectTasks.filter((t) => t.status === 'blocked')
   const doneTasks    = projectTasks.filter((t) => t.status === 'done')
+
+  /* ── execution context filled check ─────────────────────── */
+  const hasExecData = !!(
+    project.assigned_gpt || project.primary_workspace || project.repository_url ||
+    project.github_project_name || project.local_folder_path || project.production_url ||
+    project.lovable_url || project.vercel_url || project.current_execution_path
+  )
 
   return (
     <>
@@ -589,6 +677,55 @@ export function ProjectDetailPage({ projectId }: ProjectDetailPageProps) {
 
                 {tab === 'knowledge' && (
                   <div className="space-y-4">
+                    {/* Documentation Health checklist */}
+                    <div className="rounded-lg border border-border bg-card p-4">
+                      <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                        Documentation Health
+                      </h3>
+                      <div className="space-y-1">
+                        {DOC_ROLE_CONFIG.map(({ role, label, critical }) => {
+                          const docItem = projectKnowledge.find((k) => k.doc_role === role)
+                          const status = docItem?.doc_status ?? null
+
+                          return (
+                            <div key={role} className="flex items-center justify-between gap-2 py-1">
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                {critical && (
+                                  <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" title="Critical" />
+                                )}
+                                <span className={cn(
+                                  'text-xs truncate',
+                                  !docItem && 'text-muted-foreground',
+                                  docItem && 'text-foreground',
+                                )}>
+                                  {label}
+                                </span>
+                              </div>
+                              {!docItem ? (
+                                <Link
+                                  href={`/knowledge/new?project=${projectId}&doc_role=${role}`}
+                                  className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground hover:text-primary hover:bg-muted/60 transition-colors"
+                                >
+                                  + Add
+                                </Link>
+                              ) : (
+                                <Link
+                                  href={`/knowledge/${docItem.id}`}
+                                  className={cn(
+                                    'shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium transition-colors hover:opacity-80',
+                                    status ? DOC_STATUS_STYLE[status] : 'bg-muted text-muted-foreground',
+                                  )}
+                                >
+                                  {status ?? 'unset'}
+                                </Link>
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Knowledge items list */}
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-muted-foreground">
                         {projectKnowledge.length} item{projectKnowledge.length !== 1 ? 's' : ''}
@@ -624,9 +761,24 @@ export function ProjectDetailPage({ projectId }: ProjectDetailPageProps) {
                                 <p className="text-xs text-muted-foreground truncate">{item.body}</p>
                               )}
                             </div>
-                            <span className="text-xs text-muted-foreground capitalize shrink-0 mt-0.5">
-                              {item.item_type}
-                            </span>
+                            <div className="flex items-center gap-1.5 shrink-0 mt-0.5">
+                              {item.doc_role && (
+                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/8 text-primary font-medium">
+                                  {item.doc_role.replace(/_/g, ' ')}
+                                </span>
+                              )}
+                              {item.doc_status && (
+                                <span className={cn(
+                                  'text-[10px] px-1.5 py-0.5 rounded font-medium',
+                                  DOC_STATUS_STYLE[item.doc_status],
+                                )}>
+                                  {item.doc_status}
+                                </span>
+                              )}
+                              <span className="text-xs text-muted-foreground capitalize">
+                                {item.item_type}
+                              </span>
+                            </div>
                             <ExternalLink className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                           </Link>
                         ))}
@@ -636,8 +788,10 @@ export function ProjectDetailPage({ projectId }: ProjectDetailPageProps) {
                 )}
               </div>
 
-              {/* Meta panel — all inline-editable */}
-              <div className="lg:col-span-1">
+              {/* Right column — Meta + Execution Context */}
+              <div className="space-y-4 lg:col-span-1">
+
+                {/* Main meta card */}
                 <div className="rounded-lg border border-border bg-card p-4">
                   {/* Status */}
                   <MetaRow label="Status">
@@ -671,6 +825,30 @@ export function ProjectDetailPage({ projectId }: ProjectDetailPageProps) {
                       </SelectTrigger>
                       <SelectContent>
                         {PRIORITY_OPTIONS.map((opt) => (
+                          <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </MetaRow>
+
+                  {/* Type */}
+                  <MetaRow label="Type">
+                    <Select
+                      value={project.project_type ?? ''}
+                      onValueChange={(v) => handleProjectType(v ?? '')}
+                    >
+                      <SelectTrigger className="h-auto border-0 bg-transparent p-0 shadow-none focus:ring-0 [&_svg]:ml-1">
+                        {project.project_type ? (
+                          <span className="text-sm capitalize">
+                            {PROJECT_TYPE_OPTIONS.find((o) => o.value === project.project_type)?.label ?? project.project_type}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-muted-foreground italic">None</span>
+                        )}
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">No type</SelectItem>
+                        {PROJECT_TYPE_OPTIONS.map((opt) => (
                           <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
                         ))}
                       </SelectContent>
@@ -718,6 +896,102 @@ export function ProjectDetailPage({ projectId }: ProjectDetailPageProps) {
                     </span>
                   </MetaRow>
                 </div>
+
+                {/* Execution Context card */}
+                <div className="rounded-lg border border-border bg-card">
+                  <button
+                    onClick={() => setExecContextOpen(!execContextOpen)}
+                    className="flex w-full items-center justify-between px-4 py-3 text-left"
+                  >
+                    <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      Execution Context
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      {!execContextOpen && hasExecData && (
+                        <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+                          {[
+                            project.assigned_gpt, project.primary_workspace, project.repository_url,
+                            project.local_folder_path, project.production_url, project.lovable_url,
+                            project.vercel_url, project.current_execution_path,
+                          ].filter(Boolean).length} fields
+                        </span>
+                      )}
+                      {execContextOpen
+                        ? <ChevronUp className="h-3.5 w-3.5 text-muted-foreground" />
+                        : <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                      }
+                    </div>
+                  </button>
+
+                  {execContextOpen && (
+                    <div className="border-t border-border px-4 pb-3 pt-1">
+                      <ExecRow label="GPT">
+                        <InlineText
+                          value={project.assigned_gpt ?? ''}
+                          placeholder="AI assistant..."
+                          onSave={(v) => handleFieldSave('assigned_gpt', v)}
+                        />
+                      </ExecRow>
+                      <ExecRow label="Workspace">
+                        <InlineText
+                          value={project.primary_workspace ?? ''}
+                          placeholder="IDE or tool..."
+                          onSave={(v) => handleFieldSave('primary_workspace', v)}
+                        />
+                      </ExecRow>
+                      <ExecRow label="Repo URL">
+                        <InlineUrl
+                          value={project.repository_url ?? ''}
+                          placeholder="https://github.com/..."
+                          onSave={(v) => handleFieldSave('repository_url', v)}
+                        />
+                      </ExecRow>
+                      <ExecRow label="GitHub">
+                        <InlineText
+                          value={project.github_project_name ?? ''}
+                          placeholder="owner/repo"
+                          onSave={(v) => handleFieldSave('github_project_name', v)}
+                        />
+                      </ExecRow>
+                      <ExecRow label="Local Dir">
+                        <InlineText
+                          value={project.local_folder_path ?? ''}
+                          placeholder="C:/Users/..."
+                          onSave={(v) => handleFieldSave('local_folder_path', v)}
+                        />
+                      </ExecRow>
+                      <ExecRow label="Production">
+                        <InlineUrl
+                          value={project.production_url ?? ''}
+                          placeholder="https://..."
+                          onSave={(v) => handleFieldSave('production_url', v)}
+                        />
+                      </ExecRow>
+                      <ExecRow label="Lovable">
+                        <InlineUrl
+                          value={project.lovable_url ?? ''}
+                          placeholder="https://...lovable.app"
+                          onSave={(v) => handleFieldSave('lovable_url', v)}
+                        />
+                      </ExecRow>
+                      <ExecRow label="Vercel">
+                        <InlineUrl
+                          value={project.vercel_url ?? ''}
+                          placeholder="https://...vercel.app"
+                          onSave={(v) => handleFieldSave('vercel_url', v)}
+                        />
+                      </ExecRow>
+                      <ExecRow label="Exec Path">
+                        <InlineText
+                          value={project.current_execution_path ?? ''}
+                          placeholder="Active session description..."
+                          onSave={(v) => handleFieldSave('current_execution_path', v)}
+                        />
+                      </ExecRow>
+                    </div>
+                  )}
+                </div>
+
               </div>
 
             </div>

@@ -14,7 +14,7 @@ import {
 import { TopBar } from '@/components/layout/TopBar'
 import { ArrowLeft, Loader2 } from 'lucide-react'
 import Link from 'next/link'
-import type { KnowledgeItem, KnowledgeType } from '@/types/entities'
+import type { KnowledgeItem, KnowledgeType, DocRole, DocStatus } from '@/types/entities'
 
 const TYPE_OPTIONS: { value: KnowledgeType; label: string }[] = [
   { value: 'note',      label: 'Note' },
@@ -24,13 +24,31 @@ const TYPE_OPTIONS: { value: KnowledgeType; label: string }[] = [
   { value: 'research',  label: 'Research' },
 ]
 
+const DOC_ROLE_OPTIONS: { value: DocRole; label: string }[] = [
+  { value: 'handoff_document',         label: 'Handoff Document' },
+  { value: 'implementation_blueprint', label: 'Implementation Blueprint' },
+  { value: 'ux_notes',                 label: 'UX Notes' },
+  { value: 'decisions_log',            label: 'Decisions Log' },
+  { value: 'execution_board',          label: 'Execution Board' },
+  { value: 'release_notes',            label: 'Release Notes' },
+  { value: 'deployment_report',        label: 'Deployment Report' },
+  { value: 'recovery_report',          label: 'Recovery Report' },
+]
+
+const DOC_STATUS_OPTIONS: { value: DocStatus; label: string }[] = [
+  { value: 'draft',    label: 'Draft' },
+  { value: 'current',  label: 'Current' },
+  { value: 'outdated', label: 'Outdated' },
+]
+
 interface KnowledgeFormProps {
   mode: 'create' | 'edit'
   item?: KnowledgeItem
   defaultProjectId?: string
+  defaultDocRole?: DocRole
 }
 
-export function KnowledgeForm({ mode, item, defaultProjectId }: KnowledgeFormProps) {
+export function KnowledgeForm({ mode, item, defaultProjectId, defaultDocRole }: KnowledgeFormProps) {
   const router = useRouter()
   const { create, update } = useKnowledgeStore()
   const { projects } = useProjectsStore()
@@ -40,6 +58,8 @@ export function KnowledgeForm({ mode, item, defaultProjectId }: KnowledgeFormPro
   const [sourceUrl,     setSourceUrl]     = useState(item?.source_url ?? '')
   const [itemType,      setItemType]      = useState<KnowledgeType>(item?.item_type ?? 'note')
   const [linkedProject, setLinkedProject] = useState(item?.project_id ?? defaultProjectId ?? '')
+  const [docRole,       setDocRole]       = useState<DocRole | ''>(item?.doc_role ?? defaultDocRole ?? '')
+  const [docStatus,     setDocStatus]     = useState<DocStatus | ''>(item?.doc_status ?? '')
   const [saving,        setSaving]        = useState(false)
   const [error,         setError]         = useState<string | null>(null)
 
@@ -59,6 +79,8 @@ export function KnowledgeForm({ mode, item, defaultProjectId }: KnowledgeFormPro
         source_url: sourceUrl,
         item_type:  itemType,
         project_id: linkedProject || null,
+        doc_role:   docRole || undefined,
+        doc_status: docRole && docStatus ? docStatus : undefined,
       }
       if (isEdit) {
         await update(item.id, payload)
@@ -91,9 +113,10 @@ export function KnowledgeForm({ mode, item, defaultProjectId }: KnowledgeFormPro
             <div className="space-y-1.5">
               <Label htmlFor="title">Title <span className="text-destructive">*</span></Label>
               <Input id="title" value={title} onChange={(e) => setTitle(e.target.value)}
-                placeholder="e.g. RLS policy patterns for Supabase" autoFocus />
+                placeholder="e.g. Deployment checklist for Vercel" autoFocus />
             </div>
 
+            {/* Type + Project */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label>Type</Label>
@@ -114,6 +137,31 @@ export function KnowledgeForm({ mode, item, defaultProjectId }: KnowledgeFormPro
                   </SelectContent>
                 </Select>
               </div>
+            </div>
+
+            {/* Doc Role + Doc Status */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label>Document Role</Label>
+                <Select value={docRole} onValueChange={(v) => setDocRole((v as DocRole) ?? '')}>
+                  <SelectTrigger><SelectValue placeholder="No role" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">No role</SelectItem>
+                    {DOC_ROLE_OPTIONS.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              {docRole && (
+                <div className="space-y-1.5">
+                  <Label>Status</Label>
+                  <Select value={docStatus} onValueChange={(v) => setDocStatus((v as DocStatus) ?? '')}>
+                    <SelectTrigger><SelectValue placeholder="No status" /></SelectTrigger>
+                    <SelectContent>
+                      {DOC_STATUS_OPTIONS.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
             </div>
 
             <div className="space-y-1.5">
