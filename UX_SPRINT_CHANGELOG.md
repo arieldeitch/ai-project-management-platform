@@ -35,7 +35,11 @@
 - ProjectsListPage line 250 `ChevronRight` intentionally kept — Kanban advance action, not navigation
 
 ## Phase 4 — Dashboard Command Center
-**Status:** Pending
+**Status:** ✅ Complete
+- **"פעולות הבאות"**: Flat next-action list for all visible active/scoped projects with `next_action` set (max 6, sorted by priority). Compact row: action text + project name + priority badge. Positioned between blocked section and Focus Now.
+- **"מסמכים חסרים"**: Active/scoped projects with zero linked knowledge items highlighted in amber. Links to project detail. Loads `useKnowledgeStore` in the same `useEffect`. Only visible when some active/scoped projects lack docs.
+- **"GPT לא מוגדר"**: Projects in `gpt_setup` workflow status highlighted in violet. Only visible when such projects exist.
+- All three sections are data-driven: render only when the relevant signal has items.
 
 ## Phase 5 — Knowledge Visibility
 **Status:** Pending

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useProjectsStore } from '@/store/projects.store'
+import { useKnowledgeStore } from '@/store/knowledge.store'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { PriorityBadge } from '@/components/shared/PriorityBadge'
 import { DomainBadge } from '@/components/shared/DomainBadge'
@@ -11,6 +12,8 @@ import { buttonVariants } from '@/components/ui/button'
 import {
   AlertTriangle,
   ArrowLeft,
+  Bot,
+  FileWarning,
   Lightbulb,
   Play,
   Target,
@@ -217,11 +220,13 @@ function SectionHeader({
 
 export function DashboardPage() {
   const { projects, isLoading, load } = useProjectsStore()
+  const { items: knowledgeItems, load: loadKnowledge } = useKnowledgeStore()
   const [domainFilter, setDomainFilter] = useState<DomainFilter>('all')
 
   useEffect(() => {
     load()
-  }, [load])
+    loadKnowledge()
+  }, [load, loadKnowledge])
 
   const visible =
     domainFilter === 'all'
@@ -245,6 +250,19 @@ export function DashboardPage() {
   }
 
   const showDomain = domainFilter === 'all'
+
+  // Command center signals
+  const nextActions = visible
+    .filter((p) => (p.status === 'active' || p.status === 'scoped') && p.next_action)
+    .sort(byPriority)
+    .slice(0, 6)
+
+  const projectIdsWithDocs = new Set(knowledgeItems.map((k) => k.project_id).filter(Boolean))
+  const missingDocs = visible
+    .filter((p) => (p.status === 'active' || p.status === 'scoped') && !projectIdsWithDocs.has(p.id))
+    .sort(byPriority)
+
+  const gptPending = visible.filter((p) => p.status === 'gpt_setup').sort(byPriority)
 
   if (isLoading) {
     return (
@@ -361,6 +379,71 @@ export function DashboardPage() {
               <div className="overflow-hidden rounded-lg border border-red-200 border-s-4 border-s-red-500 bg-red-50/40 shadow-card dark:border-red-900/30 dark:border-s-red-600 dark:bg-red-950/10">
                 {blocked.map((p) => (
                   <BlockedRow key={p.id} project={p} />
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* Next Actions */}
+          {nextActions.length > 0 && (
+            <section>
+              <SectionHeader icon={Zap} title="פעולות הבאות" count={nextActions.length} accentClass="text-primary" />
+              <div className="divide-y divide-border overflow-hidden rounded-lg border border-border bg-card shadow-card">
+                {nextActions.map((p) => (
+                  <Link
+                    key={p.id}
+                    href={`/projects/${p.id}`}
+                    className="group flex items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/40"
+                  >
+                    <Zap className="h-3.5 w-3.5 shrink-0 text-primary" />
+                    <span className="min-w-0 flex-1 truncate text-sm text-foreground group-hover:text-primary">
+                      {p.next_action}
+                    </span>
+                    <span className="shrink-0 text-xs text-muted-foreground">{p.name}</span>
+                    <PriorityBadge priority={p.priority} />
+                  </Link>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* Missing Docs */}
+          {missingDocs.length > 0 && (
+            <section>
+              <SectionHeader icon={FileWarning} title="מסמכים חסרים" count={missingDocs.length} accentClass="text-amber-500" />
+              <div className="divide-y divide-amber-200/60 overflow-hidden rounded-lg border border-amber-200 border-s-4 border-s-amber-400 bg-amber-50/40 dark:divide-amber-900/20 dark:border-amber-900/30 dark:border-s-amber-600 dark:bg-amber-950/10">
+                {missingDocs.slice(0, 5).map((p) => (
+                  <Link
+                    key={p.id}
+                    href={`/projects/${p.id}`}
+                    className="group flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-amber-50 dark:hover:bg-amber-950/20"
+                  >
+                    <FileWarning className="h-3.5 w-3.5 shrink-0 text-amber-500" />
+                    <span className="flex-1 text-sm text-foreground group-hover:text-primary">{p.name}</span>
+                    {showDomain && p.domain && <DomainBadge domain={p.domain} />}
+                    <span className="text-xs text-amber-600 dark:text-amber-400">אין תיעוד</span>
+                  </Link>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* GPT Setup Pending */}
+          {gptPending.length > 0 && (
+            <section>
+              <SectionHeader icon={Bot} title="GPT לא מוגדר" count={gptPending.length} accentClass="text-violet-500" />
+              <div className="divide-y divide-violet-200/60 overflow-hidden rounded-lg border border-violet-200 border-s-4 border-s-violet-500 bg-violet-50/40 dark:divide-violet-900/20 dark:border-violet-900/30 dark:border-s-violet-600 dark:bg-violet-950/10">
+                {gptPending.map((p) => (
+                  <Link
+                    key={p.id}
+                    href={`/projects/${p.id}`}
+                    className="group flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-violet-50 dark:hover:bg-violet-950/20"
+                  >
+                    <Bot className="h-3.5 w-3.5 shrink-0 text-violet-500" />
+                    <span className="flex-1 text-sm text-foreground group-hover:text-primary">{p.name}</span>
+                    {showDomain && p.domain && <DomainBadge domain={p.domain} />}
+                    <PriorityBadge priority={p.priority} />
+                  </Link>
                 ))}
               </div>
             </section>
