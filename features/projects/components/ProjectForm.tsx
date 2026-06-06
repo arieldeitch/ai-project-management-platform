@@ -24,7 +24,10 @@ import type {
   ProjectPriority,
   ProjectDomain,
   ProjectType,
+  DataStorageType,
+  PlatformType,
 } from '@/types/entities'
+import { getDraftFieldChecks } from '@/lib/workflow/governance'
 
 const STATUS_OPTIONS: { value: ProjectStatus; label: string }[] = [
   { value: 'draft',                 label: 'טיוטה' },
@@ -65,6 +68,22 @@ const PROJECT_TYPE_OPTIONS: { value: ProjectType; label: string }[] = [
   { value: 'infrastructure', label: 'תשתיות' },
 ]
 
+const DATA_STORAGE_OPTIONS: { value: DataStorageType; label: string }[] = [
+  { value: 'local',        label: 'מקומי' },
+  { value: 'cloud',        label: 'ענן' },
+  { value: 'hybrid',       label: 'היברידי' },
+  { value: 'not_relevant', label: 'לא רלוונטי' },
+]
+
+const PLATFORM_TYPE_OPTIONS: { value: PlatformType; label: string }[] = [
+  { value: 'web',        label: 'Web' },
+  { value: 'mobile',     label: 'Mobile' },
+  { value: 'desktop',    label: 'Desktop' },
+  { value: 'automation', label: 'אוטומציה' },
+  { value: 'gpt_only',   label: 'GPT בלבד' },
+  { value: 'other',      label: 'אחר' },
+]
+
 interface ProjectFormProps {
   mode: 'create' | 'edit'
   project?: Project
@@ -93,9 +112,18 @@ export function ProjectForm({ mode, project }: ProjectFormProps) {
   const [lovableUrl,           setLovableUrl]         = useState(project?.lovable_url ?? '')
   const [vercelUrl,            setVercelUrl]          = useState(project?.vercel_url ?? '')
   const [currentExecutionPath, setCurrentExecutionPath] = useState(project?.current_execution_path ?? '')
+  /* Draft requirement fields */
+  const [idea,             setIdea]            = useState(project?.idea ?? '')
+  const [targetAudience,   setTargetAudience]  = useState(project?.target_audience ?? '')
+  const [dataStorageType,  setDataStorageType] = useState<DataStorageType | ''>(project?.data_storage_type ?? '')
+  const [platformType,     setPlatformType]    = useState<PlatformType | ''>(project?.platform_type ?? '')
+  const [reason,           setReason]          = useState(project?.reason ?? '')
 
   const [execContextOpen, setExecContextOpen] = useState(
     !!(project?.assigned_gpt || project?.primary_workspace || project?.repository_url)
+  )
+  const [draftOpen, setDraftOpen] = useState(
+    mode === 'create' || project?.status === 'draft' || !project?.idea
   )
   const [saving, setSaving] = useState(false)
   const [error,  setError]  = useState<string | null>(null)
@@ -135,6 +163,11 @@ export function ProjectForm({ mode, project }: ProjectFormProps) {
         lovable_url: lovableUrl || undefined,
         vercel_url: vercelUrl || undefined,
         current_execution_path: currentExecutionPath || undefined,
+        idea: idea || undefined,
+        target_audience: targetAudience || undefined,
+        data_storage_type: dataStorageType || undefined,
+        platform_type: platformType || undefined,
+        reason: reason || undefined,
       }
       if (isEdit) {
         await update(project.id, payload)
@@ -199,6 +232,132 @@ export function ProjectForm({ mode, project }: ProjectFormProps) {
                 rows={4}
               />
             </div>
+
+            {/* Draft Requirements — gates progression to Scoped */}
+            {(() => {
+              const draftProxy = {
+                idea, goal, target_audience: targetAudience,
+                data_storage_type: dataStorageType || undefined,
+                platform_type: platformType || undefined,
+                project_type: projectType || undefined,
+                priority, reason, next_action: nextAction,
+              } as Parameters<typeof getDraftFieldChecks>[0]
+              const checks = getDraftFieldChecks(draftProxy)
+              const filledCount = checks.filter((c) => c.filled).length
+              return (
+                <div className="rounded-lg border border-amber-200 bg-amber-50/50 dark:border-amber-900/30 dark:bg-amber-950/10">
+                  <button
+                    type="button"
+                    onClick={() => setDraftOpen(!draftOpen)}
+                    className="flex w-full items-center justify-between px-4 py-3 text-start"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-amber-800 dark:text-amber-300">
+                        דרישות טיוטה
+                      </span>
+                      <span className={cn(
+                        'rounded-full px-1.5 py-0.5 text-[10px] font-semibold',
+                        filledCount === checks.length
+                          ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400'
+                          : 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-400'
+                      )}>
+                        {filledCount}/{checks.length}
+                      </span>
+                    </div>
+                    <span className="text-xs text-muted-foreground">
+                      {draftOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                    </span>
+                  </button>
+
+                  {draftOpen && (
+                    <div className="space-y-4 border-t border-amber-200 px-4 pb-4 pt-4 dark:border-amber-900/30">
+                      <p className="text-xs text-amber-700 dark:text-amber-400">
+                        יש למלא את כל השדות הבאים לפני מעבר לשלב &quot;ממוסגר&quot;.
+                      </p>
+
+                      {/* Idea */}
+                      <div className="space-y-1.5">
+                        <Label htmlFor="idea">
+                          רעיון / תפיסה <span className="text-destructive">*</span>
+                        </Label>
+                        <Textarea
+                          id="idea"
+                          value={idea}
+                          onChange={(e) => setIdea(e.target.value)}
+                          placeholder="מה הרעיון המרכזי? מה הפרויקט עושה?"
+                          rows={3}
+                        />
+                      </div>
+
+                      {/* Target audience */}
+                      <div className="space-y-1.5">
+                        <Label htmlFor="target_audience">
+                          קהל יעד <span className="text-destructive">*</span>
+                        </Label>
+                        <Input
+                          id="target_audience"
+                          value={targetAudience}
+                          onChange={(e) => setTargetAudience(e.target.value)}
+                          placeholder="מי ייהנה מהפרויקט? לדוג' אני, הצוות, לקוחות"
+                        />
+                      </div>
+
+                      {/* Data storage + Platform type */}
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1.5">
+                          <Label htmlFor="data_storage_type">
+                            סוג אחסון נתונים <span className="text-destructive">*</span>
+                          </Label>
+                          <Select value={dataStorageType} onValueChange={(v) => setDataStorageType(v as DataStorageType)}>
+                            <SelectTrigger id="data_storage_type">
+                              <SelectValue placeholder="בחר..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {DATA_STORAGE_OPTIONS.map((opt) => (
+                                <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label htmlFor="platform_type">
+                            פלטפורמה <span className="text-destructive">*</span>
+                          </Label>
+                          <Select value={platformType} onValueChange={(v) => setPlatformType(v as PlatformType)}>
+                            <SelectTrigger id="platform_type">
+                              <SelectValue placeholder="בחר..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {PLATFORM_TYPE_OPTIONS.map((opt) => (
+                                <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+
+                      {/* Reason */}
+                      <div className="space-y-1.5">
+                        <Label htmlFor="reason">
+                          סיבה עסקית / אישית <span className="text-destructive">*</span>
+                        </Label>
+                        <Textarea
+                          id="reason"
+                          value={reason}
+                          onChange={(e) => setReason(e.target.value)}
+                          placeholder="מדוע הפרויקט הזה חשוב? מה הבעיה שהוא פותר?"
+                          rows={2}
+                        />
+                      </div>
+
+                      <p className="text-[11px] text-muted-foreground">
+                        שדות נוספים הנדרשים: <strong>מטרה</strong>, <strong>סוג פרויקט</strong>, <strong>עדיפות</strong>, <strong>פעולה הבאה</strong>
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )
+            })()}
 
             {/* Status + Priority */}
             <div className="grid grid-cols-2 gap-4">

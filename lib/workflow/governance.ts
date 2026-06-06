@@ -129,7 +129,7 @@ export function getTransitionBlockers(
 
 /* ── Next allowed transition ─────────────────────────────────── */
 
-const LIFECYCLE_SEQUENCE: ProjectStatus[] = [
+export const LIFECYCLE_SEQUENCE: ProjectStatus[] = [
   'draft', 'scoped', 'gpt_setup', 'ready_for_development',
   'in_development', 'testing', 'deployed', 'active',
 ]

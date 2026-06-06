@@ -5,9 +5,17 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useProjectsStore } from '@/store/projects.store'
 import { useTasksStore } from '@/store/tasks.store'
+import { useKnowledgeStore } from '@/store/knowledge.store'
 import { AssetsRepository } from '@/data/repositories/assets.repository'
 import { DecisionsRepository } from '@/data/repositories/decisions.repository'
 import { KnowledgeRepository } from '@/data/repositories/knowledge.repository'
+import {
+  getDraftFieldChecks,
+  getTransitionBlockers,
+  getNextLifecycleStatus,
+  buildGptSpecBody,
+  LIFECYCLE_SEQUENCE,
+} from '@/lib/workflow/governance'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { PriorityBadge } from '@/components/shared/PriorityBadge'
 import { DomainBadge } from '@/components/shared/DomainBadge'
@@ -47,7 +55,7 @@ import {
 import { format } from 'date-fns'
 import { cn } from '@/lib/utils'
 import type {
-  Project, ProjectStatus, ProjectPriority, ProjectDomain, ProjectType,
+  Project, Task, ProjectStatus, ProjectPriority, ProjectDomain, ProjectType,
   DocRole, DocStatus,
   AIAsset, Decision, KnowledgeItem,
 } from '@/types/entities'
@@ -253,6 +261,146 @@ function ExecRow({ label, children }: { label: string; children: React.ReactNode
   )
 }
 
+/* ── WorkflowProgressPanel ─────────────────────────────────── */
+
+const LIFECYCLE_LABELS: Record<string, string> = {
+  draft: 'טיוטה', scoped: 'ממוסגר', gpt_setup: 'הגדרת GPT',
+  ready_for_development: 'מוכן לפיתוח', in_development: 'בפיתוח',
+  testing: 'בבדיקה', deployed: 'מוצב', active: 'פעיל',
+}
+
+interface WorkflowProgressPanelProps {
+  project: Project
+  tasks: Task[]
+  knowledgeItems: KnowledgeItem[]
+  onAdvance: (status: ProjectStatus) => void
+  onGenerateGptSpec: () => void
+  generatingSpec: boolean
+  blockerError: string[] | null
+  onClearError: () => void
+}
+
+function WorkflowProgressPanel({
+  project, tasks, knowledgeItems, onAdvance, onGenerateGptSpec,
+  generatingSpec, blockerError, onClearError,
+}: WorkflowProgressPanelProps) {
+  const inLifecycle = LIFECYCLE_SEQUENCE.includes(project.status as typeof LIFECYCLE_SEQUENCE[number])
+  if (!inLifecycle) return null
+
+  const nextStatus = getNextLifecycleStatus(project.status)
+  const blockers = nextStatus
+    ? getTransitionBlockers(project, tasks, knowledgeItems, nextStatus)
+    : []
+
+  const hasGptSpec = knowledgeItems.some(
+    (k) => k.project_id === project.id && k.doc_role === 'gpt_specification'
+  )
+
+  const draftChecks = project.status === 'draft' || project.status === 'scoped'
+    ? getDraftFieldChecks(project)
+    : []
+
+  return (
+    <div className="rounded-lg border border-border bg-card overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
+        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          מצב תהליך
+        </span>
+        <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
+          {LIFECYCLE_LABELS[project.status] ?? project.status}
+        </span>
+      </div>
+
+      <div className="px-4 pb-3 pt-2 space-y-3">
+
+        {/* Draft field checklist */}
+        {draftChecks.length > 0 && (
+          <div className="space-y-1">
+            {draftChecks.map((c) => (
+              <div key={String(c.key)} className="flex items-center gap-1.5">
+                <span className={cn(
+                  'h-3 w-3 shrink-0 rounded-full flex items-center justify-center',
+                  c.filled ? 'bg-emerald-100 text-emerald-600' : 'bg-muted'
+                )}>
+                  {c.filled
+                    ? <Check className="h-2 w-2" />
+                    : <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/40" />
+                  }
+                </span>
+                <span className={cn(
+                  'text-xs',
+                  c.filled ? 'text-muted-foreground line-through' : 'text-foreground'
+                )}>
+                  {c.label}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* GPT Spec generation */}
+        {project.status === 'scoped' && !hasGptSpec && (
+          <button
+            onClick={onGenerateGptSpec}
+            disabled={generatingSpec}
+            className={cn(
+              'flex w-full items-center justify-center gap-1.5 rounded-md border border-dashed border-primary/40 py-2 text-xs font-medium text-primary transition-colors hover:bg-primary/5',
+              generatingSpec && 'opacity-50 cursor-not-allowed'
+            )}
+          >
+            {generatingSpec
+              ? <Loader2 className="h-3 w-3 animate-spin" />
+              : <Plus className="h-3 w-3" />
+            }
+            {generatingSpec ? 'יוצר מפרט GPT...' : 'צור מפרט GPT'}
+          </button>
+        )}
+
+        {/* Transition blockers */}
+        {nextStatus && blockers.length > 0 && (
+          <div className="space-y-1">
+            <p className="text-[11px] font-medium text-muted-foreground">
+              לקידום ל-{LIFECYCLE_LABELS[nextStatus] ?? nextStatus}:
+            </p>
+            {blockers.map((b, i) => (
+              <div key={i} className="flex items-start gap-1.5">
+                <span className="mt-0.5 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" />
+                <span className="text-xs text-amber-700 dark:text-amber-400">{b.reason}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Advance button */}
+        {nextStatus && blockers.length === 0 && (
+          <button
+            onClick={() => onAdvance(nextStatus)}
+            className="flex w-full items-center justify-center gap-1.5 rounded-md bg-primary px-3 py-2 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+          >
+            קדם ל: {LIFECYCLE_LABELS[nextStatus] ?? nextStatus} →
+          </button>
+        )}
+
+        {/* External blocker error (from status dropdown) */}
+        {blockerError && (
+          <div className="rounded-md border border-red-200 bg-red-50/50 p-2 dark:border-red-900/30 dark:bg-red-950/10">
+            <div className="flex items-start justify-between gap-1">
+              <p className="text-[11px] font-medium text-red-700 dark:text-red-400">לא ניתן לשנות סטטוס:</p>
+              <button onClick={onClearError} className="shrink-0 text-muted-foreground hover:text-foreground">
+                <X className="h-3 w-3" />
+              </button>
+            </div>
+            {blockerError.map((r, i) => (
+              <p key={i} className="text-[11px] text-red-600 dark:text-red-400 mt-0.5">• {r}</p>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 /* ── main component ────────────────────────────────────────── */
 
 interface ProjectDetailPageProps {
@@ -263,9 +411,12 @@ export function ProjectDetailPage({ projectId }: ProjectDetailPageProps) {
   const router = useRouter()
   const { projects, isLoading, load, update, remove } = useProjectsStore()
   const { tasks, loadByProject } = useTasksStore()
+  const { create: createKnowledge } = useKnowledgeStore()
   const [deleteOpen,      setDeleteOpen]     = useState(false)
   const [deleting,        setDeleting]       = useState(false)
   const [statusChanging,  setStatusChanging] = useState(false)
+  const [generatingSpec,  setGeneratingSpec] = useState(false)
+  const [blockerError,    setBlockerError]   = useState<string[] | null>(null)
   const [tab,             setTab]            = useState('overview')
   const [showTaskForm,    setShowTaskForm]   = useState(false)
   const [execContextOpen, setExecContextOpen] = useState(false)
@@ -301,8 +452,8 @@ export function ProjectDetailPage({ projectId }: ProjectDetailPageProps) {
   }, [tab, project])
 
   useEffect(() => {
-    if (tab === 'knowledge' && project) KnowledgeRepository.findByProject(project.id).then(setProjectKnowledge)
-  }, [tab, project])
+    if (project) KnowledgeRepository.findByProject(project.id).then(setProjectKnowledge)
+  }, [project?.id, tab])
 
   const projectTasks = tasks.filter((t) => t.project_id === projectId)
 
@@ -310,6 +461,12 @@ export function ProjectDetailPage({ projectId }: ProjectDetailPageProps) {
 
   async function handleStatusChange(newStatus: ProjectStatus) {
     if (!project || statusChanging) return
+    const blockers = getTransitionBlockers(project, projectTasks, projectKnowledge, newStatus)
+    if (blockers.length > 0) {
+      setBlockerError(blockers.map((b) => b.reason))
+      return
+    }
+    setBlockerError(null)
     setStatusChanging(true)
     try {
       await update(project.id, {
@@ -318,6 +475,25 @@ export function ProjectDetailPage({ projectId }: ProjectDetailPageProps) {
       })
     } finally {
       setStatusChanging(false)
+    }
+  }
+
+  async function handleGenerateGptSpec() {
+    if (!project || generatingSpec) return
+    setGeneratingSpec(true)
+    try {
+      await createKnowledge({
+        title: `מפרט GPT — ${project.name}`,
+        body: buildGptSpecBody(project),
+        item_type: 'process',
+        project_id: project.id,
+        doc_role: 'gpt_specification',
+        doc_status: 'current',
+        source_url: '',
+      })
+      await KnowledgeRepository.findByProject(project.id).then(setProjectKnowledge)
+    } finally {
+      setGeneratingSpec(false)
     }
   }
 
@@ -906,6 +1082,18 @@ export function ProjectDetailPage({ projectId }: ProjectDetailPageProps) {
                     </span>
                   </MetaRow>
                 </div>
+
+                {/* Workflow Progress Panel */}
+                <WorkflowProgressPanel
+                  project={project}
+                  tasks={projectTasks}
+                  knowledgeItems={projectKnowledge}
+                  onAdvance={(s) => handleStatusChange(s)}
+                  onGenerateGptSpec={handleGenerateGptSpec}
+                  generatingSpec={generatingSpec}
+                  blockerError={blockerError}
+                  onClearError={() => setBlockerError(null)}
+                />
 
                 {/* Execution Context card */}
                 <div className="rounded-lg border border-border bg-card">
