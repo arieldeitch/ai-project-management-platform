@@ -90,21 +90,52 @@ export function TaskRow({ task, showProject = false }: TaskRowProps) {
 
         {/* Content */}
         <div className="min-w-0 flex-1">
-          <span
-            className={cn(
-              'text-sm font-medium',
-              task.status === 'done'
-                ? 'text-muted-foreground line-through'
-                : 'text-foreground'
+          <div className="flex flex-wrap items-baseline gap-1.5">
+            {task.task_type === 'feature' && (
+              <span className="shrink-0 rounded px-1 py-0 text-[10px] font-semibold bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-400">
+                פיצ&apos;ר
+              </span>
             )}
-          >
-            {task.title}
-          </span>
+            {task.task_type === 'bug' && (
+              <span className={cn(
+                'shrink-0 rounded px-1 py-0 text-[10px] font-semibold',
+                task.severity === 'critical' ? 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-400' :
+                task.severity === 'high'     ? 'bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-400' :
+                'bg-yellow-100 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-400'
+              )}>
+                באג{task.severity ? ` · ${
+                  task.severity === 'critical' ? 'קריטי' :
+                  task.severity === 'high' ? 'גבוה' :
+                  task.severity === 'medium' ? 'בינוני' : 'נמוך'
+                }` : ''}
+              </span>
+            )}
+            <span
+              className={cn(
+                'text-sm font-medium',
+                task.status === 'done'
+                  ? 'text-muted-foreground line-through'
+                  : 'text-foreground'
+              )}
+            >
+              {task.title}
+            </span>
+            {task.task_type === 'feature' && task.scope && (
+              <span className="shrink-0 text-[10px] text-muted-foreground">
+                [{task.scope === 'mvp' ? 'MVP' : task.scope === 'later' ? 'מאוחר' : 'נדחה'}]
+              </span>
+            )}
+          </div>
           {showProject && project && (
             <span className="ms-2 text-xs text-muted-foreground">{project.name}</span>
           )}
           {task.blocked_reason && task.status === 'blocked' && (
             <p className="mt-0.5 text-xs text-red-500/80">⊘ {task.blocked_reason}</p>
+          )}
+          {task.task_type === 'feature' && task.acceptance_criteria && task.status !== 'done' && (
+            <p className="mt-0.5 text-xs text-blue-600/70 dark:text-blue-400/70 line-clamp-1">
+              ✓ {task.acceptance_criteria}
+            </p>
           )}
           {task.notes && task.status !== 'done' && (
             <p className="mt-0.5 text-xs text-muted-foreground">{task.notes}</p>
