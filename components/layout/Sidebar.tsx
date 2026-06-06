@@ -296,7 +296,7 @@ export function Sidebar() {
                       {p.name}
                     </p>
                     <p className="mt-0.5 text-[10px] leading-snug text-purple-600/80 line-clamp-1">
-                      {!p.assigned_gpt ? 'GPT לא משויך' : !p.gpt_role ? 'תפקיד GPT חסר' : 'Knowledge לא הועלה'}
+                      {!p.assigned_gpt ? 'GPT לא משויך' : !p.gpt_role ? 'תפקיד GPT חסר' : 'ידע לא הועלה'}
                     </p>
                   </Link>
                 ))}

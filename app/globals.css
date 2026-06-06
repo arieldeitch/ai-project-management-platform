@@ -155,6 +155,15 @@
     font-feature-settings: "kern" 1;
     -webkit-font-smoothing: antialiased;
   }
+  /* Keyboard focus rings — visible only for keyboard nav */
+  :focus-visible {
+    outline: 2px solid oklch(0.50 0.20 264 / 0.7);
+    outline-offset: 2px;
+  }
+  /* Remove focus ring on mouse/touch click */
+  :focus:not(:focus-visible) {
+    outline: none;
+  }
 }
 
 @layer utilities {

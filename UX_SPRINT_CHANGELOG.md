@@ -50,4 +50,10 @@
 - `TypeFilter` type extended with `'docs'` discriminant.
 
 ## Phase 6 — Visual Polish & Consistency
-**Status:** Pending
+**Status:** ✅ Complete
+- **select.tsx**: `text-left` → `text-start` (RTL logical alignment in SelectValue)
+- **table.tsx**: `text-left` → `text-start`, `pr-0` → `pe-0` in TableHead (RTL logical)
+- **Sidebar.tsx**: `'Knowledge לא הועלה'` → `'ידע לא הועלה'` (removed orphaned English)
+- **globals.css**: Added `focus-visible` ring (2px indigo, 70% opacity) for keyboard nav; suppressed focus ring on mouse/touch via `:focus:not(:focus-visible)`.
+- All feature files confirmed zero orphaned English UI strings.
+- All tab badge patterns, card padding, hover states, and empty states consistent across Assets, Decisions, Knowledge, Tasks, Projects pages.
