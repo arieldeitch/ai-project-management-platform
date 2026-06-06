@@ -55,13 +55,18 @@ import type {
 /* ── constants ─────────────────────────────────────────────── */
 
 const STATUS_OPTIONS: { value: ProjectStatus; label: string }[] = [
-  { value: 'idea',      label: 'רעיון' },
-  { value: 'scoped',    label: 'באפיון' },
-  { value: 'active',    label: 'פעיל' },
-  { value: 'blocked',   label: 'חסום' },
-  { value: 'completed', label: 'הושלם' },
-  { value: 'deferred',  label: 'נדחה' },
-  { value: 'archived',  label: 'בארכיון' },
+  { value: 'draft',                 label: 'טיוטה' },
+  { value: 'scoped',                label: 'ממוסגר' },
+  { value: 'gpt_setup',             label: 'הגדרת GPT' },
+  { value: 'ready_for_development', label: 'מוכן לפיתוח' },
+  { value: 'in_development',        label: 'בפיתוח' },
+  { value: 'testing',               label: 'בבדיקה' },
+  { value: 'deployed',              label: 'מוצב' },
+  { value: 'active',                label: 'פעיל' },
+  { value: 'blocked',               label: 'חסום' },
+  { value: 'completed',             label: 'הושלם' },
+  { value: 'deferred',              label: 'נדחה' },
+  { value: 'archived',              label: 'בארכיון' },
 ]
 
 const PRIORITY_OPTIONS: { value: ProjectPriority; label: string }[] = [
@@ -89,14 +94,15 @@ const PROJECT_TYPE_OPTIONS: { value: ProjectType; label: string }[] = [
 ]
 
 const DOC_ROLE_CONFIG: { role: DocRole; label: string; critical: boolean }[] = [
-  { role: 'handoff_document',         label: 'מסמך מסירה',    critical: true },
-  { role: 'implementation_blueprint', label: 'תכנית מימוש',   critical: true },
-  { role: 'ux_notes',                 label: 'הערות UX',      critical: false },
-  { role: 'decisions_log',            label: 'יומן החלטות',   critical: false },
-  { role: 'execution_board',          label: 'לוח ביצוע',     critical: false },
-  { role: 'release_notes',            label: 'הערות גרסה',    critical: false },
-  { role: 'deployment_report',        label: 'דו"ח פריסה',    critical: false },
-  { role: 'recovery_report',          label: 'דו"ח שחזור',    critical: false },
+  { role: 'gpt_specification',        label: 'מפרט GPT',       critical: true },
+  { role: 'handoff_document',         label: 'מסמך מסירה',     critical: true },
+  { role: 'implementation_blueprint', label: 'תכנית מימוש',    critical: true },
+  { role: 'ux_notes',                 label: 'הערות UX',       critical: false },
+  { role: 'decisions_log',            label: 'יומן החלטות',    critical: false },
+  { role: 'execution_board',          label: 'לוח ביצוע',      critical: false },
+  { role: 'release_notes',            label: 'הערות גרסה',     critical: false },
+  { role: 'deployment_report',        label: 'דו"ח פריסה',     critical: false },
+  { role: 'recovery_report',          label: 'דו"ח שחזור',     critical: false },
 ]
 
 const DOC_STATUS_STYLE: Record<DocStatus, string> = {

@@ -6,7 +6,9 @@ interface Props {
 }
 
 const VALID_STATUSES = new Set<ProjectStatus>([
-  'idea', 'scoped', 'active', 'blocked', 'completed', 'deferred', 'archived',
+  'draft', 'scoped', 'gpt_setup', 'ready_for_development',
+  'in_development', 'testing', 'deployed', 'active',
+  'blocked', 'completed', 'deferred', 'archived',
 ])
 const VALID_DOMAINS = new Set<ProjectDomain>(['personal', 'work', 'general'])
 

@@ -26,6 +26,7 @@ const TYPE_CONFIG: Record<KnowledgeType, { label: string; color: string }> = {
 }
 
 const DOC_ROLE_LABELS: Record<DocRole, string> = {
+  gpt_specification:        'מפרט GPT',
   handoff_document:         'מסמך מסירה',
   implementation_blueprint: 'תכנית מימוש',
   ux_notes:                 'הערות UX',

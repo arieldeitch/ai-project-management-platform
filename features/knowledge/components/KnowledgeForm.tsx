@@ -25,6 +25,7 @@ const TYPE_OPTIONS: { value: KnowledgeType; label: string }[] = [
 ]
 
 const DOC_ROLE_OPTIONS: { value: DocRole; label: string }[] = [
+  { value: 'gpt_specification',        label: 'מפרט GPT' },
   { value: 'handoff_document',         label: 'מסמך מסירה' },
   { value: 'implementation_blueprint', label: 'תכנית מימוש' },
   { value: 'ux_notes',                 label: 'הערות UX' },

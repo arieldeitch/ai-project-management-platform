@@ -1,6 +1,11 @@
 export type ProjectStatus =
-  | 'idea'
+  | 'draft'
   | 'scoped'
+  | 'gpt_setup'
+  | 'ready_for_development'
+  | 'in_development'
+  | 'testing'
+  | 'deployed'
   | 'active'
   | 'blocked'
   | 'completed'
@@ -20,7 +25,18 @@ export type ProjectType =
   | 'personal'
   | 'infrastructure'
 
+export type DataStorageType = 'local' | 'cloud' | 'hybrid' | 'not_relevant'
+
+export type PlatformType = 'web' | 'mobile' | 'desktop' | 'automation' | 'gpt_only' | 'other'
+
+export type TaskType = 'task' | 'feature' | 'bug'
+
+export type TaskScope = 'mvp' | 'later' | 'deferred'
+
+export type BugSeverity = 'critical' | 'high' | 'medium' | 'low'
+
 export type DocRole =
+  | 'gpt_specification'
   | 'handoff_document'
   | 'implementation_blueprint'
   | 'ux_notes'
@@ -55,6 +71,19 @@ export interface Project {
   lovable_url?: string
   vercel_url?: string
   current_execution_path?: string
+  /* Workflow Governance — Draft required fields */
+  idea?: string
+  target_audience?: string
+  data_storage_type?: DataStorageType
+  platform_type?: PlatformType
+  reason?: string
+  /* Workflow Governance — GPT Setup */
+  gpt_url?: string
+  gpt_role?: string
+  knowledge_uploaded?: boolean
+  uploaded_knowledge_files?: string
+  /* Workflow Governance — Deployment exception */
+  deployment_not_applicable?: boolean
   created_at: string
   updated_at: string
 }
@@ -74,6 +103,18 @@ export interface Task {
   priority: TaskPriority
   notes: string
   blocked_reason: string
+  /* Workflow Governance — Task classification */
+  task_type?: TaskType
+  /* Feature fields */
+  user_value?: string
+  acceptance_criteria?: string
+  scope?: TaskScope
+  /* Bug fields */
+  severity?: BugSeverity
+  steps_to_reproduce?: string
+  expected_behavior?: string
+  actual_behavior?: string
+  environment?: string
   created_at: string
   updated_at: string
 }

@@ -43,6 +43,20 @@ class AppDatabase extends Dexie {
       decisions:      'id, project_id, status, created_at, updated_at',
       knowledge:      'id, project_id, item_type, doc_role, created_at, updated_at',
     })
+
+    /* v5 — workflow governance: new lifecycle statuses, task_type index; migrate 'idea' → 'draft' */
+    this.version(5).stores({
+      projects:       'id, name, status, priority, domain, project_type, data_storage_type, platform_type, created_at, updated_at',
+      tasks:          'id, project_id, status, priority, task_type, created_at, updated_at',
+      assets:         'id, name, asset_type, status, created_at, updated_at',
+      project_assets: '[project_id+asset_id], project_id, asset_id',
+      decisions:      'id, project_id, status, created_at, updated_at',
+      knowledge:      'id, project_id, item_type, doc_role, created_at, updated_at',
+    }).upgrade(trans =>
+      trans.table('projects').toCollection().modify((project: { status: string }) => {
+        if (project.status === 'idea') project.status = 'draft'
+      })
+    )
   }
 }
 

@@ -39,13 +39,18 @@ interface ColumnConfig {
 }
 
 const KANBAN_COLUMNS: ColumnConfig[] = [
-  { status: 'idea',      label: 'רעיון',    dot: 'bg-zinc-400',    headerBg: 'bg-zinc-100/80',  headerText: 'text-zinc-600',   barColor: 'bg-zinc-400' },
-  { status: 'scoped',    label: 'באפיון',   dot: 'bg-sky-500',     headerBg: 'bg-sky-50',       headerText: 'text-sky-700',    barColor: 'bg-sky-400' },
-  { status: 'active',    label: 'פעיל',     dot: 'bg-emerald-500', headerBg: 'bg-emerald-100',  headerText: 'text-emerald-700',barColor: 'bg-emerald-500' },
-  { status: 'blocked',   label: 'חסום',     dot: 'bg-red-500',     headerBg: 'bg-red-100',      headerText: 'text-red-700',    barColor: 'bg-red-500' },
-  { status: 'completed', label: 'הושלם',    dot: 'bg-violet-500',  headerBg: 'bg-violet-50',    headerText: 'text-violet-700', barColor: 'bg-violet-400' },
-  { status: 'deferred',  label: 'נדחה',     dot: 'bg-amber-500',   headerBg: 'bg-amber-50',     headerText: 'text-amber-700',  barColor: 'bg-amber-400' },
-  { status: 'archived',  label: 'בארכיון',  dot: 'bg-zinc-300',    headerBg: 'bg-zinc-100/60',  headerText: 'text-zinc-500',   barColor: 'bg-zinc-300' },
+  { status: 'draft',                label: 'טיוטה',        dot: 'bg-zinc-400',    headerBg: 'bg-zinc-100/80',    headerText: 'text-zinc-600',    barColor: 'bg-zinc-400' },
+  { status: 'scoped',               label: 'ממוסגר',       dot: 'bg-sky-500',     headerBg: 'bg-sky-50',         headerText: 'text-sky-700',     barColor: 'bg-sky-400' },
+  { status: 'gpt_setup',            label: 'הגדרת GPT',    dot: 'bg-purple-500',  headerBg: 'bg-purple-50',      headerText: 'text-purple-700',  barColor: 'bg-purple-400' },
+  { status: 'ready_for_development',label: 'מוכן לפיתוח', dot: 'bg-teal-500',    headerBg: 'bg-teal-50',        headerText: 'text-teal-700',    barColor: 'bg-teal-400' },
+  { status: 'in_development',       label: 'בפיתוח',       dot: 'bg-blue-500',    headerBg: 'bg-blue-50',        headerText: 'text-blue-700',    barColor: 'bg-blue-400' },
+  { status: 'testing',              label: 'בבדיקה',        dot: 'bg-orange-500',  headerBg: 'bg-orange-50',      headerText: 'text-orange-700',  barColor: 'bg-orange-400' },
+  { status: 'deployed',             label: 'מוצב',          dot: 'bg-cyan-500',    headerBg: 'bg-cyan-50',        headerText: 'text-cyan-700',    barColor: 'bg-cyan-400' },
+  { status: 'active',               label: 'פעיל',          dot: 'bg-emerald-500', headerBg: 'bg-emerald-100',    headerText: 'text-emerald-700', barColor: 'bg-emerald-500' },
+  { status: 'blocked',              label: 'חסום',          dot: 'bg-red-500',     headerBg: 'bg-red-100',        headerText: 'text-red-700',     barColor: 'bg-red-500' },
+  { status: 'completed',            label: 'הושלם',         dot: 'bg-violet-500',  headerBg: 'bg-violet-50',      headerText: 'text-violet-700',  barColor: 'bg-violet-400' },
+  { status: 'deferred',             label: 'נדחה',          dot: 'bg-amber-500',   headerBg: 'bg-amber-50',       headerText: 'text-amber-700',   barColor: 'bg-amber-400' },
+  { status: 'archived',             label: 'בארכיון',       dot: 'bg-zinc-300',    headerBg: 'bg-zinc-100/60',    headerText: 'text-zinc-500',    barColor: 'bg-zinc-300' },
 ]
 
 const DOMAIN_FILTER_OPTIONS: { value: DomainFilter; label: string }[] = [

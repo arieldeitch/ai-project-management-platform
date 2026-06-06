@@ -231,7 +231,7 @@ export function DashboardPage() {
   const active    = visible.filter((p) => p.status === 'active').sort(byPriority)
   const blocked   = visible.filter((p) => p.status === 'blocked').sort(byPriority)
   const scoped    = visible.filter((p) => p.status === 'scoped').sort(byPriority)
-  const ideas     = visible.filter((p) => p.status === 'idea' && p.priority !== 'unset' && p.priority !== 'low').sort(byPriority)
+  const ideas     = visible.filter((p) => p.status === 'draft' && p.priority !== 'unset' && p.priority !== 'low').sort(byPriority)
   const completed = visible.filter((p) => p.status === 'completed').length
 
   const focusProject = active[0] ?? scoped[0] ?? null
@@ -421,7 +421,7 @@ export function DashboardPage() {
                 icon={Lightbulb}
                 title="רעיונות עם עדיפות גבוהה"
                 count={ideas.length}
-                href={ideas.length > 4 ? '/projects?status=idea' : undefined}
+                href={ideas.length > 4 ? '/projects?status=draft' : undefined}
                 accentClass="text-amber-500"
               />
               <div className="rounded-lg border border-border bg-card shadow-card">

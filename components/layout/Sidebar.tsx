@@ -29,9 +29,10 @@ const BOTTOM_ITEMS = [
 
 const PRIORITY_ORDER: ProjectPriority[] = ['critical', 'high', 'medium', 'low', 'unset']
 
-const CRITICAL_DOC_ROLES: DocRole[] = ['handoff_document', 'implementation_blueprint']
+const CRITICAL_DOC_ROLES: DocRole[] = ['gpt_specification', 'handoff_document', 'implementation_blueprint']
 
 const CRITICAL_ROLE_LABELS: Record<DocRole, string> = {
+  gpt_specification:        'מפרט GPT',
   handoff_document:         'מסירה',
   implementation_blueprint: 'תכנית',
   ux_notes:                 'הערות UX',

@@ -110,7 +110,7 @@ export const SEED_PROJECTS: ProjectCreateInput[] = [
   {
     name: 'פלטפורמת תפעול זביקה',
     description: 'מותאמת לסגנון עבודה ספציפי עם זביקה. תצוגות נתונים מותאמות אישית, מקושרת לניהול משימות עבודה (מחליפה Monday.com). מטפלת במעקב התפעולי שמתרחש כיום בצורה אד-הוק.',
-    status: 'idea',
+    status: 'draft',
     priority: 'high',
     domain: 'work',
     goal: 'מעקב תפעולי מובנה עם זביקה, המחליף תיאום אד-הוק',
@@ -121,7 +121,7 @@ export const SEED_PROJECTS: ProjectCreateInput[] = [
   {
     name: 'חלופה ל-Monday.com',
     description: 'פלטפורמה מותאמת אישית להחלפת Monday.com, מותאמת לצרכי תהליך עבודה אמיתיים. מזהה חולשות של Monday.com ומייטבת סביבן. נדרשת: נראות לסטטוס פרויקטי פיתוח וחסמים, תצוגות מול הצוות, תמיכה בתהליך עבודה ספציפי לזביקה. קולטת דרישות נראות פרויקטי פיתוח.',
-    status: 'idea',
+    status: 'draft',
     priority: 'medium',
     domain: 'work',
     goal: 'החלפת Monday.com בכלי ייעודי שמתאים לדפוסי עבודה אמיתיים',
@@ -132,7 +132,7 @@ export const SEED_PROJECTS: ProjectCreateInput[] = [
   {
     name: 'ניהול משימות משותף הודו',
     description: 'פלטפורמת ניהול משימות משותפת לתיאום עם הצוות בהודו.',
-    status: 'idea',
+    status: 'draft',
     priority: 'medium',
     domain: 'work',
     goal: 'החלפת תיאום משימות ב-WhatsApp/אימייל עם הצוות בהודו',
@@ -142,7 +142,7 @@ export const SEED_PROJECTS: ProjectCreateInput[] = [
   {
     name: 'כלי הזמנות אריזה הודו',
     description: 'כלי לניהול ומעקב הזמנות אריזה מהודו.',
-    status: 'idea',
+    status: 'draft',
     priority: 'medium',
     domain: 'work',
     goal: 'החלפת מעקב ידני של הזמנות אריזה בכלי מובנה',
@@ -152,7 +152,7 @@ export const SEED_PROJECTS: ProjectCreateInput[] = [
   {
     name: 'סוכן בדיקות אפליקציות',
     description: 'סוכן אוטומטי לבדיקת אפליקציות, מחליף הפעלת פלטפורמה ידנית. תלוי בסוכן כתיבת אפליקציות שיבסס מבנה אפליקציה עקבי לבדיקה.',
-    status: 'idea',
+    status: 'draft',
     priority: 'medium',
     domain: 'general',
     goal: 'השגת כיסוי בדיקות אוטומטי עקבי בכל האפליקציות האישיות',
@@ -163,7 +163,7 @@ export const SEED_PROJECTS: ProjectCreateInput[] = [
   {
     name: 'אפליקציית אופטימיזציית הוצאות',
     description: 'ניתוח הוצאות שוטף עם AI. קלטים: חשבוניות סופרמרקט, נתוני ביטוח, דוח SolarEdge, פוליסות ביטוח. גם משמש כפלטפורמת נראות תקציב אישי — מכסה מעקב, ניתוח ואופטימיזציה בכלי אחד. קלטה היקף מפלטפורמת ניהול הוצאות.',
-    status: 'idea',
+    status: 'draft',
     priority: 'medium',
     domain: 'personal',
     goal: 'נראות מלאה על הכספים האישיים — מציאת והסרת הוצאות מיותרות באמצעות ניתוח AI של חשבוניות, ביטוח ועלויות חוזרות',
@@ -174,7 +174,7 @@ export const SEED_PROJECTS: ProjectCreateInput[] = [
   {
     name: 'פלטפורמת אופטימיזציית טיולים',
     description: 'תכנון נסיעות מותאם אישית עם למידה מתמשכת. שילוב מועדוני נאמנות, פירסור מסמכי Booking/חברות תעופה. כולל סוכן AI לסריקת Booking/Skyscanner עם שקלול גורמים דינמיים (מזג אוויר, ביטחון, תזמון) לאיתור הזדמנויות עסקאות. קלטה היקף מאפליקציית טיולים וחופשות.',
-    status: 'idea',
+    status: 'draft',
     priority: 'medium',
     domain: 'personal',
     goal: 'מיקסום ערך הטיולים דרך גילוי עסקאות מבוסס AI ותכנון מותאם אישית',
@@ -185,7 +185,7 @@ export const SEED_PROJECTS: ProjectCreateInput[] = [
   {
     name: 'אפליקציית הזדמנויות תעסוקה',
     description: 'סוכן הסורק LinkedIn, AllJobs ופלטפורמות נוספות להזדמנויות המותאמות להגדרות קריירה — עבורי ועבור אלנה.',
-    status: 'idea',
+    status: 'draft',
     priority: 'medium',
     domain: 'personal',
     goal: 'אוטומציה של סריקת שוק העבודה עבור שני פרופילי קריירה',
@@ -196,7 +196,7 @@ export const SEED_PROJECTS: ProjectCreateInput[] = [
   {
     name: 'פלטפורמת ניהול למידת AI',
     description: 'כלי משפחתי למעקב וניהול התקדמות למידת AI, מפותח בנפרד עבור כל בן משפחה.',
-    status: 'idea',
+    status: 'draft',
     priority: 'medium',
     domain: 'personal',
     goal: 'למידת AI מובנית לכל המשפחה',
@@ -206,7 +206,7 @@ export const SEED_PROJECTS: ProjectCreateInput[] = [
   {
     name: 'אפליקציית ניהול קניות',
     description: 'רשימת קניות חכמה ומעקב רכישות.',
-    status: 'idea',
+    status: 'draft',
     priority: 'low',
     domain: 'personal',
     goal: 'הפחתת חיכוך בתכנון הצרכנות השבועי',
@@ -216,7 +216,7 @@ export const SEED_PROJECTS: ProjectCreateInput[] = [
   {
     name: 'אפליקציית תמיכה OCD',
     description: 'כלי פשוט עם כפתור אחד ודיווח בדיקות בזמן אמת (לדוג\' דלת סגורה). דגש על פשטות.',
-    status: 'idea',
+    status: 'draft',
     priority: 'low',
     domain: 'personal',
     goal: 'הפחתת חרדת בדיקות OCD עם כלי מעקב מינימלי',
@@ -226,7 +226,7 @@ export const SEED_PROJECTS: ProjectCreateInput[] = [
   {
     name: 'אפליקציית פיתוח אישי של תום',
     description: 'כלי דינמי שמעודד את תום ללמוד ולפעול. סוכן שמחפש באופן יזום רעיונות רלוונטיים.',
-    status: 'idea',
+    status: 'draft',
     priority: 'low',
     domain: 'personal',
     goal: 'בניית הסקרנות של תום והרגל למידה עצמאית',
@@ -236,7 +236,7 @@ export const SEED_PROJECTS: ProjectCreateInput[] = [
   {
     name: 'אפליקציית פיתוח אישי של רוני',
     description: 'כלי מעקב ועידוד פיתוח אישי עבור רוני.',
-    status: 'idea',
+    status: 'draft',
     priority: 'low',
     domain: 'personal',
     goal: 'תמיכה בצמיחה האישית ולמידה של רוני',

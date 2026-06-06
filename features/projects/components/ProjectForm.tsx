@@ -27,13 +27,18 @@ import type {
 } from '@/types/entities'
 
 const STATUS_OPTIONS: { value: ProjectStatus; label: string }[] = [
-  { value: 'idea',      label: 'רעיון' },
-  { value: 'scoped',    label: 'באפיון' },
-  { value: 'active',    label: 'פעיל' },
-  { value: 'blocked',   label: 'חסום' },
-  { value: 'completed', label: 'הושלם' },
-  { value: 'deferred',  label: 'נדחה' },
-  { value: 'archived',  label: 'בארכיון' },
+  { value: 'draft',                 label: 'טיוטה' },
+  { value: 'scoped',                label: 'ממוסגר' },
+  { value: 'gpt_setup',             label: 'הגדרת GPT' },
+  { value: 'ready_for_development', label: 'מוכן לפיתוח' },
+  { value: 'in_development',        label: 'בפיתוח' },
+  { value: 'testing',               label: 'בבדיקה' },
+  { value: 'deployed',              label: 'מוצב' },
+  { value: 'active',                label: 'פעיל' },
+  { value: 'blocked',               label: 'חסום' },
+  { value: 'completed',             label: 'הושלם' },
+  { value: 'deferred',              label: 'נדחה' },
+  { value: 'archived',              label: 'בארכיון' },
 ]
 
 const PRIORITY_OPTIONS: { value: ProjectPriority; label: string }[] = [
@@ -74,7 +79,7 @@ export function ProjectForm({ mode, project }: ProjectFormProps) {
   const [goal,                 setGoal]               = useState(project?.goal ?? '')
   const [domain,               setDomain]             = useState<ProjectDomain | ''>(project?.domain ?? '')
   const [projectType,          setProjectType]        = useState<ProjectType | ''>(project?.project_type ?? '')
-  const [status,               setStatus]             = useState<ProjectStatus>(project?.status ?? 'idea')
+  const [status,               setStatus]             = useState<ProjectStatus>(project?.status ?? 'draft')
   const [priority,             setPriority]           = useState<ProjectPriority>(project?.priority ?? 'unset')
   const [currentPhase,         setCurrentPhase]       = useState(project?.current_phase ?? '')
   const [nextAction,           setNextAction]         = useState(project?.next_action ?? '')
