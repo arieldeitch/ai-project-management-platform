@@ -1,94 +1,119 @@
 # Deployment Report
-**Date:** 2026-06-06  
-**Release:** v1.0.0
+**Date:** 2026-06-06
+**Commit:** `34bd2df` — feat: Portfolio Control Tower
+**Release:** v1.0.0 + UI Pass #3
 
 ---
 
-## Summary
+## Deployment Status
 
-| Environment | Status | URL |
-|---|---|---|
-| Local development | ✓ Running | http://localhost:3000 |
-| Production | ⚠ Blocked — awaiting auth | See below |
-
----
-
-## Local Deployment — COMPLETE
-
-The application runs successfully on `http://localhost:3000`.
-
-All 7 major routes return HTTP 200. Build is clean (21 routes, 0 TS errors).
-
-Command: `cd platform && npm run dev`
+| Check | Result |
+|---|---|
+| Working tree | ✓ Clean |
+| Latest commit (`34bd2df`) local | ✓ Confirmed |
+| `34bd2df` on `origin/main` | ✓ Confirmed pushed |
+| GitHub remote | ✓ https://github.com/arieldeitch/ai-project-management-platform |
+| `vercel.json` | — Not present (standard Next.js auto-detection applies) |
+| Build command | `next build` (from `scripts.build` in package.json) |
+| Root directory for Vercel | `platform/` |
+| Vercel CLI auth | ⚠ **Requires browser authentication — user action needed** |
+| Production URL | Not yet assigned |
 
 ---
 
-## Production Deployment — BLOCKED AT AUTH BOUNDARY
+## Build Validation
 
-### Platform: Vercel (recommended)
+| Check | Result |
+|---|---|
+| `npx tsc --noEmit` | ✓ 0 errors |
+| `npx next build` | ✓ 21 routes, 0 warnings |
+| All routes | ✓ Static + dynamic routes clean |
 
-Vercel is the standard deployment target for Next.js applications. The Vercel CLI was installed (v54.9.1) and attempted to authenticate, but requires your browser confirmation.
+---
 
-**Why this is blocked:**
-> The CLI displayed: "No existing credentials found. Starting login flow..."
-> This requires manual browser authorization — a hard stop boundary per the release instructions.
+## Vercel CLI Auth — Blocked at Browser Boundary
 
-### To complete Vercel deployment (one-time, ~3 minutes)
+The Vercel CLI has no saved credentials on this machine. Deployment requires one manual browser step.
 
-**Option A — CLI (fastest)**
+**Two paths to production:**
+
+---
+
+### Path A — GitHub Import at vercel.com (recommended, enables auto-deploy)
+
+1. Open: **https://vercel.com/new**
+2. Click **Import Git Repository**
+3. Find and import: `arieldeitch/ai-project-management-platform`
+4. Set **Root Directory** to: `platform`
+5. Framework preset: **Next.js** (auto-detected)
+6. Environment variables: **none required** (app is fully local/client-side)
+7. Click **Deploy**
+
+Result: Vercel deploys immediately and sets up auto-deploy for every push to `main`.
+
+---
+
+### Path B — CLI device auth (one-time setup)
+
+Run this in a terminal in the project directory:
 
 ```bash
-cd platform
-npx vercel --yes
+cd "C:\Users\user\Desktop\AI\ניהול פרויקטים\platform"
+npx vercel
 ```
 
-The CLI will open a browser tab to `https://vercel.com/oauth/device?user_code=CGFX-ZZLF`  
-*(Note: this device code may have expired — a new one will be generated)*
+The CLI will display a device code URL. Open it in your browser, log in to Vercel, and approve.
 
-After browser auth:
+After auth completes, the deploy will proceed automatically. Then run:
+
 ```bash
 npx vercel --prod
 ```
 
-This deploys to a URL like: `https://ai-project-management-platform.vercel.app`
+to promote the preview to production.
 
-**Option B — GitHub integration (zero-config)**
+---
 
-1. Go to https://vercel.com/new
-2. Click **Import Git Repository**
-3. Connect to `github.com/arieldeitch/ai-project-management-platform`
-4. Set **Root Directory** to `platform`
-5. Framework will auto-detect as Next.js
-6. Click **Deploy**
+## Why No Environment Variables Are Needed
 
-Vercel will build and deploy automatically. Every push to `main` triggers a new deployment.
+This application is 100% client-side. All data lives in the browser's IndexedDB via Dexie.js.
+There is no backend, no database connection string, no API keys, no secrets.
 
-**Option C — Vercel with token (if you have one)**
+Vercel receives only the compiled Next.js app — no env configuration required.
 
-```bash
-VERCEL_TOKEN=your_token npx vercel --prod --yes --cwd platform
+---
+
+## Why Static Export Won't Work
+
+Routes like `/projects/[id]` and `/assets/[id]` are dynamic — IDs come from IndexedDB
+at runtime, not available at build time. Vercel handles these as serverless functions
+automatically. GitHub Pages / static export is not a viable deployment target.
+
+---
+
+## Post-Deployment Validation Checklist
+
+After production URL is live, verify:
+
 ```
-
----
-
-## Why Dynamic Routes Need a Server
-
-This app cannot be deployed as a static site (GitHub Pages, etc.) because:
-
-1. Routes like `/projects/[id]` and `/assets/[id]` are Next.js dynamic routes
-2. The IDs come from client-side IndexedDB — they don't exist at build time
-3. `generateStaticParams()` cannot enumerate IndexedDB keys during build
-4. The app requires server-side routing (Next.js Node.js runtime or edge)
-
-**Vercel handles this transparently** — it deploys dynamic routes as serverless functions automatically.
-
----
-
-## Environment Variables
-
-This application has **no required environment variables**. All data lives in the browser's IndexedDB. There is no backend, no database connection string, no API keys.
-
-Deployment is zero-config for environment variables.
+Route / Feature                     Expected
+────────────────────────────────────────────────────────────
+/dashboard                          Loads, stat cards visible
+/projects                           KPI strip visible above board
+                                    Active column: wider + stronger header
+                                    Blocked column: red badge count + warning icon
+                                    Empty columns: collapsed to 36px strips
+                                    Priority borders on tickets
+/tasks                              Task list renders
+/assets                             Asset tabs render
+/decisions                          Decision log renders
+/knowledge                          Knowledge entries render
+/settings → Import                  Import seed data → 23 projects load
+/projects (after seed)              All 7 columns populate correctly
+⌘K / Ctrl+K                        Search palette opens
+Create project → reload             Data persists in IndexedDB
+Console errors                      None
+```
 
 ---
 
@@ -96,20 +121,10 @@ Deployment is zero-config for environment variables.
 
 - **GitHub:** https://github.com/arieldeitch/ai-project-management-platform
 - **Branch:** `main`
-- **Latest commit:** `b323c6a` — feat: apply Helm UI polish
-- **Release tag:** `v1.0.0` (pending push)
-
----
-
-## Post-Deployment Checklist
-
-Once deployed on Vercel:
-
-```
-[ ] https://<your-app>.vercel.app loads (redirects to /dashboard)
-[ ] /dashboard shows empty state (no data on first load — expected)
-[ ] /settings → Import → import seed data → 23 projects appear
-[ ] /projects → project list renders
-[ ] ⌘K opens search palette
-[ ] Create a project → project appears → reload → project persists (IndexedDB)
-```
+- **Latest commit:** `34bd2df` — Portfolio Control Tower
+- **Previous commits on origin/main:**
+  - `34bd2df` feat: Portfolio Control Tower — priority borders, KPI strip, density, empty collapse
+  - `fb8f1b2` feat: redesign Projects as portfolio Kanban board
+  - `2cca0fc` feat: redesign Projects screen — execution-first card layout
+  - `4c64998` release: update RELEASE_STATUS
+  - `211f3f2` release: v1.0.0 deployment reports
