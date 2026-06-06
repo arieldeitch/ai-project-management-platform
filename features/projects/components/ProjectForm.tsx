@@ -112,6 +112,12 @@ export function ProjectForm({ mode, project }: ProjectFormProps) {
   const [lovableUrl,           setLovableUrl]         = useState(project?.lovable_url ?? '')
   const [vercelUrl,            setVercelUrl]          = useState(project?.vercel_url ?? '')
   const [currentExecutionPath, setCurrentExecutionPath] = useState(project?.current_execution_path ?? '')
+  /* GPT Setup fields */
+  const [gptUrl,                setGptUrl]                = useState(project?.gpt_url ?? '')
+  const [gptRole,               setGptRole]               = useState(project?.gpt_role ?? '')
+  const [knowledgeUploaded,     setKnowledgeUploaded]     = useState<boolean>(project?.knowledge_uploaded ?? false)
+  const [uploadedKnowledgeFiles,setUploadedKnowledgeFiles]= useState(project?.uploaded_knowledge_files ?? '')
+  const [deploymentNotApplicable,setDeploymentNotApplicable] = useState<boolean>(project?.deployment_not_applicable ?? false)
   /* Draft requirement fields */
   const [idea,             setIdea]            = useState(project?.idea ?? '')
   const [targetAudience,   setTargetAudience]  = useState(project?.target_audience ?? '')
@@ -168,6 +174,11 @@ export function ProjectForm({ mode, project }: ProjectFormProps) {
         data_storage_type: dataStorageType || undefined,
         platform_type: platformType || undefined,
         reason: reason || undefined,
+        gpt_url: gptUrl || undefined,
+        gpt_role: gptRole || undefined,
+        knowledge_uploaded: knowledgeUploaded || undefined,
+        uploaded_knowledge_files: uploadedKnowledgeFiles || undefined,
+        deployment_not_applicable: deploymentNotApplicable || undefined,
       }
       if (isEdit) {
         await update(project.id, payload)
@@ -495,6 +506,65 @@ export function ProjectForm({ mode, project }: ProjectFormProps) {
                         placeholder="לדוג' Claude Code CLI"
                       />
                     </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label htmlFor="gpt_url">קישור ל-GPT</Label>
+                    <Input
+                      id="gpt_url"
+                      value={gptUrl}
+                      onChange={(e) => setGptUrl(e.target.value)}
+                      placeholder="https://chat.openai.com/g/..."
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label htmlFor="gpt_role">תפקיד ה-GPT</Label>
+                    <Textarea
+                      id="gpt_role"
+                      value={gptRole}
+                      onChange={(e) => setGptRole(e.target.value)}
+                      placeholder="מה ה-GPT עושה? איזה תפקיד הוא ממלא בפרויקט?"
+                      rows={2}
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="checkbox"
+                      id="knowledge_uploaded"
+                      checked={knowledgeUploaded}
+                      onChange={(e) => setKnowledgeUploaded(e.target.checked)}
+                      className="h-4 w-4 rounded border-border"
+                    />
+                    <Label htmlFor="knowledge_uploaded" className="cursor-pointer">
+                      קבצי Knowledge הועלו ל-GPT
+                    </Label>
+                  </div>
+
+                  {knowledgeUploaded && (
+                    <div className="space-y-1.5">
+                      <Label htmlFor="uploaded_knowledge_files">קבצים שהועלו</Label>
+                      <Input
+                        id="uploaded_knowledge_files"
+                        value={uploadedKnowledgeFiles}
+                        onChange={(e) => setUploadedKnowledgeFiles(e.target.value)}
+                        placeholder="לדוג' handoff.md, blueprint.md"
+                      />
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="checkbox"
+                      id="deployment_not_applicable"
+                      checked={deploymentNotApplicable}
+                      onChange={(e) => setDeploymentNotApplicable(e.target.checked)}
+                      className="h-4 w-4 rounded border-border"
+                    />
+                    <Label htmlFor="deployment_not_applicable" className="cursor-pointer">
+                      פריסה לא רלוונטית לפרויקט זה
+                    </Label>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">

@@ -1190,6 +1190,61 @@ export function ProjectDetailPage({ projectId }: ProjectDetailPageProps) {
                   )}
                 </div>
 
+                {/* GPT Setup card */}
+                {(project.assigned_gpt || project.gpt_role || project.gpt_url || project.knowledge_uploaded) && (
+                  <div className="rounded-lg border border-border bg-card">
+                    <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+                      <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                        הגדרת GPT
+                      </span>
+                      {project.knowledge_uploaded && (
+                        <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-medium text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400">
+                          Knowledge הועלה ✓
+                        </span>
+                      )}
+                    </div>
+                    <div className="px-4 pb-3 pt-1">
+                      {project.assigned_gpt && (
+                        <ExecRow label="GPT">
+                          <InlineText
+                            value={project.assigned_gpt}
+                            placeholder=""
+                            onSave={(v) => handleFieldSave('assigned_gpt', v)}
+                          />
+                        </ExecRow>
+                      )}
+                      {project.gpt_url && (
+                        <ExecRow label="קישור">
+                          <InlineUrl
+                            value={project.gpt_url}
+                            placeholder="https://chat.openai.com/g/..."
+                            onSave={(v) => handleFieldSave('gpt_url', v)}
+                          />
+                        </ExecRow>
+                      )}
+                      {project.gpt_role && (
+                        <ExecRow label="תפקיד">
+                          <InlineText
+                            value={project.gpt_role}
+                            placeholder=""
+                            onSave={(v) => handleFieldSave('gpt_role', v)}
+                            multiline
+                          />
+                        </ExecRow>
+                      )}
+                      {project.uploaded_knowledge_files && (
+                        <ExecRow label="קבצים">
+                          <InlineText
+                            value={project.uploaded_knowledge_files}
+                            placeholder=""
+                            onSave={(v) => handleFieldSave('uploaded_knowledge_files', v)}
+                          />
+                        </ExecRow>
+                      )}
+                    </div>
+                  </div>
+                )}
+
               </div>
 
             </div>
