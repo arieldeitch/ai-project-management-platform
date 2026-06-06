@@ -16,19 +16,19 @@ import Link from 'next/link'
 import type { AIAsset, AssetType, AssetStatus } from '@/types/entities'
 
 const TYPE_OPTIONS: { value: AssetType; label: string }[] = [
-  { value: 'prompt',       label: 'Prompt' },
-  { value: 'agent',        label: 'Agent' },
+  { value: 'prompt',       label: 'פרומפט' },
+  { value: 'agent',        label: 'סוכן' },
   { value: 'gpt',          label: 'GPT' },
-  { value: 'workflow',     label: 'Workflow' },
-  { value: 'tool',         label: 'Tool' },
-  { value: 'model_config', label: 'Model Config' },
+  { value: 'workflow',     label: 'תהליך' },
+  { value: 'tool',         label: 'כלי' },
+  { value: 'model_config', label: 'הגדרות מודל' },
 ]
 
 const STATUS_OPTIONS: { value: AssetStatus; label: string }[] = [
-  { value: 'idea',       label: 'Idea' },
-  { value: 'draft',      label: 'Draft' },
-  { value: 'active',     label: 'Active' },
-  { value: 'deprecated', label: 'Deprecated' },
+  { value: 'idea',       label: 'רעיון' },
+  { value: 'draft',      label: 'טיוטה' },
+  { value: 'active',     label: 'פעיל' },
+  { value: 'deprecated', label: 'לא בשימוש' },
 ]
 
 interface AssetFormProps {
@@ -53,7 +53,7 @@ export function AssetForm({ mode, asset }: AssetFormProps) {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!name.trim()) { setError('Asset name is required.'); return }
+    if (!name.trim()) { setError('שם הנכס נדרש.'); return }
 
     setSaving(true)
     setError(null)
@@ -75,11 +75,11 @@ export function AssetForm({ mode, asset }: AssetFormProps) {
   return (
     <div className="flex flex-col overflow-hidden">
       <TopBar
-        title={isEdit ? 'Edit Asset' : 'New AI Asset'}
+        title={isEdit ? 'ערוך נכס' : 'נכס AI חדש'}
         actions={
           <Link href={backUrl} className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
-            <ArrowLeft className="mr-1.5 h-3.5 w-3.5" />
-            Back
+            <ArrowLeft className="me-1.5 h-3.5 w-3.5" />
+            חזרה
           </Link>
         }
       />
@@ -89,19 +89,19 @@ export function AssetForm({ mode, asset }: AssetFormProps) {
           <form onSubmit={handleSubmit} className="space-y-6">
 
             <div className="space-y-1.5">
-              <Label htmlFor="name">Name <span className="text-destructive">*</span></Label>
+              <Label htmlFor="name">שם <span className="text-destructive">*</span></Label>
               <Input
                 id="name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="e.g. Project Summarizer Prompt"
+                placeholder="לדוג' פרומפט סיכום פרויקט"
                 autoFocus
               />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <Label>Type</Label>
+                <Label>סוג</Label>
                 <Select value={assetType} onValueChange={(v) => v && setAssetType(v as AssetType)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -112,7 +112,7 @@ export function AssetForm({ mode, asset }: AssetFormProps) {
                 </Select>
               </div>
               <div className="space-y-1.5">
-                <Label>Status</Label>
+                <Label>סטטוס</Label>
                 <Select value={status} onValueChange={(v) => v && setStatus(v as AssetStatus)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -125,23 +125,23 @@ export function AssetForm({ mode, asset }: AssetFormProps) {
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="description">Description</Label>
+              <Label htmlFor="description">תיאור</Label>
               <Textarea
                 id="description"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="What this asset does and when to use it..."
+                placeholder="מה הנכס הזה עושה ומתי משתמשים בו..."
                 rows={3}
               />
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="content">Content / Config</Label>
+              <Label htmlFor="content">תוכן / הגדרות</Label>
               <Textarea
                 id="content"
                 value={content}
                 onChange={(e) => setContent(e.target.value)}
-                placeholder="The actual prompt text, agent config, or workflow definition..."
+                placeholder="טקסט הפרומפט, הגדרות הסוכן, או הגדרת התהליך..."
                 rows={8}
                 className="font-mono text-sm"
               />
@@ -154,9 +154,9 @@ export function AssetForm({ mode, asset }: AssetFormProps) {
             <div className="flex items-center gap-3 pt-2">
               <Button type="submit" disabled={saving}>
                 {saving && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
-                {isEdit ? 'Save Changes' : 'Create Asset'}
+                {isEdit ? 'שמור שינויים' : 'צור נכס'}
               </Button>
-              <Link href={backUrl} className={buttonVariants({ variant: 'ghost' })}>Cancel</Link>
+              <Link href={backUrl} className={buttonVariants({ variant: 'ghost' })}>ביטול</Link>
             </div>
           </form>
         </div>

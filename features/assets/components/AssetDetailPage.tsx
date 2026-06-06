@@ -25,28 +25,28 @@ import { cn } from '@/lib/utils'
 import type { AIAsset, AssetType, AssetStatus } from '@/types/entities'
 
 const TYPE_CONFIG: Record<AssetType, { label: string; color: string }> = {
-  prompt:       { label: 'Prompt',       color: 'bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-400' },
-  agent:        { label: 'Agent',        color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400' },
+  prompt:       { label: 'פרומפט',       color: 'bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-400' },
+  agent:        { label: 'סוכן',         color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400' },
   gpt:          { label: 'GPT',          color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400' },
-  workflow:     { label: 'Workflow',     color: 'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-400' },
-  tool:         { label: 'Tool',         color: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-400' },
-  model_config: { label: 'Model Config', color: 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400' },
+  workflow:     { label: 'תהליך',        color: 'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-400' },
+  tool:         { label: 'כלי',          color: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-400' },
+  model_config: { label: 'הגדרות מודל', color: 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400' },
 }
 
 const STATUS_OPTIONS: { value: AssetStatus; label: string }[] = [
-  { value: 'idea',       label: 'Idea' },
-  { value: 'draft',      label: 'Draft' },
-  { value: 'active',     label: 'Active' },
-  { value: 'deprecated', label: 'Deprecated' },
+  { value: 'idea',       label: 'רעיון' },
+  { value: 'draft',      label: 'טיוטה' },
+  { value: 'active',     label: 'פעיל' },
+  { value: 'deprecated', label: 'לא בשימוש' },
 ]
 
 const TYPE_OPTIONS: { value: AssetType; label: string }[] = [
-  { value: 'prompt',       label: 'Prompt' },
-  { value: 'agent',        label: 'Agent' },
+  { value: 'prompt',       label: 'פרומפט' },
+  { value: 'agent',        label: 'סוכן' },
   { value: 'gpt',          label: 'GPT' },
-  { value: 'workflow',     label: 'Workflow' },
-  { value: 'tool',         label: 'Tool' },
-  { value: 'model_config', label: 'Model Config' },
+  { value: 'workflow',     label: 'תהליך' },
+  { value: 'tool',         label: 'כלי' },
+  { value: 'model_config', label: 'הגדרות מודל' },
 ]
 
 function TypeBadge({ type }: { type: AssetType }) {
@@ -128,17 +128,17 @@ export function AssetDetailPage({ assetId }: AssetDetailPageProps) {
   }
 
   if (isLoading && assets.length === 0) {
-    return <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">Loading...</div>
+    return <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">טוען...</div>
   }
 
   if (!asset) {
     return (
       <div className="flex flex-col overflow-hidden">
-        <TopBar title="Asset not found" />
+        <TopBar title="נכס לא נמצא" />
         <div className="flex flex-1 flex-col items-center justify-center gap-4 p-8">
-          <p className="text-sm text-muted-foreground">This asset does not exist.</p>
+          <p className="text-sm text-muted-foreground">נכס זה אינו קיים.</p>
           <Link href="/assets" className={buttonVariants({ variant: 'outline', size: 'sm' })}>
-            <ArrowLeft className="mr-1.5 h-3.5 w-3.5" /> Back to Assets
+            <ArrowLeft className="me-1.5 h-3.5 w-3.5" /> חזרה לנכסים
           </Link>
         </div>
       </div>
@@ -155,7 +155,7 @@ export function AssetDetailPage({ assetId }: AssetDetailPageProps) {
           title={
             <span className="flex items-center gap-1.5 text-sm">
               <Link href="/assets" className="font-normal text-muted-foreground hover:text-foreground transition-colors">
-                AI Assets
+                נכסי AI
               </Link>
               <span className="text-muted-foreground/50 select-none">/</span>
               <span className="font-semibold text-foreground">{asset.name}</span>
@@ -164,7 +164,7 @@ export function AssetDetailPage({ assetId }: AssetDetailPageProps) {
           actions={
             <div className="flex items-center gap-2">
               <Link href={`/assets/${asset.id}/edit`} className={buttonVariants({ variant: 'outline', size: 'sm' })}>
-                Edit
+                ערוך
               </Link>
               <DropdownMenu>
                 <DropdownMenuTrigger className={cn(buttonVariants({ variant: 'ghost', size: 'icon' }), 'h-8 w-8')}>
@@ -172,15 +172,15 @@ export function AssetDetailPage({ assetId }: AssetDetailPageProps) {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                   <DropdownMenuItem onClick={handleDuplicate}>
-                    <Copy className="mr-2 h-4 w-4" /> Duplicate
+                    <Copy className="me-2 h-4 w-4" /> שכפל
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => setDeleteOpen(true)} className="text-destructive focus:text-destructive">
-                    <Trash2 className="mr-2 h-4 w-4" /> Delete
+                    <Trash2 className="me-2 h-4 w-4" /> מחק
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
               <Link href="/assets" className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
-                <ArrowLeft className="mr-1.5 h-3.5 w-3.5" /> Assets
+                <ArrowLeft className="me-1.5 h-3.5 w-3.5" /> נכסים
               </Link>
             </div>
           }
@@ -194,14 +194,14 @@ export function AssetDetailPage({ assetId }: AssetDetailPageProps) {
               <div className="space-y-6 lg:col-span-2">
                 {asset.description && (
                   <section>
-                    <h2 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Description</h2>
+                    <h2 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">תיאור</h2>
                     <p className="text-sm leading-relaxed text-foreground">{asset.description}</p>
                   </section>
                 )}
 
                 {asset.content && (
                   <section>
-                    <h2 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Content</h2>
+                    <h2 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">תוכן</h2>
                     <pre className="whitespace-pre-wrap rounded-lg border border-border bg-muted/40 p-4 text-sm font-mono leading-relaxed text-foreground overflow-x-auto">
                       {asset.content}
                     </pre>
@@ -211,9 +211,9 @@ export function AssetDetailPage({ assetId }: AssetDetailPageProps) {
                 {!asset.description && !asset.content && (
                   <div className="rounded-lg border border-dashed border-border p-8 text-center">
                     <p className="text-sm text-muted-foreground">
-                      No content yet.{' '}
+                      אין תוכן עדיין.{' '}
                       <Link href={`/assets/${asset.id}/edit`} className="text-primary hover:underline">
-                        Add description and content →
+                        הוסף תיאור ותוכן
                       </Link>
                     </p>
                   </div>
@@ -223,16 +223,16 @@ export function AssetDetailPage({ assetId }: AssetDetailPageProps) {
                 <section>
                   <div className="mb-3 flex items-center justify-between">
                     <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                      Linked Projects ({linkedProjects.length})
+                      פרויקטים מקושרים ({linkedProjects.length})
                     </h2>
                     <Button size="sm" variant="outline" onClick={() => setLinkOpen(true)}>
-                      <LinkIcon className="mr-1.5 h-3.5 w-3.5" />
-                      Link Project
+                      <LinkIcon className="me-1.5 h-3.5 w-3.5" />
+                      קשר לפרויקט
                     </Button>
                   </div>
 
                   {linkedProjects.length === 0 ? (
-                    <p className="text-sm italic text-muted-foreground">Not linked to any projects.</p>
+                    <p className="text-sm italic text-muted-foreground">לא מקושר לפרויקטים.</p>
                   ) : (
                     <div className="rounded-lg border border-border bg-card">
                       {linkedProjects.map((p) => (
@@ -242,7 +242,7 @@ export function AssetDetailPage({ assetId }: AssetDetailPageProps) {
                           </Link>
                           <button
                             onClick={() => handleUnlink(p.id)}
-                            title="Unlink"
+                            title="הסר קישור"
                             className="rounded p-0.5 text-muted-foreground hover:text-destructive transition-colors"
                           >
                             <XCircle className="h-4 w-4" />
@@ -257,7 +257,7 @@ export function AssetDetailPage({ assetId }: AssetDetailPageProps) {
               {/* Meta panel */}
               <div className="lg:col-span-1">
                 <div className="rounded-lg border border-border bg-card p-4">
-                  <MetaRow label="Type">
+                  <MetaRow label="סוג">
                     <Select
                       value={asset.asset_type}
                       onValueChange={(v) => v && update(asset.id, { asset_type: v as AssetType })}
@@ -271,7 +271,7 @@ export function AssetDetailPage({ assetId }: AssetDetailPageProps) {
                     </Select>
                   </MetaRow>
 
-                  <MetaRow label="Status">
+                  <MetaRow label="סטטוס">
                     <Select
                       value={asset.status}
                       onValueChange={(v) => v && update(asset.id, { status: v as AssetStatus })}
@@ -285,11 +285,11 @@ export function AssetDetailPage({ assetId }: AssetDetailPageProps) {
                     </Select>
                   </MetaRow>
 
-                  <MetaRow label="Created">
-                    <span className="text-sm text-foreground">{format(new Date(asset.created_at), 'MMM d, yyyy')}</span>
+                  <MetaRow label="נוצר">
+                    <span className="text-sm text-foreground">{format(new Date(asset.created_at), 'd/M/yyyy')}</span>
                   </MetaRow>
-                  <MetaRow label="Updated">
-                    <span className="text-sm text-foreground">{format(new Date(asset.updated_at), 'MMM d, yyyy')}</span>
+                  <MetaRow label="עודכן">
+                    <span className="text-sm text-foreground">{format(new Date(asset.updated_at), 'd/M/yyyy')}</span>
                   </MetaRow>
                 </div>
               </div>
@@ -302,16 +302,16 @@ export function AssetDetailPage({ assetId }: AssetDetailPageProps) {
       <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Delete asset?</DialogTitle>
+            <DialogTitle>מחק נכס?</DialogTitle>
             <DialogDescription>
-              <strong>{asset.name}</strong> will be permanently deleted.
+              <strong>{asset.name}</strong> יימחק לצמיתות.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteOpen(false)} disabled={deleting}>Cancel</Button>
+            <Button variant="outline" onClick={() => setDeleteOpen(false)} disabled={deleting}>ביטול</Button>
             <Button variant="destructive" onClick={handleDelete} disabled={deleting}>
-              {deleting && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
-              Delete
+              {deleting && <Loader2 className="me-1.5 h-3.5 w-3.5 animate-spin" />}
+              מחק
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -321,11 +321,11 @@ export function AssetDetailPage({ assetId }: AssetDetailPageProps) {
       <Dialog open={linkOpen} onOpenChange={setLinkOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Link to Project</DialogTitle>
+            <DialogTitle>קשר לפרויקט</DialogTitle>
           </DialogHeader>
           <Select value={selectedProj} onValueChange={(v) => v && setSelectedProj(v)}>
             <SelectTrigger>
-              <SelectValue placeholder="Select a project..." />
+              <SelectValue placeholder="בחר פרויקט..." />
             </SelectTrigger>
             <SelectContent>
               {unlinkable.map((p) => (
@@ -334,8 +334,8 @@ export function AssetDetailPage({ assetId }: AssetDetailPageProps) {
             </SelectContent>
           </Select>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setLinkOpen(false)}>Cancel</Button>
-            <Button onClick={handleLink} disabled={!selectedProj}>Link</Button>
+            <Button variant="outline" onClick={() => setLinkOpen(false)}>ביטול</Button>
+            <Button onClick={handleLink} disabled={!selectedProj}>קשר</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

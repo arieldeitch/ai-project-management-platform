@@ -14,31 +14,31 @@ import type { AIAsset, AssetType, AssetStatus } from '@/types/entities'
 /* ── config ────────────────────────────────────────────────── */
 
 const TYPE_CONFIG: Record<AssetType, { label: string; color: string }> = {
-  prompt:       { label: 'Prompt',       color: 'bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-400' },
-  agent:        { label: 'Agent',        color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400' },
-  gpt:          { label: 'GPT',          color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400' },
-  workflow:     { label: 'Workflow',     color: 'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-400' },
-  tool:         { label: 'Tool',         color: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-400' },
-  model_config: { label: 'Model Config', color: 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400' },
+  prompt:       { label: 'פרומפט',        color: 'bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-400' },
+  agent:        { label: 'סוכן',          color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400' },
+  gpt:          { label: 'GPT',           color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400' },
+  workflow:     { label: 'תהליך',         color: 'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-400' },
+  tool:         { label: 'כלי',           color: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-400' },
+  model_config: { label: 'הגדרות מודל',  color: 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400' },
 }
 
 const STATUS_CONFIG: Record<AssetStatus, { label: string; color: string }> = {
-  idea:       { label: 'Idea',       color: 'text-zinc-500' },
-  draft:      { label: 'Draft',      color: 'text-amber-600 dark:text-amber-400' },
-  active:     { label: 'Active',     color: 'text-emerald-600 dark:text-emerald-400' },
-  deprecated: { label: 'Deprecated', color: 'text-zinc-400 line-through' },
+  idea:       { label: 'רעיון',       color: 'text-zinc-500' },
+  draft:      { label: 'טיוטה',       color: 'text-amber-600 dark:text-amber-400' },
+  active:     { label: 'פעיל',        color: 'text-emerald-600 dark:text-emerald-400' },
+  deprecated: { label: 'לא בשימוש',  color: 'text-zinc-400 line-through' },
 }
 
 type TypeFilter = 'all' | AssetType
 
 const TYPE_TABS: { value: TypeFilter; label: string }[] = [
-  { value: 'all',          label: 'All' },
-  { value: 'prompt',       label: 'Prompts' },
-  { value: 'agent',        label: 'Agents' },
+  { value: 'all',          label: 'הכל' },
+  { value: 'prompt',       label: 'פרומפטים' },
+  { value: 'agent',        label: 'סוכנים' },
   { value: 'gpt',          label: 'GPTs' },
-  { value: 'workflow',     label: 'Workflows' },
-  { value: 'tool',         label: 'Tools' },
-  { value: 'model_config', label: 'Configs' },
+  { value: 'workflow',     label: 'תהליכים' },
+  { value: 'tool',         label: 'כלים' },
+  { value: 'model_config', label: 'הגדרות' },
 ]
 
 /* ── components ────────────────────────────────────────────── */
@@ -80,7 +80,7 @@ function AssetRow({ asset, onDuplicate, onDelete }: {
         <div className="flex shrink-0 items-center gap-3">
           <TypeBadge type={asset.asset_type} />
           <StatusDot status={asset.status} />
-          <span className="hidden text-xs text-muted-foreground sm:block w-24 text-right">{updatedAt}</span>
+          <span className="hidden text-xs text-muted-foreground sm:block w-24 text-end">{updatedAt}</span>
           <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
         </div>
       </Link>
@@ -89,14 +89,14 @@ function AssetRow({ asset, onDuplicate, onDelete }: {
       <div className="flex shrink-0 items-center gap-1 opacity-30 group-hover:opacity-100 transition-opacity">
         <button
           onClick={() => onDuplicate(asset.id)}
-          title="Duplicate"
+          title="שכפל"
           className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
         >
           <Copy className="h-3.5 w-3.5" />
         </button>
         <button
           onClick={() => onDelete(asset.id)}
-          title="Delete"
+          title="מחק"
           className="rounded p-1 text-muted-foreground hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-900/40 dark:hover:text-red-400"
         >
           <Trash2 className="h-3.5 w-3.5" />
@@ -124,11 +124,11 @@ export function AssetsListPage() {
   return (
     <div className="flex flex-col overflow-hidden">
       <TopBar
-        title="AI Assets"
+        title="נכסי AI"
         actions={
           <Link href="/assets/new" className={cn(buttonVariants({ size: 'sm' }))}>
-            <Plus className="mr-1.5 h-3.5 w-3.5" />
-            New Asset
+            <Plus className="me-1.5 h-3.5 w-3.5" />
+            נכס חדש
           </Link>
         }
       />
@@ -164,17 +164,17 @@ export function AssetsListPage() {
 
       <div className="flex-1 overflow-y-auto">
         {isLoading ? (
-          <div className="flex items-center justify-center py-16 text-sm text-muted-foreground">Loading...</div>
+          <div className="flex items-center justify-center py-16 text-sm text-muted-foreground">טוען...</div>
         ) : filtered.length === 0 ? (
           <EmptyState
             icon={<Bot className="h-12 w-12" />}
-            title="No AI assets yet"
-            description={typeFilter === 'all' ? 'Create your first prompt, agent, or GPT.' : `No ${typeFilter} assets.`}
+            title="אין נכסי AI עדיין"
+            description={typeFilter === 'all' ? 'צור את הפרומפט, הסוכן או ה-GPT הראשון שלך.' : `אין נכסים מסוג "${TYPE_CONFIG[typeFilter as AssetType]?.label ?? typeFilter}".`}
             action={
               typeFilter === 'all' ? (
                 <Link href="/assets/new" className={cn(buttonVariants({ size: 'sm' }))}>
-                  <Plus className="mr-1.5 h-3.5 w-3.5" />
-                  New Asset
+                  <Plus className="me-1.5 h-3.5 w-3.5" />
+                  נכס חדש
                 </Link>
               ) : undefined
             }

@@ -1,10 +1,25 @@
 # UX Sprint Changelog
 
 ## Phase 1 — Typography: Heebo Hebrew Font
-**Status:** Pending
+**Status:** ✅ Complete
+- Replaced Geist Sans with Heebo (Hebrew + Latin subsets)
+- Wired `--font-sans` → `--font-heebo` in globals.css
+- Body font-size 15px, line-height 1.6
+- `:lang(he)` kerning + font-smoothing rule
+- Commit: `4dc2a7d`
 
 ## Phase 2 — Full Hebrew Localization
-**Status:** Pending
+**Status:** ✅ Complete
+- **AssetsListPage**: Hebrew type labels (פרומפט/סוכן/GPT/תהליך/כלי/הגדרות מודל), status labels, tabs, TopBar, empty state
+- **AssetDetailPage**: All section titles, breadcrumb, button labels, dialog text, meta row labels, dates in d/M/yyyy
+- **AssetForm**: Labels, placeholders, error messages, buttons
+- **DecisionsListPage**: Status labels (פעיל/הוחלף/בוטל), tabs, TopBar, empty state
+- **DecisionDetailPage**: Section titles (הקשר/אפשרויות שנשקלו/ההחלטה/נימוק), meta labels, dialog, breadcrumb
+- **DecisionForm**: All labels, placeholders, buttons
+- **SettingsPage**: Full Hebrew — section titles, data labels, import/export/clear UI, dialog
+- **ProjectDetailPage**: Inline Hebrew maps for asset_type, asset.status, decision status, knowledge item_type; dates in d/M/yyyy
+- **KnowledgeDetailPage**: Dates in d/M/yyyy
+- RTL logical properties: replaced `mr-`/`ml-` with `me-`/`ms-`, `text-right` with `text-end` throughout
 
 ## Phase 3 — RTL Layout Fixes
 **Status:** Pending

@@ -58,9 +58,9 @@ export function SettingsPage() {
       }
       const newCounts = await getDataCounts()
       setCounts(newCounts)
-      setImportMsg(`Imported ${created} projects successfully.`)
+      setImportMsg(`יובאו ${created} פרויקטים בהצלחה.`)
     } catch (e) {
-      setImportMsg(`Import failed: ${String(e)}`)
+      setImportMsg(`הייבוא נכשל: ${String(e)}`)
     } finally {
       setImporting(false)
     }
@@ -105,7 +105,7 @@ export function SettingsPage() {
       ])
       const newCounts = await getDataCounts()
       setCounts(newCounts)
-      setImportMsg('All data cleared.')
+      setImportMsg('כל הנתונים נמחקו.')
     } finally {
       setClearing(false)
       setClearOpen(false)
@@ -115,7 +115,7 @@ export function SettingsPage() {
   return (
     <>
       <div className="flex flex-col overflow-hidden">
-        <TopBar title="Settings" />
+        <TopBar title="הגדרות" />
 
         <div className="flex-1 overflow-y-auto">
           <div className="mx-auto max-w-2xl px-6 py-8 space-y-8">
@@ -123,18 +123,18 @@ export function SettingsPage() {
             {/* Data overview */}
             <section>
               <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-4">
-                Data Overview
+                סקירת נתונים
               </h2>
               <div className="rounded-lg border border-border bg-card">
                 {counts ? (
                   <div className="grid grid-cols-5 divide-x divide-border">
                     {(
                       [
-                        ['Projects',  counts.projects],
-                        ['Tasks',     counts.tasks],
-                        ['Assets',    counts.assets],
-                        ['Decisions', counts.decisions],
-                        ['Knowledge', counts.knowledge],
+                        ['פרויקטים', counts.projects],
+                        ['משימות',   counts.tasks],
+                        ['נכסים',    counts.assets],
+                        ['החלטות',   counts.decisions],
+                        ['ידע',      counts.knowledge],
                       ] as const
                     ).map(([label, count]) => (
                       <div key={label} className="flex flex-col items-center py-5 gap-1">
@@ -156,15 +156,15 @@ export function SettingsPage() {
               <div className="flex items-start gap-3">
                 <DatabaseZap className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
                 <div className="flex-1">
-                  <h3 className="text-sm font-semibold">Import Portfolio Data</h3>
+                  <h3 className="text-sm font-semibold">ייבוא נתוני פורטפוליו</h3>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    Import all 27 projects from the original Excel spreadsheet. This adds projects
-                    regardless of existing data — run only on an empty database to avoid duplicates.
+                    ייבא את כל 27 הפרויקטים מגיליון ה-Excel המקורי. הייבוא מוסיף פרויקטים
+                    ללא קשר לנתונים קיימים — הפעל רק על מסד נתונים ריק כדי להימנע מכפולות.
                   </p>
                   {counts && counts.projects > 0 && (
                     <div className="mt-2 flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400">
                       <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-                      {counts.projects} projects already exist — importing will add duplicates.
+                      קיימים כבר {counts.projects} פרויקטים — הייבוא יוסיף כפולות.
                     </div>
                   )}
                   {importMsg && (
@@ -176,11 +176,11 @@ export function SettingsPage() {
                 onClick={handleImportSeed}
                 disabled={importing}
                 size="sm"
-                className="ml-8"
+                className="ms-8"
               >
                 {importing
-                  ? <><Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />Importing…</>
-                  : <><DatabaseZap className="mr-1.5 h-3.5 w-3.5" />Import 27 projects</>
+                  ? <><Loader2 className="me-1.5 h-3.5 w-3.5 animate-spin" />מייבא...</>
+                  : <><DatabaseZap className="me-1.5 h-3.5 w-3.5" />ייבא 27 פרויקטים</>
                 }
               </Button>
             </section>
@@ -190,10 +190,10 @@ export function SettingsPage() {
               <div className="flex items-start gap-3">
                 <Download className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
                 <div className="flex-1">
-                  <h3 className="text-sm font-semibold">Export JSON Backup</h3>
+                  <h3 className="text-sm font-semibold">ייצוא גיבוי JSON</h3>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    Download all data as a JSON file. Includes projects, tasks, assets, decisions,
-                    and knowledge items.
+                    הורד את כל הנתונים כקובץ JSON. כולל פרויקטים, משימות, נכסים, החלטות
+                    ופריטי ידע.
                   </p>
                 </div>
               </div>
@@ -202,11 +202,11 @@ export function SettingsPage() {
                 disabled={exporting}
                 variant="outline"
                 size="sm"
-                className="ml-8"
+                className="ms-8"
               >
                 {exporting
-                  ? <><Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />Exporting…</>
-                  : <><Download className="mr-1.5 h-3.5 w-3.5" />Export JSON</>
+                  ? <><Loader2 className="me-1.5 h-3.5 w-3.5 animate-spin" />מייצא...</>
+                  : <><Download className="me-1.5 h-3.5 w-3.5" />ייצא JSON</>
                 }
               </Button>
             </section>
@@ -216,10 +216,10 @@ export function SettingsPage() {
               <div className="flex items-start gap-3">
                 <Trash2 className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
                 <div className="flex-1">
-                  <h3 className="text-sm font-semibold text-destructive">Clear All Data</h3>
+                  <h3 className="text-sm font-semibold text-destructive">מחיקת כל הנתונים</h3>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    Permanently delete all projects, tasks, assets, decisions, and knowledge items.
-                    This cannot be undone. Export a backup first.
+                    מחק לצמיתות את כל הפרויקטים, המשימות, הנכסים, ההחלטות ופריטי הידע.
+                    לא ניתן לבטל פעולה זו. ייצא גיבוי קודם.
                   </p>
                 </div>
               </div>
@@ -227,10 +227,10 @@ export function SettingsPage() {
                 onClick={() => setClearOpen(true)}
                 variant="destructive"
                 size="sm"
-                className="ml-8"
+                className="ms-8"
               >
-                <Trash2 className="mr-1.5 h-3.5 w-3.5" />
-                Clear all data
+                <Trash2 className="me-1.5 h-3.5 w-3.5" />
+                מחק את כל הנתונים
               </Button>
             </section>
 
@@ -241,23 +241,23 @@ export function SettingsPage() {
       <Dialog open={clearOpen} onOpenChange={setClearOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Clear all data?</DialogTitle>
+            <DialogTitle>מחק את כל הנתונים?</DialogTitle>
             <DialogDescription>
-              This will permanently delete all{' '}
-              {counts && counts.projects > 0 && <strong>{counts.projects} projects</strong>}
-              {counts && counts.tasks > 0 && <>, {counts.tasks} tasks</>}
-              {counts && counts.assets > 0 && <>, {counts.assets} assets</>}
-              {counts && (counts.decisions > 0 || counts.knowledge > 0) && <>, and all decisions and knowledge items</>}.
-              {' '}This cannot be undone.
+              פעולה זו תמחק לצמיתות{' '}
+              {counts && counts.projects > 0 && <strong>{counts.projects} פרויקטים</strong>}
+              {counts && counts.tasks > 0 && <>, {counts.tasks} משימות</>}
+              {counts && counts.assets > 0 && <>, {counts.assets} נכסים</>}
+              {counts && (counts.decisions > 0 || counts.knowledge > 0) && <>, וכל ההחלטות ופריטי הידע</>}.
+              {' '}לא ניתן לבטל פעולה זו.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setClearOpen(false)} disabled={clearing}>
-              Cancel
+              ביטול
             </Button>
             <Button variant="destructive" onClick={handleClearAll} disabled={clearing}>
-              {clearing && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
-              Yes, delete everything
+              {clearing && <Loader2 className="me-1.5 h-3.5 w-3.5 animate-spin" />}
+              כן, מחק הכל
             </Button>
           </DialogFooter>
         </DialogContent>

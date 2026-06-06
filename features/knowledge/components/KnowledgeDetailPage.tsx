@@ -193,10 +193,10 @@ export function KnowledgeDetailPage({ itemId }: { itemId: string }) {
                     </MetaRow>
                   )}
                   <MetaRow label="נוצר">
-                    <span className="text-sm">{format(new Date(item.created_at), 'MMM d, yyyy')}</span>
+                    <span className="text-sm">{format(new Date(item.created_at), 'd/M/yyyy')}</span>
                   </MetaRow>
                   <MetaRow label="עודכן">
-                    <span className="text-sm">{format(new Date(item.updated_at), 'MMM d, yyyy')}</span>
+                    <span className="text-sm">{format(new Date(item.updated_at), 'd/M/yyyy')}</span>
                   </MetaRow>
                 </div>
               </div>

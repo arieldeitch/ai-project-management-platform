@@ -21,9 +21,9 @@ import { cn } from '@/lib/utils'
 import type { DecisionStatus } from '@/types/entities'
 
 const STATUS_OPTIONS: { value: DecisionStatus; label: string }[] = [
-  { value: 'active',     label: 'Active' },
-  { value: 'superseded', label: 'Superseded' },
-  { value: 'reversed',   label: 'Reversed' },
+  { value: 'active',     label: 'פעיל' },
+  { value: 'superseded', label: 'הוחלף' },
+  { value: 'reversed',   label: 'בוטל' },
 ]
 
 const STATUS_COLORS: Record<DecisionStatus, string> = {
@@ -73,17 +73,17 @@ export function DecisionDetailPage({ decisionId }: { decisionId: string }) {
   }
 
   if (isLoading && decisions.length === 0) {
-    return <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">Loading...</div>
+    return <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">טוען...</div>
   }
 
   if (!decision) {
     return (
       <div className="flex flex-col overflow-hidden">
-        <TopBar title="Decision not found" />
+        <TopBar title="החלטה לא נמצאה" />
         <div className="flex flex-1 flex-col items-center justify-center gap-4 p-8">
-          <p className="text-sm text-muted-foreground">This decision does not exist.</p>
+          <p className="text-sm text-muted-foreground">החלטה זו אינה קיימת.</p>
           <Link href="/decisions" className={buttonVariants({ variant: 'outline', size: 'sm' })}>
-            <ArrowLeft className="mr-1.5 h-3.5 w-3.5" /> Back
+            <ArrowLeft className="me-1.5 h-3.5 w-3.5" /> חזרה
           </Link>
         </div>
       </div>
@@ -97,7 +97,7 @@ export function DecisionDetailPage({ decisionId }: { decisionId: string }) {
           title={
             <span className="flex items-center gap-1.5 text-sm">
               <Link href="/decisions" className="font-normal text-muted-foreground hover:text-foreground transition-colors">
-                Decisions
+                החלטות
               </Link>
               <span className="text-muted-foreground/50 select-none">/</span>
               <span className="font-semibold text-foreground">{decision.title}</span>
@@ -105,19 +105,19 @@ export function DecisionDetailPage({ decisionId }: { decisionId: string }) {
           }
           actions={
             <div className="flex items-center gap-2">
-              <Link href={`/decisions/${decision.id}/edit`} className={buttonVariants({ variant: 'outline', size: 'sm' })}>Edit</Link>
+              <Link href={`/decisions/${decision.id}/edit`} className={buttonVariants({ variant: 'outline', size: 'sm' })}>ערוך</Link>
               <DropdownMenu>
                 <DropdownMenuTrigger className={cn(buttonVariants({ variant: 'ghost', size: 'icon' }), 'h-8 w-8')}>
                   <MoreHorizontal className="h-4 w-4" />
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                   <DropdownMenuItem onClick={() => setDeleteOpen(true)} className="text-destructive focus:text-destructive">
-                    <Trash2 className="mr-2 h-4 w-4" /> Delete
+                    <Trash2 className="me-2 h-4 w-4" /> מחק
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
               <Link href="/decisions" className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
-                <ArrowLeft className="mr-1.5 h-3.5 w-3.5" /> Decisions
+                <ArrowLeft className="me-1.5 h-3.5 w-3.5" /> החלטות
               </Link>
             </div>
           }
@@ -128,24 +128,24 @@ export function DecisionDetailPage({ decisionId }: { decisionId: string }) {
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
               <div className="space-y-6 lg:col-span-2">
                 {decision.context && (
-                  <Section title="Context">
+                  <Section title="הקשר">
                     <p className="whitespace-pre-wrap">{decision.context}</p>
                   </Section>
                 )}
                 {decision.options_considered && (
-                  <Section title="Options Considered">
+                  <Section title="אפשרויות שנשקלו">
                     <p className="whitespace-pre-wrap">{decision.options_considered}</p>
                   </Section>
                 )}
                 {decision.decision_made && (
-                  <Section title="Decision Made">
+                  <Section title="ההחלטה שהתקבלה">
                     <div className="rounded-md border border-border bg-muted/40 px-4 py-3">
                       <p className="font-medium">{decision.decision_made}</p>
                     </div>
                   </Section>
                 )}
                 {decision.rationale && (
-                  <Section title="Rationale">
+                  <Section title="נימוק">
                     <p className="whitespace-pre-wrap">{decision.rationale}</p>
                   </Section>
                 )}
@@ -153,7 +153,7 @@ export function DecisionDetailPage({ decisionId }: { decisionId: string }) {
 
               <div className="lg:col-span-1">
                 <div className="rounded-lg border border-border bg-card p-4">
-                  <MetaRow label="Status">
+                  <MetaRow label="סטטוס">
                     <Select
                       value={decision.status}
                       onValueChange={(v) => v && update(decision.id, { status: v as DecisionStatus })}
@@ -168,11 +168,11 @@ export function DecisionDetailPage({ decisionId }: { decisionId: string }) {
                       </SelectContent>
                     </Select>
                   </MetaRow>
-                  <MetaRow label="Created">
-                    <span className="text-sm">{format(new Date(decision.created_at), 'MMM d, yyyy')}</span>
+                  <MetaRow label="נוצר">
+                    <span className="text-sm">{format(new Date(decision.created_at), 'd/M/yyyy')}</span>
                   </MetaRow>
-                  <MetaRow label="Updated">
-                    <span className="text-sm">{format(new Date(decision.updated_at), 'MMM d, yyyy')}</span>
+                  <MetaRow label="עודכן">
+                    <span className="text-sm">{format(new Date(decision.updated_at), 'd/M/yyyy')}</span>
                   </MetaRow>
                 </div>
               </div>
@@ -183,12 +183,12 @@ export function DecisionDetailPage({ decisionId }: { decisionId: string }) {
 
       <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Delete decision?</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>מחק החלטה?</DialogTitle></DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteOpen(false)} disabled={deleting}>Cancel</Button>
+            <Button variant="outline" onClick={() => setDeleteOpen(false)} disabled={deleting}>ביטול</Button>
             <Button variant="destructive" onClick={handleDelete} disabled={deleting}>
-              {deleting && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
-              Delete
+              {deleting && <Loader2 className="me-1.5 h-3.5 w-3.5 animate-spin" />}
+              מחק
             </Button>
           </DialogFooter>
         </DialogContent>

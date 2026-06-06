@@ -788,8 +788,8 @@ export function ProjectDetailPage({ projectId }: ProjectDetailPageProps) {
                                 <p className="text-xs text-muted-foreground truncate">{asset.description}</p>
                               )}
                             </div>
-                            <span className="text-xs text-muted-foreground capitalize shrink-0">
-                              {asset.asset_type}
+                            <span className="text-xs text-muted-foreground shrink-0">
+                              {{ prompt: 'פרומפט', agent: 'סוכן', gpt: 'GPT', workflow: 'תהליך', tool: 'כלי', model_config: 'הגדרות מודל' }[asset.asset_type] ?? asset.asset_type}
                             </span>
                             <span className={cn(
                               'text-xs px-1.5 py-0.5 rounded shrink-0',
@@ -798,7 +798,7 @@ export function ProjectDetailPage({ projectId }: ProjectDetailPageProps) {
                               asset.status === 'deprecated' && 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-400',
                               asset.status === 'idea'       && 'bg-muted text-muted-foreground',
                             )}>
-                              {asset.status}
+                              {{ active: 'פעיל', draft: 'טיוטה', deprecated: 'לא בשימוש', idea: 'רעיון' }[asset.status] ?? asset.status}
                             </span>
                             <ExternalLink className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                           </Link>
@@ -851,7 +851,7 @@ export function ProjectDetailPage({ projectId }: ProjectDetailPageProps) {
                               d.status === 'superseded' && 'bg-yellow-100 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-400',
                               d.status === 'reversed'   && 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-400',
                             )}>
-                              {d.status}
+                              {{ active: 'פעיל', superseded: 'הוחלף', reversed: 'בוטל' }[d.status] ?? d.status}
                             </span>
                             <ExternalLink className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                           </Link>
@@ -961,8 +961,8 @@ export function ProjectDetailPage({ projectId }: ProjectDetailPageProps) {
                                   {DOC_STATUS_LABEL[item.doc_status]}
                                 </span>
                               )}
-                              <span className="text-xs text-muted-foreground capitalize">
-                                {item.item_type}
+                              <span className="text-xs text-muted-foreground">
+                                {{ note: 'הערה', reference: 'הפניה', learning: 'למידה', process: 'תהליך', research: 'מחקר' }[item.item_type] ?? item.item_type}
                               </span>
                             </div>
                             <ExternalLink className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
@@ -1072,13 +1072,13 @@ export function ProjectDetailPage({ projectId }: ProjectDetailPageProps) {
 
                   <MetaRow label="נוצר">
                     <span className="text-sm text-foreground">
-                      {format(new Date(project.created_at), 'MMM d, yyyy')}
+                      {format(new Date(project.created_at), 'd/M/yyyy')}
                     </span>
                   </MetaRow>
 
                   <MetaRow label="עודכן">
                     <span className="text-sm text-foreground">
-                      {format(new Date(project.updated_at), 'MMM d, yyyy')}
+                      {format(new Date(project.updated_at), 'd/M/yyyy')}
                     </span>
                   </MetaRow>
                 </div>

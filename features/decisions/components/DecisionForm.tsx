@@ -17,9 +17,9 @@ import Link from 'next/link'
 import type { Decision, DecisionStatus } from '@/types/entities'
 
 const STATUS_OPTIONS: { value: DecisionStatus; label: string }[] = [
-  { value: 'active',     label: 'Active' },
-  { value: 'superseded', label: 'Superseded' },
-  { value: 'reversed',   label: 'Reversed' },
+  { value: 'active',     label: 'פעיל' },
+  { value: 'superseded', label: 'הוחלף' },
+  { value: 'reversed',   label: 'בוטל' },
 ]
 
 interface DecisionFormProps {
@@ -48,7 +48,7 @@ export function DecisionForm({ mode, decision, defaultProjectId }: DecisionFormP
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!title.trim()) { setError('Title is required.'); return }
+    if (!title.trim()) { setError('כותרת נדרשת.'); return }
 
     setSaving(true)
     setError(null)
@@ -79,10 +79,10 @@ export function DecisionForm({ mode, decision, defaultProjectId }: DecisionFormP
   return (
     <div className="flex flex-col overflow-hidden">
       <TopBar
-        title={isEdit ? 'Edit Decision' : 'New Decision'}
+        title={isEdit ? 'ערוך החלטה' : 'החלטה חדשה'}
         actions={
           <Link href={backUrl} className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
-            <ArrowLeft className="mr-1.5 h-3.5 w-3.5" /> Back
+            <ArrowLeft className="me-1.5 h-3.5 w-3.5" /> חזרה
           </Link>
         }
       />
@@ -92,14 +92,14 @@ export function DecisionForm({ mode, decision, defaultProjectId }: DecisionFormP
           <form onSubmit={handleSubmit} className="space-y-6">
 
             <div className="space-y-1.5">
-              <Label htmlFor="title">Decision Title <span className="text-destructive">*</span></Label>
+              <Label htmlFor="title">כותרת ההחלטה <span className="text-destructive">*</span></Label>
               <Input id="title" value={title} onChange={(e) => setTitle(e.target.value)}
-                placeholder="e.g. Use Dexie instead of SQLite WASM" autoFocus />
+                placeholder="לדוג' השתמש ב-Dexie במקום SQLite WASM" autoFocus />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <Label>Status</Label>
+                <Label>סטטוס</Label>
                 <Select value={status} onValueChange={(v) => v && setStatus(v as DecisionStatus)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -108,11 +108,11 @@ export function DecisionForm({ mode, decision, defaultProjectId }: DecisionFormP
                 </Select>
               </div>
               <div className="space-y-1.5">
-                <Label>Project (optional)</Label>
+                <Label>פרויקט (אופציונלי)</Label>
                 <Select value={linkedProject} onValueChange={(v) => setLinkedProject(v ?? '')}>
-                  <SelectTrigger><SelectValue placeholder="No project" /></SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder="ללא פרויקט" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">No project</SelectItem>
+                    <SelectItem value="">ללא פרויקט</SelectItem>
                     {projects.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
@@ -120,27 +120,27 @@ export function DecisionForm({ mode, decision, defaultProjectId }: DecisionFormP
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="context">Context</Label>
+              <Label htmlFor="context">הקשר</Label>
               <Textarea id="context" value={context} onChange={(e) => setContext(e.target.value)}
-                placeholder="What situation prompted this decision?" rows={3} />
+                placeholder="איזו מצב הוביל להחלטה זו?" rows={3} />
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="options">Options Considered</Label>
+              <Label htmlFor="options">אפשרויות שנשקלו</Label>
               <Textarea id="options" value={options} onChange={(e) => setOptions(e.target.value)}
-                placeholder="What alternatives were evaluated?" rows={3} />
+                placeholder="אילו חלופות הוערכו?" rows={3} />
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="decision">Decision Made</Label>
+              <Label htmlFor="decision">ההחלטה שהתקבלה</Label>
               <Input id="decision" value={decisionMade} onChange={(e) => setDecisionMade(e.target.value)}
-                placeholder="The chosen option in one sentence" />
+                placeholder="האפשרות שנבחרה במשפט אחד" />
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="rationale">Rationale</Label>
+              <Label htmlFor="rationale">נימוק</Label>
               <Textarea id="rationale" value={rationale} onChange={(e) => setRationale(e.target.value)}
-                placeholder="Why this option was chosen..." rows={3} />
+                placeholder="למה נבחרה אפשרות זו..." rows={3} />
             </div>
 
             {error && (
@@ -150,9 +150,9 @@ export function DecisionForm({ mode, decision, defaultProjectId }: DecisionFormP
             <div className="flex items-center gap-3 pt-2">
               <Button type="submit" disabled={saving}>
                 {saving && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
-                {isEdit ? 'Save Changes' : 'Log Decision'}
+                {isEdit ? 'שמור שינויים' : 'רשום החלטה'}
               </Button>
-              <Link href={backUrl} className={buttonVariants({ variant: 'ghost' })}>Cancel</Link>
+              <Link href={backUrl} className={buttonVariants({ variant: 'ghost' })}>ביטול</Link>
             </div>
           </form>
         </div>

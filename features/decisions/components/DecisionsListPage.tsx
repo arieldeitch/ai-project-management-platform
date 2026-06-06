@@ -12,18 +12,18 @@ import { formatDistanceToNow } from 'date-fns'
 import type { DecisionStatus } from '@/types/entities'
 
 const STATUS_CONFIG: Record<DecisionStatus, { label: string; color: string }> = {
-  active:     { label: 'Active',     color: 'text-emerald-600 dark:text-emerald-400' },
-  superseded: { label: 'Superseded', color: 'text-amber-600 dark:text-amber-400 line-through' },
-  reversed:   { label: 'Reversed',   color: 'text-red-600 dark:text-red-400 line-through' },
+  active:     { label: 'פעיל',    color: 'text-emerald-600 dark:text-emerald-400' },
+  superseded: { label: 'הוחלף',  color: 'text-amber-600 dark:text-amber-400 line-through' },
+  reversed:   { label: 'בוטל',   color: 'text-red-600 dark:text-red-400 line-through' },
 }
 
 type StatusFilter = 'all' | DecisionStatus
 
 const STATUS_TABS: { value: StatusFilter; label: string }[] = [
-  { value: 'all',       label: 'All' },
-  { value: 'active',    label: 'Active' },
-  { value: 'superseded',label: 'Superseded' },
-  { value: 'reversed',  label: 'Reversed' },
+  { value: 'all',       label: 'הכל' },
+  { value: 'active',    label: 'פעיל' },
+  { value: 'superseded',label: 'הוחלף' },
+  { value: 'reversed',  label: 'בוטל' },
 ]
 
 export function DecisionsListPage() {
@@ -42,11 +42,11 @@ export function DecisionsListPage() {
   return (
     <div className="flex flex-col overflow-hidden">
       <TopBar
-        title="Decisions"
+        title="החלטות"
         actions={
           <Link href="/decisions/new" className={cn(buttonVariants({ size: 'sm' }))}>
-            <Plus className="mr-1.5 h-3.5 w-3.5" />
-            New Decision
+            <Plus className="me-1.5 h-3.5 w-3.5" />
+            החלטה חדשה
           </Link>
         }
       />
@@ -79,15 +79,15 @@ export function DecisionsListPage() {
 
       <div className="flex-1 overflow-y-auto">
         {isLoading ? (
-          <div className="flex items-center justify-center py-16 text-sm text-muted-foreground">Loading...</div>
+          <div className="flex items-center justify-center py-16 text-sm text-muted-foreground">טוען...</div>
         ) : filtered.length === 0 ? (
           <EmptyState
             icon={<BookOpen className="h-12 w-12" />}
-            title="No decisions yet"
-            description="Log an architectural or strategic decision."
+            title="אין החלטות עדיין"
+            description="תעד החלטה ארכיטקטונית או אסטרטגית."
             action={
               <Link href="/decisions/new" className={cn(buttonVariants({ size: 'sm' }))}>
-                <Plus className="mr-1.5 h-3.5 w-3.5" /> New Decision
+                <Plus className="me-1.5 h-3.5 w-3.5" /> החלטה חדשה
               </Link>
             }
           />
@@ -111,7 +111,7 @@ export function DecisionsListPage() {
                       )}
                     </div>
                     <div className="flex shrink-0 items-center gap-3">
-                      <span className="hidden text-xs text-muted-foreground sm:block w-24 text-right">{updatedAt}</span>
+                      <span className="hidden text-xs text-muted-foreground sm:block w-24 text-end">{updatedAt}</span>
                       <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                     </div>
                   </Link>
