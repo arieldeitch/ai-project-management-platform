@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { ProjectPriority, DocRole } from '@/types/entities'
+import { getDraftCompletionStatus, LIFECYCLE_SEQUENCE } from '@/lib/workflow/governance'
 
 /* ── nav config ────────────────────────────────────────────── */
 
@@ -99,15 +100,18 @@ export function Sidebar() {
     loadKnowledge().then(() => setKnowledgeInitialized(true))
   }, [loadKnowledge])
 
-  const activeCount  = projects.filter((p) => p.status === 'active').length
+  const IN_PROGRESS_STATUSES = new Set(['active', 'in_development', 'testing', 'deployed'])
+  const activeCount  = projects.filter((p) => IN_PROGRESS_STATUSES.has(p.status)).length
   const blockedCount = projects.filter((p) => p.status === 'blocked').length
 
   const hotProjects = projects
     .filter(
       (p) =>
         (p.priority === 'critical' || p.priority === 'high') &&
-        (p.status === 'active' || p.status === 'scoped'),
+        LIFECYCLE_SEQUENCE.includes(p.status as typeof LIFECYCLE_SEQUENCE[number]) &&
+        p.status !== 'draft',
     )
+    .sort((a, b) => PRIORITY_ORDER.indexOf(a.priority) - PRIORITY_ORDER.indexOf(b.priority))
     .slice(0, 4)
 
   const blockedProjects = projects
@@ -115,7 +119,7 @@ export function Sidebar() {
     .slice(0, 4)
 
   const nextActionItems = projects
-    .filter((p) => p.next_action && (p.status === 'active' || p.status === 'scoped'))
+    .filter((p) => p.next_action && IN_PROGRESS_STATUSES.has(p.status))
     .sort(
       (a, b) => PRIORITY_ORDER.indexOf(a.priority) - PRIORITY_ORDER.indexOf(b.priority),
     )
@@ -123,7 +127,7 @@ export function Sidebar() {
 
   const docsMissingProjects = knowledgeInitialized
     ? projects
-        .filter((p) => p.status === 'active' || p.status === 'scoped')
+        .filter((p) => LIFECYCLE_SEQUENCE.includes(p.status as typeof LIFECYCLE_SEQUENCE[number]) && p.status !== 'draft')
         .map((p) => {
           const projectDocs = knowledgeItems.filter(
             (k) => k.project_id === p.id && k.doc_role,
@@ -136,6 +140,19 @@ export function Sidebar() {
         .filter((x) => x.missing.length > 0)
         .slice(0, 3)
     : []
+
+  const gptMissingProjects = projects
+    .filter((p) => p.status === 'gpt_setup' && (!p.assigned_gpt || !p.gpt_role || !p.knowledge_uploaded))
+    .slice(0, 3)
+
+  const draftIncompleteProjects = projects
+    .filter((p) => p.status === 'draft')
+    .map((p) => {
+      const { missing } = getDraftCompletionStatus(p)
+      return { project: p, missingCount: missing.length }
+    })
+    .filter((x) => x.missingCount > 0)
+    .slice(0, 3)
 
   const hasCommandData = projects.length > 0
 
@@ -254,6 +271,58 @@ export function Sidebar() {
                     </p>
                     <p className="mt-0.5 text-[10px] leading-snug text-amber-600/80 line-clamp-1">
                       חסרים: {missing.map((r) => CRITICAL_ROLE_LABELS[r]).join(', ')}
+                    </p>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* GPT Setup incomplete */}
+          {gptMissingProjects.length > 0 && (
+            <div>
+              <div className="mb-1.5 flex items-center gap-1">
+                <Bot className="h-2.5 w-2.5 text-purple-500" />
+                <SectionLabel className="mb-0 text-purple-600">GPT חסר</SectionLabel>
+              </div>
+              <div className="flex flex-col gap-0.5">
+                {gptMissingProjects.map((p) => (
+                  <Link
+                    key={p.id}
+                    href={`/projects/${p.id}`}
+                    className="group rounded px-1.5 py-1 transition-colors hover:bg-sidebar-accent/60"
+                  >
+                    <p className="text-[11px] font-medium leading-snug text-foreground line-clamp-1 transition-colors group-hover:text-primary">
+                      {p.name}
+                    </p>
+                    <p className="mt-0.5 text-[10px] leading-snug text-purple-600/80 line-clamp-1">
+                      {!p.assigned_gpt ? 'GPT לא משויך' : !p.gpt_role ? 'תפקיד GPT חסר' : 'Knowledge לא הועלה'}
+                    </p>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Draft fields incomplete */}
+          {draftIncompleteProjects.length > 0 && (
+            <div>
+              <div className="mb-1.5 flex items-center gap-1">
+                <FileX className="h-2.5 w-2.5 text-zinc-400" />
+                <SectionLabel className="mb-0 text-zinc-500">טיוטות לא מלאות</SectionLabel>
+              </div>
+              <div className="flex flex-col gap-0.5">
+                {draftIncompleteProjects.map(({ project, missingCount }) => (
+                  <Link
+                    key={project.id}
+                    href={`/projects/${project.id}`}
+                    className="group rounded px-1.5 py-1 transition-colors hover:bg-sidebar-accent/60"
+                  >
+                    <p className="text-[11px] font-medium leading-snug text-foreground line-clamp-1 transition-colors group-hover:text-primary">
+                      {project.name}
+                    </p>
+                    <p className="mt-0.5 text-[10px] leading-snug text-zinc-500 line-clamp-1">
+                      {missingCount} שדות חסרים
                     </p>
                   </Link>
                 ))}
