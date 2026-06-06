@@ -41,7 +41,7 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import {
   ArrowLeft, MoreHorizontal, Archive, Trash2, Loader2, AlertTriangle, Target,
-  Plus, Check, X, Bot, BookOpen, FileText, ExternalLink, Pencil, ChevronRight,
+  Plus, Check, X, Bot, BookOpen, FileText, ExternalLink, Pencil,
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { cn } from '@/lib/utils'
@@ -299,7 +299,7 @@ export function ProjectDetailPage({ projectId }: ProjectDetailPageProps) {
               <Link href="/projects" className="font-normal text-muted-foreground hover:text-foreground transition-colors">
                 Projects
               </Link>
-              <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60" />
+              <span className="text-muted-foreground/50 select-none">/</span>
               <span className="font-semibold text-foreground">{project.name}</span>
             </span>
           }

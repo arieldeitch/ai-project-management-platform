@@ -12,7 +12,7 @@ import {
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { ArrowLeft, MoreHorizontal, Trash2, Loader2, ExternalLink, ChevronRight } from 'lucide-react'
+import { ArrowLeft, MoreHorizontal, Trash2, Loader2, ExternalLink } from 'lucide-react'
 import { format } from 'date-fns'
 import { cn } from '@/lib/utils'
 import type { KnowledgeType } from '@/types/entities'
@@ -85,7 +85,7 @@ export function KnowledgeDetailPage({ itemId }: { itemId: string }) {
               <Link href="/knowledge" className="font-normal text-muted-foreground hover:text-foreground transition-colors">
                 Knowledge
               </Link>
-              <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60" />
+              <span className="text-muted-foreground/50 select-none">/</span>
               <span className="font-semibold text-foreground">{item.title}</span>
             </span>
           }

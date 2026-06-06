@@ -13,13 +13,13 @@ export function TopBar({ title, actions }: TopBarProps) {
   const { openPalette } = useSearchStore()
 
   return (
-    <header className="flex h-14 shrink-0 items-center justify-between border-b border-border bg-background px-6">
-      <div className="text-lg font-semibold text-foreground tracking-tight">{title}</div>
-      <div className="flex items-center gap-2">
+    <header className="flex h-12 shrink-0 items-center justify-between border-b border-border bg-background px-5">
+      <div className="text-[13px] font-semibold text-foreground tracking-tight">{title}</div>
+      <div className="flex items-center gap-1.5">
         <button
           onClick={openPalette}
           className={cn(
-            'flex items-center gap-1.5 rounded-md border border-border bg-muted/50 px-2.5 py-1.5 text-xs text-muted-foreground',
+            'flex h-7 items-center gap-1.5 rounded-md border border-border bg-surface px-2.5 text-[12px] text-muted-foreground',
             'hover:bg-muted hover:text-foreground transition-colors'
           )}
         >

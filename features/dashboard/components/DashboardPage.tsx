@@ -57,11 +57,11 @@ function StatCard({
   href?: string
 }) {
   const inner = (
-    <div className="flex flex-col rounded-lg border border-border bg-card px-5 py-4 shadow-card transition-colors hover:shadow-card-hover hover:border-border/80 hover:bg-muted/30">
-      <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+    <div className="flex flex-col rounded-lg border border-border bg-surface p-4 transition-colors hover:border-border/80 hover:bg-muted/20">
+      <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
         {label}
       </span>
-      <span className={cn('mt-1 text-2xl font-bold tabular-nums', accent ?? 'text-foreground')}>
+      <span className={cn('mt-1.5 font-display text-[24px] font-semibold tabular-nums', accent ?? 'text-foreground')}>
         {value}
       </span>
     </div>
