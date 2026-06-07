@@ -6,11 +6,19 @@ import { useProjectsStore } from '@/store/projects.store'
 import { useTasksStore } from '@/store/tasks.store'
 import { useKnowledgeStore } from '@/store/knowledge.store'
 import { DomainBadge } from '@/components/shared/DomainBadge'
+import { StatusBadge } from '@/components/shared/StatusBadge'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { TopBar } from '@/components/layout/TopBar'
 import { buttonVariants } from '@/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { Plus, FolderKanban, AlertTriangle, ChevronRight, Loader2, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { STATUS_ORDER } from '@/lib/constants/statuses'
 import type { Project, ProjectStatus, ProjectDomain, ProjectPriority, Task, KnowledgeItem } from '@/types/entities'
 import { formatDistanceToNow } from 'date-fns'
 import {
@@ -145,8 +153,9 @@ function KanbanTicket({
   const isDimmed  = project.status === 'completed' || project.status === 'deferred' || project.status === 'archived'
   const isLow     = !isBlocked && !isDimmed && project.priority === 'low'
 
-  const [advancing,   setAdvancing]   = useState(false)
-  const [blockerMsgs, setBlockerMsgs] = useState<string[] | null>(null)
+  const [advancing,      setAdvancing]      = useState(false)
+  const [statusChanging, setStatusChanging] = useState(false)
+  const [blockerMsgs,    setBlockerMsgs]    = useState<string[] | null>(null)
   const clearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const nextStatus   = getNextLifecycleStatus(project.status)
@@ -158,6 +167,27 @@ function KanbanTicket({
     : isDimmed
     ? 'bg-card border-border'
     : PRIORITY_CARD[project.priority]
+
+  async function handleQuickStatusChange(newStatus: ProjectStatus) {
+    if (statusChanging || newStatus === project.status) return
+    const projectTasks = allTasks.filter((t) => t.project_id === project.id)
+    const blockers = getTransitionBlockers(project, projectTasks, allKnowledge, newStatus)
+    if (blockers.length > 0) {
+      setBlockerMsgs(blockers.map((b) => b.reason))
+      if (clearTimerRef.current) clearTimeout(clearTimerRef.current)
+      clearTimerRef.current = setTimeout(() => setBlockerMsgs(null), 6000)
+      return
+    }
+    setStatusChanging(true)
+    try {
+      await update(project.id, {
+        status: newStatus,
+        blocked_reason: newStatus !== 'blocked' ? '' : project.blocked_reason,
+      })
+    } finally {
+      setStatusChanging(false)
+    }
+  }
 
   async function handleAdvance(e: React.MouseEvent) {
     e.preventDefault()
@@ -227,11 +257,36 @@ function KanbanTicket({
         ) : null}
 
         <div className="mt-1.5 flex items-center justify-between gap-1">
-          {project.domain ? (
-            <DomainBadge domain={project.domain} className="px-1.5 py-0 text-[10px]" />
-          ) : (
-            <span />
-          )}
+          <div className="flex items-center gap-1 min-w-0">
+            {/* Status badge — click to change status */}
+            <div
+              onClick={(e) => { e.preventDefault(); e.stopPropagation() }}
+              onPointerDown={(e) => e.stopPropagation()}
+            >
+              <DropdownMenu>
+                <DropdownMenuTrigger className="focus:outline-none rounded">
+                  {statusChanging
+                    ? <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+                    : <StatusBadge status={project.status} className="px-1.5 py-0 text-[10px] cursor-pointer hover:opacity-80 transition-opacity" />
+                  }
+                </DropdownMenuTrigger>
+                <DropdownMenuContent side="bottom" align="start" className="min-w-[140px]">
+                  {STATUS_ORDER.map((s) => (
+                    <DropdownMenuItem
+                      key={s}
+                      disabled={s === project.status}
+                      onSelect={() => handleQuickStatusChange(s)}
+                    >
+                      <StatusBadge status={s} className="pointer-events-none" />
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+            {project.domain && (
+              <DomainBadge domain={project.domain} className="px-1.5 py-0 text-[10px]" />
+            )}
+          </div>
           <div className="flex shrink-0 items-center gap-1">
             <span className="tabular-nums text-[10px] text-muted-foreground">{updatedAt}</span>
             {nextStatus && LIFECYCLE_SEQUENCE.includes(project.status as typeof LIFECYCLE_SEQUENCE[number]) && (
