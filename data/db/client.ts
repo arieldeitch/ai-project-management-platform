@@ -1,7 +1,7 @@
 'use client'
 
 import Dexie, { type Table } from 'dexie'
-import type { Project, Task, AIAsset, ProjectAsset, Decision, KnowledgeItem } from '@/types/entities'
+import type { Project, Task, AIAsset, ProjectAsset, Decision, KnowledgeItem, DailyFocus } from '@/types/entities'
 
 class AppDatabase extends Dexie {
   projects!:       Table<Project,      string>
@@ -10,6 +10,7 @@ class AppDatabase extends Dexie {
   project_assets!: Table<ProjectAsset, [string, string]>
   decisions!:      Table<Decision,     string>
   knowledge!:      Table<KnowledgeItem, string>
+  daily_focus!:    Table<DailyFocus,   string>
 
   constructor() {
     super('ai-pm-platform-v1')
@@ -57,6 +58,11 @@ class AppDatabase extends Dexie {
         if (project.status === 'idea') project.status = 'draft'
       })
     )
+
+    /* v6 — daily focus workspace */
+    this.version(6).stores({
+      daily_focus: 'id, project_id, status, focus_date, created_at, updated_at',
+    })
   }
 }
 

@@ -184,3 +184,21 @@ export interface KnowledgeItem {
 
 export type KnowledgeCreateInput = Omit<KnowledgeItem, 'id' | 'created_at' | 'updated_at'>
 export type KnowledgeUpdateInput = Partial<KnowledgeCreateInput>
+
+/* ── Daily Focus ────────────────────────────────────────────── */
+export type DailyFocusStatus = 'active' | 'done' | 'deferred'
+
+export interface DailyFocus {
+  id: string
+  project_id: string
+  title: string
+  note: string
+  status: DailyFocusStatus
+  created_task_id?: string
+  focus_date: string  // YYYY-MM-DD
+  created_at: string
+  updated_at: string
+}
+
+export type DailyFocusCreateInput = Omit<DailyFocus, 'id' | 'created_at' | 'updated_at'>
+export type DailyFocusUpdateInput = Partial<DailyFocusCreateInput>

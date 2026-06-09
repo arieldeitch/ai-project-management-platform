@@ -7,7 +7,7 @@ import { useProjectsStore } from '@/store/projects.store'
 import { useKnowledgeStore } from '@/store/knowledge.store'
 import {
   LayoutDashboard, FolderKanban, CheckSquare, Bot,
-  BookOpen, FileText, Settings, Sparkles, AlertTriangle, FileX,
+  BookOpen, FileText, Settings, Sparkles, AlertTriangle, FileX, Target,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { ProjectPriority, DocRole } from '@/types/entities'
@@ -16,12 +16,13 @@ import { getDraftCompletionStatus, LIFECYCLE_SEQUENCE } from '@/lib/workflow/gov
 /* ── nav config ────────────────────────────────────────────── */
 
 const NAV_ITEMS = [
-  { href: '/dashboard', label: 'לוח בקרה', icon: LayoutDashboard },
-  { href: '/projects',  label: 'פרויקטים', icon: FolderKanban },
-  { href: '/tasks',     label: 'משימות',    icon: CheckSquare },
-  { href: '/assets',    label: 'נכסי AI',   icon: Bot },
-  { href: '/decisions', label: 'החלטות',    icon: BookOpen },
-  { href: '/knowledge', label: 'ידע',       icon: FileText },
+  { href: '/dashboard',   label: 'לוח בקרה',   icon: LayoutDashboard },
+  { href: '/daily-focus', label: 'מיקוד יומי', icon: Target },
+  { href: '/projects',    label: 'פרויקטים',   icon: FolderKanban },
+  { href: '/tasks',       label: 'משימות',      icon: CheckSquare },
+  { href: '/assets',      label: 'נכסי AI',     icon: Bot },
+  { href: '/decisions',   label: 'החלטות',      icon: BookOpen },
+  { href: '/knowledge',   label: 'ידע',         icon: FileText },
 ]
 
 const BOTTOM_ITEMS = [

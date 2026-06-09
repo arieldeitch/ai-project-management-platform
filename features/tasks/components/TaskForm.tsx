@@ -46,15 +46,18 @@ const SEVERITY_OPTIONS: { value: BugSeverity; label: string }[] = [
 interface TaskFormProps {
   projectId?: string | null
   task?: Task
+  initialTitle?: string
+  initialNotes?: string
   onClose: () => void
+  onCreated?: (task: Task) => void
 }
 
-export function TaskForm({ projectId, task, onClose }: TaskFormProps) {
+export function TaskForm({ projectId, task, initialTitle, initialNotes, onClose, onCreated }: TaskFormProps) {
   const { create, update } = useTasksStore()
   const { projects } = useProjectsStore()
 
-  const [title,         setTitle]         = useState(task?.title ?? '')
-  const [notes,         setNotes]         = useState(task?.notes ?? '')
+  const [title,         setTitle]         = useState(task?.title ?? initialTitle ?? '')
+  const [notes,         setNotes]         = useState(task?.notes ?? initialNotes ?? '')
   const [priority,      setPriority]      = useState<TaskPriority>(task?.priority ?? 'medium')
   const [linkedProject, setLinkedProject] = useState<string>(task?.project_id ?? projectId ?? '')
   const [taskType,      setTaskType]      = useState<TaskType>(task?.task_type ?? 'task')
@@ -98,11 +101,12 @@ export function TaskForm({ projectId, task, onClose }: TaskFormProps) {
       if (isEdit) {
         await update(task.id, base)
       } else {
-        await create({
+        const created = await create({
           ...base,
           status: 'todo',
           blocked_reason: '',
         })
+        onCreated?.(created)
       }
       onClose()
     } catch (err) {
