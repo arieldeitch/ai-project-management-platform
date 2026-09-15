@@ -1,0 +1,28 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.ariel.controltower'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'com.ariel.controltower'
+        minSdk 26
+        targetSdk 35
+        versionCode 1
+        versionName '0.1.0'
+        buildConfigField 'String', 'SUPABASE_URL', '"https://tbqdpvmlhtlrngoxbouf.supabase.co"'
+        buildConfigField 'String', 'SUPABASE_KEY', '"sb_publishable_PXzKC8MBsEGCk_4ccJ-A5w_HFaekiCK"'
+        buildConfigField 'String', 'AUTHORIZED_EMAIL', '"arieldeitch@gmail.com"'
+    }
+
+    buildFeatures {
+        buildConfig true
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
