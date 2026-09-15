@@ -1,0 +1,53 @@
+name: Control Tower APK
+
+on:
+  push:
+    branches:
+      - control-tower-apk-build
+    paths:
+      - 'control-tower-android/**'
+      - '.github/workflows/control-tower-apk.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android platform
+        run: yes | sdkmanager --licenses >/dev/null && sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Build debug APK
+        working-directory: control-tower-android
+        run: gradle :app:assembleDebug --stacktrace
+
+      - name: Rename APK
+        run: cp control-tower-android/app/build/outputs/apk/debug/app-debug.apk ControlTower-v0.1.0.apk
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: ControlTower-APK
+          path: ControlTower-v0.1.0.apk
+          if-no-files-found: error
+          retention-days: 30
