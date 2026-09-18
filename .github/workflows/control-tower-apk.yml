@@ -15,7 +15,7 @@ permissions:
 jobs:
   build-apk:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -38,17 +38,76 @@ jobs:
         with:
           gradle-version: '8.9'
 
+      - name: Read app version from build.gradle
+        id: version
+        shell: bash
+        run: |
+          NAME=$(sed -n "s/.*versionName *'\([^']*\)'.*/\1/p" control-tower-android/app/build.gradle)
+          CODE=$(sed -n "s/.*versionCode *\([0-9]*\).*/\1/p" control-tower-android/app/build.gradle)
+          test -n "$NAME" && test -n "$CODE"
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+          echo "code=$CODE" >> "$GITHUB_OUTPUT"
+          echo "artifact=ControlTower-$NAME-debug" >> "$GITHUB_OUTPUT"
+          echo "Building Control Tower $NAME ($CODE) @ ${GITHUB_SHA::12}"
+
+      # Firebase client config is an external secret, never committed. Absent -> app builds with push "not configured".
+      - name: Materialise google-services.json (if secret is set)
+        id: firebase
+        shell: bash
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          if [ -n "$GOOGLE_SERVICES_JSON" ]; then
+            printf '%s' "$GOOGLE_SERVICES_JSON" > control-tower-android/app/google-services.json
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+            echo "Firebase: google-services.json materialised from secret"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "Firebase: GOOGLE_SERVICES_JSON secret not set — building without push configuration"
+          fi
+
       - name: Build debug APK
         working-directory: control-tower-android
+        env:
+          CT_GIT_SHA: ${{ github.sha }}
         run: gradle :app:assembleDebug --stacktrace
 
-      - name: Rename APK
-        run: cp control-tower-android/app/build/outputs/apk/debug/app-debug.apk ControlTower-v0.1.0.apk
+      - name: Lint (non-blocking)
+        working-directory: control-tower-android
+        continue-on-error: true
+        env:
+          CT_GIT_SHA: ${{ github.sha }}
+        run: gradle :app:lintDebug
+
+      - name: Name artifact after the real version
+        shell: bash
+        run: |
+          OUT="${{ steps.version.outputs.artifact }}.apk"
+          cp control-tower-android/app/build/outputs/apk/debug/app-debug.apk "$OUT"
+          sha256sum "$OUT" | tee "$OUT.sha256"
+          {
+            echo "## Control Tower ${{ steps.version.outputs.name }} (versionCode ${{ steps.version.outputs.code }})"
+            echo "- Artifact: \`$OUT\`"
+            echo "- Commit: \`${GITHUB_SHA}\`"
+            echo "- Firebase configured in build: \`${{ steps.firebase.outputs.configured }}\`"
+            echo "- SHA-256: \`$(cut -d' ' -f1 "$OUT.sha256")\`"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: ControlTower-APK
-          path: ControlTower-v0.1.0.apk
+          name: ${{ steps.version.outputs.artifact }}
+          path: |
+            ${{ steps.version.outputs.artifact }}.apk
+            ${{ steps.version.outputs.artifact }}.apk.sha256
           if-no-files-found: error
           retention-days: 30
+
+      - name: Upload lint report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.version.outputs.artifact }}-lint
+          path: control-tower-android/app/build/reports/lint-results-debug.html
+          if-no-files-found: ignore
+          retention-days: 14

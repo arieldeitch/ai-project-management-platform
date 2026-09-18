@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Control Tower</string>
+    <string name="share_target_label">דווח למגדל הפיקוח</string>
+    <string name="notification_channel_name">התראות מגדל הפיקוח</string>
+    <string name="notification_channel_description">התראות בעדיפות גבוהה: פרויקט אדום, החלטה שממתינה לאריאל, ובדיקות מערכת.</string>
+    <string name="notification_default_title">מגדל הפיקוח</string>
+    <string name="notification_default_body">יש עדכון שדורש את תשומת לבך.</string>
+</resources>

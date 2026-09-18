@@ -2,6 +2,7 @@ package com.ariel.controltower;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.content.Intent;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
@@ -14,6 +15,7 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.HorizontalScrollView;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.ScrollView;
@@ -57,10 +59,44 @@ public class MainActivity extends Activity {
         getWindow().setStatusBarColor(BG);
         getWindow().setNavigationBarColor(BG);
         prefs = getSharedPreferences("control_tower_session", MODE_PRIVATE);
+        applyRoutingIntent(getIntent());
         if (prefs.getString("refresh_token", null) != null || prefs.getString("access_token", null) != null) {
             showApp();
         } else {
             showLogin();
+        }
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        if (applyRoutingIntent(intent) && contentHost != null) selectTab(activeTab);
+    }
+
+    /**
+     * Low-risk deep link: a push payload may name a target tab. Project-level routing data is
+     * preserved on the intent (ct_project_id) but not acted on yet.
+     */
+    private boolean applyRoutingIntent(Intent intent) {
+        if (intent == null) return false;
+        String target = intent.getStringExtra(PushNotifications.EXTRA_TARGET);
+        if (target == null) target = intent.getStringExtra("target"); // FCM-displayed notifications pass raw data keys
+        if (target == null) return false;
+        switch (target) {
+            case "now": activeTab = 0; return true;
+            case "projects": activeTab = 1; return true;
+            case "deputy": activeTab = 2; return true;
+            case "activity": activeTab = 3; return true;
+            default: return false;
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == PushNotifications.PERMISSION_REQUEST) {
+            PushNotifications.refreshAndRegisterToken(this, prefs);
         }
     }
 
@@ -110,6 +146,14 @@ public class MainActivity extends Activity {
         wrap.setGravity(Gravity.CENTER_VERTICAL);
         wrap.setPadding(dp(24), dp(36), dp(24), dp(36));
         wrap.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+
+        ImageView mark = new ImageView(this);
+        mark.setImageResource(R.drawable.ic_brand_mark);
+        mark.setContentDescription("Control Tower");
+        LinearLayout.LayoutParams markLp = new LinearLayout.LayoutParams(dp(72), dp(72));
+        markLp.bottomMargin = dp(18);
+        markLp.gravity = Gravity.START;
+        wrap.addView(mark, markLp);
 
         TextView eyebrow = text("CONTROL TOWER", 12, BLUE, true);
         wrap.addView(eyebrow);
@@ -241,8 +285,10 @@ public class MainActivity extends Activity {
     }
 
     private void logout() {
-        prefs.edit().clear().apply();
-        showLogin();
+        PushNotifications.unregisterOnLogout(this, prefs, () -> {
+            prefs.edit().clear().apply();
+            showLogin();
+        });
     }
 
     private void showApp() {
@@ -263,6 +309,8 @@ public class MainActivity extends Activity {
         root.addView(nav, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(70)));
         setContentView(root);
         selectTab(activeTab);
+        // Context now exists (owner authenticated, main screen visible): channel, permission, token.
+        PushNotifications.onSessionReady(this, prefs);
     }
 
     private void buildNav() {
@@ -607,8 +655,22 @@ public class MainActivity extends Activity {
         LinearLayout security = card();
         security.addView(text("מצב מערכת", 13, BLUE, true));
         security.addView(text("DB מאובטח מחובר • RLS פעיל • Google Drive נשאר מקור האמת", 13, TEXT, true), lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 7, 0));
+        TextView pushStatus = text(PushNotifications.statusLine(this, prefs), 12, MUTED, false);
+        security.addView(pushStatus, lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 8, 0));
+        security.addView(text("גרסה " + BuildConfig.VERSION_NAME + " (" + BuildConfig.VERSION_CODE + ") • " + BuildConfig.GIT_SHA, 11, MUTED, false),
+                lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 4, 0));
+        Button testPush = actionButton("שלח התראת בדיקה", false);
+        security.addView(testPush, lp(ViewGroup.LayoutParams.MATCH_PARENT, dp(46), 12, 0));
+        testPush.setOnClickListener(v -> {
+            testPush.setEnabled(false);
+            pushStatus.setText("שולח התראת בדיקה…");
+            PushNotifications.requestTestPush(prefs, msg -> runOnUiThread(() -> {
+                testPush.setEnabled(true);
+                pushStatus.setText(msg);
+            }));
+        });
         Button logout = actionButton("התנתקות", false);
-        security.addView(logout, lp(ViewGroup.LayoutParams.MATCH_PARENT, dp(46), 12, 0));
+        security.addView(logout, lp(ViewGroup.LayoutParams.MATCH_PARENT, dp(46), 8, 0));
         logout.setOnClickListener(v -> logout());
         c.addView(security, lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 0, 16));
         c.addView(section("שינויים משמעותיים"));

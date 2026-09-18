@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Monochrome (themed-icon) layer: same geometry, single colour; the launcher tints it. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- outer signal arc -->
+    <path
+        android:pathData="M34.08,31.28 A26,26 0 0 1 73.92,31.28"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="4.5"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000" />
+    <!-- middle signal arc -->
+    <path
+        android:pathData="M40.6,36.75 A17.5,17.5 0 0 1 67.4,36.75"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="4.5"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000" />
+    <!-- inner signal arc -->
+    <path
+        android:pathData="M47.11,42.22 A9,9 0 0 1 60.89,42.22"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="4.5"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000" />
+    <!-- emitter -->
+    <path
+        android:pathData="M54,48 m-4.2,0 a4.2,4.2 0 1 0 8.4,0 a4.2,4.2 0 1 0 -8.4,0"
+        android:fillColor="#FFFFFF" />
+    <!-- tower mast -->
+    <path
+        android:pathData="M54,52.5 L54,74"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="5"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000" />
+    <!-- tower base -->
+    <path
+        android:pathData="M42.5,76 L65.5,76"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="5"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000" />
+</vector>

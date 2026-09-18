@@ -2,6 +2,17 @@ plugins {
     id 'com.android.application'
 }
 
+// Firebase config is an external, per-environment file and is never committed.
+// The CI workflow materialises it from the GOOGLE_SERVICES_JSON secret when present.
+// Without it the app still builds and runs; push is reported as "not configured" in-app.
+def googleServicesFile = file('google-services.json')
+def firebaseConfigured = googleServicesFile.exists()
+if (firebaseConfigured) {
+    apply plugin: 'com.google.gms.google-services'
+}
+
+def gitSha = (System.getenv('CT_GIT_SHA') ?: 'local').take(12)
+
 android {
     namespace 'com.ariel.controltower'
     compileSdk 35
@@ -10,11 +21,13 @@ android {
         applicationId 'com.ariel.controltower'
         minSdk 26
         targetSdk 35
-        versionCode 2
-        versionName '0.2.0'
+        versionCode 3
+        versionName '0.3.0'
         buildConfigField 'String', 'SUPABASE_URL', '"https://tbqdpvmlhtlrngoxbouf.supabase.co"'
         buildConfigField 'String', 'SUPABASE_KEY', '"sb_publishable_PXzKC8MBsEGCk_4ccJ-A5w_HFaekiCK"'
         buildConfigField 'String', 'AUTHORIZED_EMAIL', '"arieldeitch@gmail.com"'
+        buildConfigField 'String', 'GIT_SHA', "\"${gitSha}\""
+        buildConfigField 'boolean', 'FIREBASE_CONFIGURED', "${firebaseConfigured}"
     }
 
     buildFeatures {
@@ -25,4 +38,15 @@ android {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
     }
+
+    lint {
+        abortOnError false
+        checkReleaseBuilds false
+    }
+}
+
+dependencies {
+    // Pinned Firebase BoM; firebase-messaging version is resolved from the BoM.
+    implementation platform('com.google.firebase:firebase-bom:33.7.0')
+    implementation 'com.google.firebase:firebase-messaging'
 }
