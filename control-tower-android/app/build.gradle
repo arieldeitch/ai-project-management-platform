@@ -18,7 +18,8 @@ def gitSha = (System.getenv('CT_GIT_SHA') ?: 'local').take(12)
 // its setup screen and accepts them on-device.
 def gatewayUrl = (System.getenv('CT_GATEWAY_URL') ?: '').trim()
 def gatewayToken = (System.getenv('CT_GATEWAY_TOKEN') ?: '').trim()
-def jstr = { String s -> '"' + s.replace('\', '\\').replace('"', '\\"') + '"' }
+// Quote a value as a Java string literal for BuildConfig (escape backslash and double quote).
+def jstr = { String s -> '"' + s.replace('\\', '\\\\').replace('"', '\\"') + '"' }
 
 android {
     namespace 'com.ariel.controltower'
