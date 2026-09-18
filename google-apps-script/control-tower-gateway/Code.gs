@@ -15,7 +15,7 @@
  *   PROJECTS_COLUMN_MAP        optional  — JSON {field: "Exact Header"} overriding header auto-detection.
  */
 
-var GATEWAY_VERSION = '0.6.0';
+var GATEWAY_VERSION = '0.7.0';
 
 var ACTIONS = {
   health: function () { return healthReport_(); },
@@ -92,6 +92,9 @@ function tokenMatches_(candidate) {
 /** Apps Script cannot set HTTP status codes on ContentService; the status travels in the JSON. */
 function reply_(status, payload) {
   payload.status = status;
+  // Version markers are not secrets; they let a deployment be verified without the token.
+  if (payload.contract_version === undefined) payload.contract_version = GATEWAY_CONTRACT_VERSION;
+  if (payload.gateway_version === undefined) payload.gateway_version = GATEWAY_VERSION;
   return ContentService.createTextOutput(JSON.stringify(payload)).setMimeType(ContentService.MimeType.JSON);
 }
 

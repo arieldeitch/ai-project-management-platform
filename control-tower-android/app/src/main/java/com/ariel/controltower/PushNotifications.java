@@ -40,6 +40,8 @@ public final class PushNotifications {
     static final String PREF_TOKEN = "fcm_token";
     static final String PREF_TOKEN_REGISTERED = "fcm_token_registered";
     static final String PREF_PERMISSION_ASKED = "notif_permission_asked";
+    static final String PREF_TOKEN_REGISTERED_AT = "fcm_token_registered_at";
+    private static final long REGISTER_MIN_INTERVAL = 24L * 60 * 60 * 1000;
 
     private static final ExecutorService io = Executors.newSingleThreadExecutor();
 
@@ -106,6 +108,9 @@ public final class PushNotifications {
         if (token == null || token.isEmpty()) return;
         SharedPreferences p = prefs(context);
         String previous = p.getString(PREF_TOKEN, null);
+        long registeredAt = p.getLong(PREF_TOKEN_REGISTERED_AT, 0);
+        boolean sameToken = token.equals(previous) && p.getBoolean(PREF_TOKEN_REGISTERED, false);
+        if (sameToken && System.currentTimeMillis() - registeredAt < REGISTER_MIN_INTERVAL) return; // already registered recently: no churn
         p.edit().putString(PREF_TOKEN, token).apply();
         if (!Gateway.isConfigured(context)) return;
         io.execute(() -> {
@@ -115,7 +120,7 @@ public final class PushNotifications {
                         .put("device_id", Gateway.deviceId(context))
                         .put("device_label", Gateway.deviceLabel());
                 Gateway.Result r = Gateway.call(context, "register_device", params);
-                p.edit().putBoolean(PREF_TOKEN_REGISTERED, r.ok()).apply();
+                p.edit().putBoolean(PREF_TOKEN_REGISTERED, r.ok()).putLong(PREF_TOKEN_REGISTERED_AT, r.ok() ? System.currentTimeMillis() : 0).apply();
                 if (r.ok() && previous != null && !previous.equals(token)) {
                     Gateway.call(context, "unregister_device", new JSONObject().put("token", previous));
                 }

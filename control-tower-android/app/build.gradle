@@ -27,6 +27,12 @@ if (reviewBuild) gatewayUrl = reviewGatewayUrl
 // Quote a value as a Java string literal for BuildConfig (escape backslash and double quote).
 def jstr = { String s -> '"' + s.replace('\\', '\\\\').replace('"', '\\"') + '"' }
 
+// Persistent release signing. The keystore and its passwords are never in Git: CI decodes the
+// CT_RELEASE_KEYSTORE_B64 secret to a temp file and passes the path + passwords through env.
+// Locally, point CT_RELEASE_KEYSTORE_PATH at the keystore kept outside the repo.
+def releaseKeystorePath = (System.getenv('CT_RELEASE_KEYSTORE_PATH') ?: '').trim()
+def releaseSigningAvailable = !releaseKeystorePath.isEmpty() && file(releaseKeystorePath).exists()
+
 android {
     namespace 'com.ariel.controltower'
     compileSdk 35
@@ -35,14 +41,40 @@ android {
         applicationId 'com.ariel.controltower'
         minSdk 26
         targetSdk 35
-        versionCode 7
-        versionName '0.6.0'
+        versionCode 8
+        versionName '0.7.0'
         buildConfigField 'String', 'GATEWAY_URL', jstr(gatewayUrl)
         buildConfigField 'String', 'GATEWAY_TOKEN', jstr(gatewayToken)
         buildConfigField 'String', 'GIT_SHA', "\"${gitSha}\""
         buildConfigField 'boolean', 'FIREBASE_CONFIGURED', "${firebaseConfigured}"
         buildConfigField 'boolean', 'REVIEW_BUILD', "${reviewBuild}"
         manifestPlaceholders = [cleartext: reviewBuild ? 'true' : 'false']
+    }
+
+    signingConfigs {
+        if (releaseSigningAvailable) {
+            release {
+                storeFile file(releaseKeystorePath)
+                storePassword System.getenv('CT_RELEASE_KEYSTORE_PASSWORD') ?: ''
+                keyAlias System.getenv('CT_RELEASE_KEY_ALIAS') ?: 'controltower'
+                keyPassword System.getenv('CT_RELEASE_KEY_PASSWORD') ?: ''
+                enableV2Signing true
+                enableV3Signing true
+            }
+        }
+    }
+
+    buildTypes {
+        // The install-over baseline for Ariel's phone: the same persistent key on every future build.
+        release {
+            minifyEnabled false
+            shrinkResources false
+            debuggable false
+            if (releaseSigningAvailable) signingConfig signingConfigs.release
+        }
+        debug {
+            // Unchanged debug path (runner/local debug key) for emulator and review work.
+        }
     }
 
     buildFeatures {

@@ -1,7 +1,6 @@
 package com.ariel.controltower.model;
 
 import java.time.Instant;
-import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
@@ -13,38 +12,45 @@ import java.util.regex.Pattern;
 public final class TimeText {
     public static final ZoneId ISRAEL = ZoneId.of("Asia/Jerusalem");
     private static final DateTimeFormatter ABSOLUTE = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm", Locale.ROOT);
-    private static final Pattern DMY = Pattern.compile("^(\\d{1,2})[/.\\-](\\d{1,2})[/.\\-](\\d{4})(?:[ T,]+(\\d{1,2}):(\\d{2}))?");
+    private static final Pattern DMY = Pattern.compile("^(\\d{1,2})[/.\\-](\\d{1,2})[/.\\-](\\d{4})(?:[ T,]+(\\d{1,2}):(\\d{2}))?(?!\\d)");
+    private static final Pattern YMD = Pattern.compile("^(\\d{4})-(\\d{2})-(\\d{2})(?:[ T](\\d{1,2}):(\\d{2})(?::\\d{2})?)?(?!\\d)");
+    private static final Pattern ISO_ZONED = Pattern.compile("^(\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}(?::\\d{2}(?:\\.\\d+)?)?(?:Z|[+\\-]\\d{2}:?\\d{2}))");
+    /** One leading status word is tolerated ("VERIFIED 2026-09-17 08:07: …"); prose is never a timestamp. */
+    private static final Pattern STATUS_PREFIX = Pattern.compile("^(?:(?:VERIFIED|REPORTED|DONE|CHECKED|UPDATED|OK|מאומת|דווח)(?=[\\s:\\-–—])[\\s:\\-–—]*)?", Pattern.CASE_INSENSITIVE);
 
     private TimeText() {}
 
-    /** ISO-8601 (with or without millis/offset) or DD/MM/YYYY[ HH:MM] → epoch millis, or -1. */
+    /**
+     * Accepted, anchored at the start (after at most one status word): ISO-8601 with zone,
+     * YYYY-MM-DD[ HH:mm] and DD/MM/YYYY[ HH:mm] as Israel wall clock. Anything else → -1.
+     */
     public static long parse(String value) {
         if (value == null) return -1;
-        String s = value.trim();
+        String s = STATUS_PREFIX.matcher(value.trim()).replaceFirst("");
         if (s.isEmpty()) return -1;
-        try {
-            return Instant.parse(s).toEpochMilli();
-        } catch (Exception ignored) {}
-        try {
-            return ZonedDateTime.parse(s).toInstant().toEpochMilli();
-        } catch (Exception ignored) {}
-        try {
-            if (s.length() >= 16 && s.charAt(10) == 'T') {
-                return LocalDateTime.parse(s.length() > 19 ? s.substring(0, 19) : s).atZone(ISRAEL).toInstant().toEpochMilli();
-            }
-        } catch (Exception ignored) {}
-        Matcher m = DMY.matcher(s);
+        Matcher m = ISO_ZONED.matcher(s);
         if (m.find()) {
             try {
-                int day = Integer.parseInt(m.group(1));
-                int month = Integer.parseInt(m.group(2));
-                int year = Integer.parseInt(m.group(3));
-                int hour = m.group(4) == null ? 0 : Integer.parseInt(m.group(4));
-                int minute = m.group(5) == null ? 0 : Integer.parseInt(m.group(5));
-                return ZonedDateTime.of(year, month, day, hour, minute, 0, 0, ISRAEL).toInstant().toEpochMilli();
+                return ZonedDateTime.parse(m.group(1).replaceAll("([+\\-]\\d{2})(\\d{2})$", "$1:$2")).toInstant().toEpochMilli();
+            } catch (Exception ignored) {}
+            try {
+                return Instant.parse(m.group(1)).toEpochMilli();
             } catch (Exception ignored) {}
         }
+        m = YMD.matcher(s);
+        if (m.find()) return wallClock(m.group(1), m.group(2), m.group(3), m.group(4), m.group(5));
+        m = DMY.matcher(s);
+        if (m.find()) return wallClock(m.group(3), m.group(2), m.group(1), m.group(4), m.group(5));
         return -1;
+    }
+
+    private static long wallClock(String y, String mo, String d, String h, String mi) {
+        try {
+            return ZonedDateTime.of(Integer.parseInt(y), Integer.parseInt(mo), Integer.parseInt(d),
+                    h == null ? 0 : Integer.parseInt(h), mi == null ? 0 : Integer.parseInt(mi), 0, 0, ISRAEL).toInstant().toEpochMilli();
+        } catch (Exception e) {
+            return -1;
+        }
     }
 
     /** Unicode isolates so a date/time keeps its LTR order inside Hebrew sentences. */

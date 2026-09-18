@@ -15,7 +15,7 @@ permissions:
 jobs:
   build-apk:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -48,9 +48,12 @@ jobs:
         shell: bash
         run: |
           set -e
-          PATTERNS='BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY|"private_key"|"client_email"|service_role|sb_secret_|CT_GATEWAY_TOKEN=[A-Za-z0-9]'
+          PATTERNS='BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY|"private_key"|"client_email"|service_role|sb_secret_|CT_GATEWAY_TOKEN=[A-Za-z0-9]|CT_RELEASE_KEYSTORE_PASSWORD=[A-Za-z0-9]|CT_RELEASE_KEY_PASSWORD=[A-Za-z0-9]'
           if git grep -n -E "$PATTERNS" -- ':!docs' ':!*.md' ':!.github/workflows/control-tower-apk.yml' ':!google-apps-script/control-tower-gateway/test'; then
             echo "::error::secret-like material found in tracked files"; exit 1
+          fi
+          if git ls-files | grep -E '\.(jks|keystore|p12|pem)$'; then
+            echo "::error::keystore/key file is tracked"; exit 1
           fi
           test ! -f control-tower-android/app/service-account.json
           echo "Secret scan: clean"
@@ -70,20 +73,20 @@ jobs:
           echo "name=$NAME" >> "$GITHUB_OUTPUT"
           echo "code=$CODE" >> "$GITHUB_OUTPUT"
           echo "artifact=ControlTower-$NAME-debug" >> "$GITHUB_OUTPUT"
+          echo "release=ControlTower-$NAME-release" >> "$GITHUB_OUTPUT"
           echo "Building Control Tower $NAME ($CODE) @ ${GITHUB_SHA::12}"
 
-      # Gateway config (Apps Script Web App URL + shared token) comes from secrets; absent -> in-app setup screen.
+      # Gateway token comes from a secret; absent -> the app asks for it once on-device. The URL is tracked.
       - name: Check gateway configuration
         id: gateway
         shell: bash
         env:
-          CT_GATEWAY_URL: ${{ secrets.CT_GATEWAY_URL }}
           CT_GATEWAY_TOKEN: ${{ secrets.CT_GATEWAY_TOKEN }}
         run: |
-          if [ -n "$CT_GATEWAY_URL" ] && [ "${#CT_GATEWAY_TOKEN}" -ge 32 ]; then
-            echo "configured=true" >> "$GITHUB_OUTPUT"; echo "Gateway: URL + token embedded from secrets"
+          if [ "${#CT_GATEWAY_TOKEN}" -ge 32 ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"; echo "Gateway: token embedded from secrets"
           else
-            echo "configured=false" >> "$GITHUB_OUTPUT"; echo "Gateway: CT_GATEWAY_URL/CT_GATEWAY_TOKEN not set — app will show its setup screen"
+            echo "configured=false" >> "$GITHUB_OUTPUT"; echo "Gateway: CT_GATEWAY_TOKEN not set — app asks for the token once on-device"
           fi
 
       # Firebase Android client config contains non-secret app/project identifiers.
@@ -106,6 +109,23 @@ jobs:
             echo "Firebase: no Android client configuration found"
           fi
 
+      # Persistent release key: decoded from a secret into the runner temp dir, never into the workspace.
+      - name: Prepare release signing
+        id: signing
+        shell: bash
+        env:
+          CT_RELEASE_KEYSTORE_B64: ${{ secrets.CT_RELEASE_KEYSTORE_B64 }}
+        run: |
+          if [ -n "$CT_RELEASE_KEYSTORE_B64" ]; then
+            printf '%s' "$CT_RELEASE_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/ct-release.jks"
+            echo "path=$RUNNER_TEMP/ct-release.jks" >> "$GITHUB_OUTPUT"
+            echo "available=true" >> "$GITHUB_OUTPUT"
+            echo "Signing: persistent release keystore available"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "Signing: CT_RELEASE_KEYSTORE_B64 not set — no release APK this run"
+          fi
+
       - name: Build debug APK
         working-directory: control-tower-android
         env:
@@ -113,6 +133,32 @@ jobs:
           CT_GATEWAY_URL: ${{ secrets.CT_GATEWAY_URL }}
           CT_GATEWAY_TOKEN: ${{ secrets.CT_GATEWAY_TOKEN }}
         run: gradle :app:assembleDebug --stacktrace
+
+      - name: Build signed release APK
+        if: steps.signing.outputs.available == 'true'
+        working-directory: control-tower-android
+        env:
+          CT_GIT_SHA: ${{ github.sha }}
+          CT_GATEWAY_URL: ${{ secrets.CT_GATEWAY_URL }}
+          CT_GATEWAY_TOKEN: ${{ secrets.CT_GATEWAY_TOKEN }}
+          CT_RELEASE_KEYSTORE_PATH: ${{ steps.signing.outputs.path }}
+          CT_RELEASE_KEYSTORE_PASSWORD: ${{ secrets.CT_RELEASE_KEYSTORE_PASSWORD }}
+          CT_RELEASE_KEY_ALIAS: ${{ secrets.CT_RELEASE_KEY_ALIAS }}
+          CT_RELEASE_KEY_PASSWORD: ${{ secrets.CT_RELEASE_KEY_PASSWORD }}
+        run: gradle :app:assembleRelease --stacktrace
+
+      - name: Verify release signature
+        if: steps.signing.outputs.available == 'true'
+        id: cert
+        shell: bash
+        run: |
+          APK=control-tower-android/app/build/outputs/apk/release/app-release.apk
+          test -s "$APK"
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs "$APK" | tee cert.txt
+          FP=$(grep -i "SHA-256 digest" cert.txt | head -1 | awk '{print $NF}')
+          test -n "$FP"
+          echo "fingerprint=$FP" >> "$GITHUB_OUTPUT"
+          rm -f "$RUNNER_TEMP/ct-release.jks"
 
       - name: Unit tests (presentation model)
         working-directory: control-tower-android
@@ -131,22 +177,34 @@ jobs:
           CT_GATEWAY_TOKEN: ${{ secrets.CT_GATEWAY_TOKEN }}
         run: gradle :app:lintDebug
 
-      - name: Name artifact after the real version
+      - name: Name artifacts after the real version
         shell: bash
+        env:
+          FINGERPRINT: ${{ steps.cert.outputs.fingerprint }}
+          SIGNED: ${{ steps.signing.outputs.available }}
         run: |
           OUT="${{ steps.version.outputs.artifact }}.apk"
           cp control-tower-android/app/build/outputs/apk/debug/app-debug.apk "$OUT"
           sha256sum "$OUT" | tee "$OUT.sha256"
           {
             echo "## Control Tower ${{ steps.version.outputs.name }} (versionCode ${{ steps.version.outputs.code }})"
-            echo "- Artifact: \`$OUT\`"
-            echo "- Commit: \`${GITHUB_SHA}\`"
-            echo "- Firebase configured in build: \`${{ steps.firebase.outputs.configured }}\`"
-            echo "- Gateway configured in build: \`${{ steps.gateway.outputs.configured }}\`"
-            echo "- SHA-256: \`$(cut -d' ' -f1 "$OUT.sha256")\`"
+            echo "- Commit: ${GITHUB_SHA}"
+            echo "- Debug artifact: $OUT — SHA-256 $(cut -d' ' -f1 "$OUT.sha256")"
+            echo "- Firebase configured in build: ${{ steps.firebase.outputs.configured }}"
+            echo "- Gateway configured in build: ${{ steps.gateway.outputs.configured }}"
           } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$SIGNED" = "true" ]; then
+            REL="${{ steps.version.outputs.release }}.apk"
+            cp control-tower-android/app/build/outputs/apk/release/app-release.apk "$REL"
+            sha256sum "$REL" | tee "$REL.sha256"
+            echo "$FINGERPRINT" > "$REL.cert-sha256"
+            {
+              echo "- **Release artifact (install-over baseline): $REL** — SHA-256 $(cut -d' ' -f1 "$REL.sha256")"
+              echo "- Signing certificate SHA-256: $FINGERPRINT"
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
 
-      - name: Upload APK
+      - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
           name: ${{ steps.version.outputs.artifact }}
@@ -155,6 +213,18 @@ jobs:
             ${{ steps.version.outputs.artifact }}.apk.sha256
           if-no-files-found: error
           retention-days: 30
+
+      - name: Upload signed release APK
+        if: steps.signing.outputs.available == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.version.outputs.release }}
+          path: |
+            ${{ steps.version.outputs.release }}.apk
+            ${{ steps.version.outputs.release }}.apk.sha256
+            ${{ steps.version.outputs.release }}.apk.cert-sha256
+          if-no-files-found: error
+          retention-days: 90
 
       - name: Upload unit test report
         if: always()

@@ -65,6 +65,8 @@ public class MainActivity extends Activity {
     private int activeTab = TAB_HOME;
     private boolean detailOpen = false;
     private Portfolio portfolio;          // last snapshot rendered (live or cached)
+    private static final long REFRESH_MIN_INTERVAL = 45_000L;
+    private boolean forceRefresh = false; // set by the explicit refresh button
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -183,8 +185,8 @@ public class MainActivity extends Activity {
         b.setTextColor(BLUE);
         b.setBackground(box(Theme.tint(BLUE, 28), Theme.tint(BLUE, 90), 12));
         b.setPadding(dp(14), 0, dp(14), 0);
-        b.setMinHeight(dp(40));
-        b.setMinimumHeight(dp(40));
+        b.setMinHeight(dp(44));
+        b.setMinimumHeight(dp(44));
         return b;
     }
 
@@ -381,6 +383,7 @@ public class MainActivity extends Activity {
             b.setTypeface(Typeface.DEFAULT, active ? Typeface.BOLD : Typeface.NORMAL);
             b.setTextColor(active ? BG : TEXT);
             b.setBackground(active ? box(BLUE, BLUE, 14) : box(Color.TRANSPARENT, Color.TRANSPARENT, 14));
+            b.setContentDescription(labels[i] + (active ? " (מסך נוכחי)" : ""));
             b.setOnClickListener(v -> selectTab(index));
             LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f);
             p.setMargins(dp(3), 0, dp(3), 0);
@@ -533,9 +536,11 @@ public class MainActivity extends Activity {
             wall.addView(text("אין חותמת פעילות עדכנית", large ? 18 : 15, TEXT, true), full(4, 0));
             if (!p.lastProgressRaw.isEmpty()) wall.addView(text("בלוח רשום: " + shortText(p.lastProgressRaw, 60), 12, MUTED, false), full(2, 0));
         }
+        // Stale / aging / unknown-cadence explanations. The no-timestamp case is already the headline above.
         String note = p.freshness.note();
-        if (p.freshness.state != Freshness.State.UNKNOWN && !note.isEmpty()) wall.addView(text(note, 12, accent, false), full(3, 0));
-        else if (p.freshness.state == Freshness.State.FRESH && p.freshness.cadenceAssumed) wall.addView(text("קצב צפוי לא הוגדר בלוח (הנחה: שבועי)", 11, MUTED, false), full(3, 0));
+        if (p.freshness.reason != Freshness.Reason.NO_TIMESTAMP && !note.isEmpty()) {
+            wall.addView(text(note, 12, p.freshness.state == Freshness.State.UNKNOWN ? MUTED : accent, false), full(3, 0));
+        }
         return wall;
     }
 
@@ -607,12 +612,21 @@ public class MainActivity extends Activity {
         } else {
             c.addView(loading(), lp(ViewGroup.LayoutParams.MATCH_PARENT, dp(80), 10, 0));
         }
+        if (cached != null && !forceRefresh && now() - cached.syncedAt < REFRESH_MIN_INTERVAL) {
+            // Fresh enough: render from cache without another gateway round-trip (no lifecycle churn).
+            c.removeAllViews();
+            renderHome(c, cached, null, false);
+            return;
+        }
+        forceRefresh = false;
         loadPortfolio((p, err) -> {
             if (contentHost == null || activeTab != TAB_HOME || detailOpen) return;
+            int y = s.getScrollY();
             c.removeAllViews();
             if (p != null) renderHome(c, p, null, false);
             else if (cached != null) renderHome(c, cached, err, false);
             else renderLoadError(c, err);
+            if (y > 0) s.post(() -> s.scrollTo(0, y));
         });
     }
 
@@ -634,7 +648,8 @@ public class MainActivity extends Activity {
         head.addView(snapshotLine(p, refreshError), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
         Button refresh = linkButton(refreshing ? "מרענן…" : "רענון ↻");
         refresh.setEnabled(!refreshing);
-        refresh.setOnClickListener(v -> selectTab(TAB_HOME));
+        refresh.setContentDescription("רענון הנתונים מהלוח");
+        refresh.setOnClickListener(v -> { forceRefresh = true; selectTab(TAB_HOME); });
         head.addView(refresh);
         c.addView(head, full(0, 10));
 
@@ -655,8 +670,8 @@ public class MainActivity extends Activity {
         addCount(strip, "תקין", p.green, GREEN);
         addCount(strip, "ישן", p.stale, AMBER);
         summary.addView(strip, lp(ViewGroup.LayoutParams.MATCH_PARENT, dp(64), 0, 0));
-        long latest = p.latestActivity();
-        if (latest > 0) summary.addView(text("פעילות אחרונה בפורטפוליו: " + TimeText.wall(latest, now()), 12, MUTED, false), full(8, 0));
+        Project latest = p.latestActiveProject();
+        if (latest != null) summary.addView(text("הכי עדכני: " + latest.name + " · " + TimeText.wall(latest.lastProgressMillis, now()), 12, MUTED, false), full(8, 0));
         if (p.unknownActivity > 0) summary.addView(text(p.unknownActivity + " פרויקטים בלי חותמת פעילות בלוח", 12, MUTED, false), full(3, 0));
         c.addView(summary, full(0, 14));
 
@@ -694,12 +709,16 @@ public class MainActivity extends Activity {
         Portfolio cached = cachedPortfolio();
         if (cached != null) renderProjects(c, cached, null);
         else c.addView(loading(), lp(ViewGroup.LayoutParams.MATCH_PARENT, dp(80), 0, 0));
+        if (cached != null && !forceRefresh && now() - cached.syncedAt < REFRESH_MIN_INTERVAL) return;
+        forceRefresh = false;
         loadPortfolio((p, err) -> {
             if (contentHost == null || activeTab != TAB_PROJECTS || detailOpen) return;
+            int y = s.getScrollY();
             c.removeAllViews();
             if (p != null) renderProjects(c, p, null);
             else if (cached != null) renderProjects(c, cached, err);
             else renderLoadError(c, err);
+            if (y > 0) s.post(() -> s.scrollTo(0, y));
         });
     }
 
@@ -732,6 +751,29 @@ public class MainActivity extends Activity {
         if (value == null || value.trim().isEmpty() || "null".equals(value)) return;
         c.addView(text(label, 12, BLUE, true), full(14, 0));
         c.addView(text(value, 15, TEXT, false), full(3, 0));
+    }
+
+    /** Long free text: show the first {@code limit} characters with an inline "הצג עוד" toggle. */
+    private void addExpandableField(LinearLayout c, String label, String value, int limit) {
+        if (value == null || value.trim().isEmpty() || "null".equals(value)) return;
+        String full = value.trim();
+        if (full.length() <= limit + 40) {
+            addField(c, label, full);
+            return;
+        }
+        c.addView(text(label, 12, BLUE, true), full(14, 0));
+        TextView body = text(shortText(full, limit), 15, TEXT, false);
+        c.addView(body, full(3, 0));
+        TextView more = text("הצג עוד", 13, BLUE, true);
+        more.setMinHeight(dp(36));
+        more.setGravity(Gravity.CENTER_VERTICAL | Gravity.START);
+        more.setContentDescription("הצג את הטקסט המלא");
+        c.addView(more, full(2, 0));
+        more.setOnClickListener(v -> {
+            boolean expanded = body.getText().length() > limit + 1;
+            body.setText(expanded ? shortText(full, limit) : full);
+            more.setText(expanded ? "הצג עוד" : "הצג פחות");
+        });
     }
 
     /** Full-screen detail inside the shell (nav stays visible; Back returns to the list). */
@@ -773,7 +815,7 @@ public class MainActivity extends Activity {
         }
         addField(body, "מה המטרה", p.objective);
         addField(body, "מה המצב עכשיו", p.milestone.isEmpty() ? Hebrew.lifecycle(p.lifecycle) : p.milestone);
-        addField(body, "מה קרה לאחרונה", p.progressEvidence);
+        addExpandableField(body, "מה קרה לאחרונה", p.progressEvidence, 280);
         addField(body, "הפעולה הבאה", p.nextAction);
         addField(body, "מה חוסם", p.blocker);
         if (!p.needsAttention()) addField(body, "צריך את אריאל", "לא נדרשת פעולה כרגע");
@@ -786,8 +828,8 @@ public class MainActivity extends Activity {
         meta.addView(text("נתוני בקרה", 12, MUTED, true));
         String check = p.lastControlCheckMillis > 0 ? TimeText.wall(p.lastControlCheckMillis, now()) : (p.lastControlCheckRaw.isEmpty() ? "לא נרשמה" : p.lastControlCheckRaw);
         meta.addView(text("בדיקת Control Tower אחרונה: " + check, 13, MUTED, false), full(6, 0));
-        String cadence = p.expectedCadence.isEmpty() ? "לא הוגדר בלוח (הנחה: שבועי)"
-                : p.freshness.cadenceAssumed ? p.freshness.cadenceLabel + " · בלוח רשום: " + p.expectedCadence
+        String cadence = p.expectedCadence.isEmpty() ? "לא הוגדר בלוח"
+                : p.freshness.cadenceUnknown() ? "לא זוהה · בלוח רשום: " + p.expectedCadence
                 : p.freshness.cadenceLabel;
         meta.addView(text("קצב צפוי: " + cadence, 13, MUTED, false), full(3, 0));
         if (!p.id.isEmpty()) meta.addView(text("מזהה בלוח: " + p.id, 12, MUTED, false), full(3, 0));

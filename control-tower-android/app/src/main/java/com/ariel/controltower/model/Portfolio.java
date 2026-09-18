@@ -81,8 +81,14 @@ public final class Portfolio {
 
     /** Most recent project activity across the portfolio, -1 if none has a timestamp. */
     public long latestActivity() {
-        long best = -1;
-        for (Project p : projects) if (p.lastProgressMillis > best) best = p.lastProgressMillis;
+        Project p = latestActiveProject();
+        return p == null ? -1 : p.lastProgressMillis;
+    }
+
+    /** The project with the most recent activity timestamp, or null when none has one. */
+    public Project latestActiveProject() {
+        Project best = null;
+        for (Project p : projects) if (p.lastProgressMillis > 0 && (best == null || p.lastProgressMillis > best.lastProgressMillis)) best = p;
         return best;
     }
 }

@@ -133,3 +133,82 @@ test('CombinedCode.gs is generated from the current modular sources', async () =
   const current = readFileSync(join(here, '..', 'CombinedCode.gs'), 'utf8').replace(/\r\n/g, '\n');
   assert.equal(current, combined().replace(/\r\n/g, '\n'));
 });
+
+// ---------- 0.7: timestamp shapes (accepted / rejected) ----------
+
+test('parseCellDate_ accepts every documented shape and rejects prose', () => {
+  const ctx = makeContext(liveShapedRows);
+  const p = (v) => ctx.parseCellDate_(v);
+  // exact instants
+  assert.equal(p('2026-09-18T11:23:00Z').iso, '2026-09-18T11:23:00.000Z');
+  assert.equal(p('2026-09-18T14:23:00+03:00').iso, '2026-09-18T11:23:00.000Z');
+  assert.equal(p('2026-09-18T14:23:00.250+0300').iso, '2026-09-18T11:23:00.250Z');
+  // Israel wall clock (IDT in September = UTC+3, IST in January = UTC+2)
+  assert.equal(p('2026-09-18 14:23').iso, '2026-09-18T11:23:00.000Z');
+  assert.equal(p('2026-09-18T14:23').iso, '2026-09-18T11:23:00.000Z');
+  assert.equal(p('2026-09-18').iso, '2026-09-17T21:00:00.000Z');
+  assert.equal(p('2026-01-15 09:00').iso, '2026-01-15T07:00:00.000Z');
+  assert.equal(p('18/09/2026 14:23').iso, '2026-09-18T11:23:00.000Z');
+  assert.equal(p('18.9.2026').iso, '2026-09-17T21:00:00.000Z');
+  assert.equal(p('18-09-2026 08:07').iso, '2026-09-18T05:07:00.000Z');
+  // status word + timestamp, then anything
+  const v = p('VERIFIED 2026-09-17 08:07: nightly sync ran, 6 rows');
+  assert.equal(v.iso, '2026-09-17T05:07:00.000Z');
+  assert.equal(v.raw, 'VERIFIED 2026-09-17 08:07: nightly sync ran, 6 rows');
+  assert.equal(p('reported: 17/09/2026 09:10 — APK sent').iso, '2026-09-17T06:10:00.000Z');
+  assert.equal(p('מאומת 2026-09-17 08:07 סנכרון').iso, '2026-09-17T05:07:00.000Z');
+  // rejected: prose, mid-sentence dates, relative words, garbage
+  assert.equal(p('nightly sync ran on 2026-09-17 08:07').iso, '');
+  assert.equal(p('yesterday').iso, '');
+  assert.equal(p('ongoing').iso, '');
+  assert.equal(p('VERIFIED yesterday morning').iso, '');
+  assert.equal(p('20260918').iso, '');
+  assert.equal(p('18/09/26').iso, '');
+  assert.equal(p('').iso, '');
+  assert.equal(p('ongoing').raw, 'ongoing');
+});
+
+test('Connections resolves the real board headers (Platform / Verification Status / Evidence / Connector)', () => {
+  const ctx = makeContext(liveShapedRows);
+  const CONN_HEADERS = ['Platform', 'Verification Status', 'Evidence / Connector', 'Notes'];
+  const CONN_ROWS = [['Google Drive', 'VERIFIED', 'Apps Script gateway', ''], ['Firebase', 'PENDING', 'FCM service account not set', 'x'], ['', '', '', '']];
+  ctx.SpreadsheetApp.openById = () => ({
+    getSheetByName: (n) => n === 'Connections' ? {
+      getLastRow: () => CONN_ROWS.length + 1, getLastColumn: () => CONN_HEADERS.length,
+      getRange: () => ({ getValues: () => [CONN_HEADERS, ...CONN_ROWS] }),
+    } : null,
+  });
+  const out = ctx.readConnections_();
+  assert.equal(out.length, 2);
+  assert.equal(out[0].name, 'Google Drive');
+  assert.equal(out[0].status, 'VERIFIED');
+  assert.equal(out[0].note, 'Apps Script gateway');
+  assert.equal(out[1].status, 'PENDING');
+});
+
+test('every reply carries contract/gateway version so a deployment can be verified without the token', () => {
+  const ctx = makeContext(liveShapedRows);
+  let captured = '';
+  ctx.ContentService = { createTextOutput: (t) => { captured = t; return { setMimeType: () => ({}) }; }, MimeType: { JSON: 'json' } };
+  ctx.reply_(401, { ok: false, error: 'unauthorized' });
+  const body = JSON.parse(captured);
+  assert.equal(body.contract_version, 2);
+  assert.equal(body.gateway_version, '0.7.0');
+  assert.equal(body.error, 'unauthorized');
+});
+
+test('board column names from the hardening brief resolve without collisions', () => {
+  const HEAD = ['ID', 'Project', 'Lifecycle', 'RAG', 'Confidence', 'Objective', 'Current Milestone', 'Progress Evidence',
+    'Next Action', 'Blocker / Dependency', 'Needs Ariel', 'Ariel Decision / Input', 'Risk / Drift',
+    'Last Meaningful Progress', 'Last Control Check', 'Expected Cadence', 'Primary Link'];
+  const ctx = makeContext([]);
+  ctx.SpreadsheetApp.openById = () => ({ getSheetByName: (n) => n === 'Projects' ? { getLastColumn: () => HEAD.length, getLastRow: () => 1, getRange: (r, c, nr, nc) => ({ getValues: () => [HEAD.slice(c - 1, c - 1 + nc)] }) } : null });
+  const map = ctx.resolveProjectColumns_();
+  const expect = { id: 'ID', name: 'Project', lifecycle: 'Lifecycle', rag: 'RAG', confidence: 'Confidence', objective: 'Objective',
+    milestone: 'Current Milestone', progress_evidence: 'Progress Evidence', next_action: 'Next Action', blocker: 'Blocker / Dependency',
+    needs_ariel: 'Needs Ariel', ariel_input: 'Ariel Decision / Input', risk: 'Risk / Drift', last_meaningful_progress: 'Last Meaningful Progress',
+    last_control_check: 'Last Control Check', expected_cadence: 'Expected Cadence', link: 'Primary Link' };
+  for (const [field, header] of Object.entries(expect)) assert.equal(HEAD[map[field]], header, field);
+  const used = Object.values(map).filter((i) => i >= 0);
+  assert.equal(new Set(used).size, used.length, 'no two fields share a column');
+});

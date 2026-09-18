@@ -191,22 +191,50 @@ function isUserTestState_(lifecycle) {
 }
 
 /**
- * Timestamp cells: a real Date, or text such as "18/09/2026 14:23", "2026-09-18T11:23:00Z", "18.9.2026".
- * Returns { iso: '' | ISO-8601, raw: original text }. Unparseable text keeps raw so the client can
- * say "no usable activity timestamp" instead of pretending.
+ * Timestamp cells: a real Date, or text. Accepted text shapes (deterministic, anchored at the start,
+ * optionally preceded by ONE status word such as "VERIFIED"/"REPORTED"/"DONE"/"CHECKED"/"UPDATED"):
+ *   2026-09-18T11:23:00Z / 2026-09-18T11:23:00.000+03:00   (ISO, any offset)
+ *   2026-09-18 14:23  /  2026-09-18                        (Israel wall clock when no offset)
+ *   18/09/2026 14:23  /  18.9.2026  /  18-09-2026           (DD/MM/YYYY)
+ *   "VERIFIED 2026-09-17 08:07: sync ran"                  (status word + timestamp, then anything)
+ * Anything else — prose, a date buried mid-sentence, "yesterday" — is NOT a timestamp.
+ * Returns { iso: '' | ISO-8601, raw: original text }. Raw is preserved so the client can show the evidence
+ * and say "no usable activity timestamp" instead of pretending.
  */
+var TIMESTAMP_STATUS_PREFIX = /^(?:(?:VERIFIED|REPORTED|DONE|CHECKED|UPDATED|OK|מאומת|דווח)(?=[\s:\-–—])[\s:\-–—]*)?/i;
+var ISRAEL_UTC_OFFSET_MINUTES_ = function (y, mo, d, h, mi) {
+  // Israel: UTC+2, DST UTC+3 from the last Friday before the last Sunday of March (02:00) to the last Sunday of October (02:00).
+  var lastSunday = function (year, month) { var t = new Date(Date.UTC(year, month + 1, 0)); return t.getUTCDate() - t.getUTCDay(); };
+  var startDay = lastSunday(y, 2) - 2; // Friday before last Sunday of March
+  var endDay = lastSunday(y, 9);
+  var t = Date.UTC(y, mo, d, h, mi);
+  var dstStart = Date.UTC(y, 2, startDay, 2, 0);
+  var dstEnd = Date.UTC(y, 9, endDay, 2, 0);
+  return (t >= dstStart && t < dstEnd) ? 180 : 120;
+};
+function israelToIso_(y, mo, d, h, mi) {
+  var offset = ISRAEL_UTC_OFFSET_MINUTES_(y, mo, d, h, mi);
+  var t = new Date(Date.UTC(y, mo, d, h, mi) - offset * 60000);
+  return isNaN(t.getTime()) ? '' : t.toISOString();
+}
 function parseCellDate_(value) {
   if (isDate_(value)) return { iso: isNaN(value.getTime()) ? '' : value.toISOString(), raw: '' };
-  var raw = str_(value, 120).trim();
+  var raw = str_(value, 400).trim();
   if (!raw) return { iso: '', raw: '' };
-  var m = raw.match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{4})(?:[ T,]+(\d{1,2}):(\d{2}))?/);
-  if (m) {
-    var d = new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]), m[4] ? Number(m[4]) : 0, m[5] ? Number(m[5]) : 0, 0);
-    return { iso: isNaN(d.getTime()) ? '' : d.toISOString(), raw: raw };
+  var text = raw.replace(TIMESTAMP_STATUS_PREFIX, '');
+  var m;
+  // ISO with time and explicit zone/offset -> exact instant
+  if ((m = text.match(/^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+\-]\d{2}:?\d{2}))/))) {
+    var exact = new Date(m[1]);
+    return { iso: isNaN(exact.getTime()) ? '' : exact.toISOString(), raw: raw };
   }
-  if (/^\d{4}-\d{2}-\d{2}/.test(raw)) {
-    var iso = new Date(raw);
-    return { iso: isNaN(iso.getTime()) ? '' : iso.toISOString(), raw: raw };
+  // YYYY-MM-DD[ T]HH:mm[:ss] without zone -> Israel wall clock
+  if ((m = text.match(/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{1,2}):(\d{2})(?::\d{2})?)?(?![\d])/))) {
+    return { iso: israelToIso_(+m[1], +m[2] - 1, +m[3], m[4] ? +m[4] : 0, m[5] ? +m[5] : 0), raw: raw };
+  }
+  // DD/MM/YYYY[ HH:mm] (also . or - separators) -> Israel wall clock
+  if ((m = text.match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{4})(?:[ T,]+(\d{1,2}):(\d{2}))?(?![\d])/))) {
+    return { iso: israelToIso_(+m[3], +m[2] - 1, +m[1], m[4] ? +m[4] : 0, m[5] ? +m[5] : 0), raw: raw };
   }
   return { iso: '', raw: raw };
 }
@@ -294,9 +322,9 @@ function readConnections_() {
     }
     return -1;
   };
-  var nameIdx = pick(['connection', 'name', 'system', 'source', 'שם']);
-  var statusIdx = pick(['status', 'state', 'סטטוס']);
-  var noteIdx = pick(['note', 'notes', 'detail', 'הערה']);
+  var nameIdx = pick(['platform', 'connection', 'name', 'system', 'source', 'service', 'פלטפורמה', 'שם']);
+  var statusIdx = pick(['verification status', 'status', 'state', 'connection status', 'סטטוס אימות', 'סטטוס']);
+  var noteIdx = pick(['evidence connector', 'evidence', 'connector', 'note', 'notes', 'detail', 'ראיות', 'הערה']);
   var out = [];
   for (var r = 1; r < values.length; r++) {
     var name = nameIdx >= 0 ? str_(values[r][nameIdx], 120) : '';
@@ -724,7 +752,7 @@ function debugTestPush() {
  *   PROJECTS_COLUMN_MAP        optional  — JSON {field: "Exact Header"} overriding header auto-detection.
  */
 
-var GATEWAY_VERSION = '0.6.0';
+var GATEWAY_VERSION = '0.7.0';
 
 var ACTIONS = {
   health: function () { return healthReport_(); },
@@ -801,6 +829,9 @@ function tokenMatches_(candidate) {
 /** Apps Script cannot set HTTP status codes on ContentService; the status travels in the JSON. */
 function reply_(status, payload) {
   payload.status = status;
+  // Version markers are not secrets; they let a deployment be verified without the token.
+  if (payload.contract_version === undefined) payload.contract_version = GATEWAY_CONTRACT_VERSION;
+  if (payload.gateway_version === undefined) payload.gateway_version = GATEWAY_VERSION;
   return ContentService.createTextOutput(JSON.stringify(payload)).setMimeType(ContentService.MimeType.JSON);
 }
 

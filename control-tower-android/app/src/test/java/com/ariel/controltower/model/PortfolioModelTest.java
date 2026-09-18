@@ -104,10 +104,60 @@ public class PortfolioModelTest {
         assertEquals(7 * Freshness.DAY / 2, Freshness.parseCadenceMillis("2x/week"));
         assertEquals(Freshness.DAY, Freshness.parseCadenceMillis("יומי"));
         assertEquals(-1, Freshness.parseCadenceMillis("whenever"));
-        Freshness f = Freshness.of(NOW - Freshness.DAY, "whenever", NOW);
-        assertTrue(f.cadenceAssumed);
-        assertEquals(Freshness.State.FRESH, f.state);
-        assertEquals("שבועי (הנחה)", f.cadenceLabel);
+        assertEquals(-1, Freshness.parseCadenceMillis("as needed"));
+        assertEquals(-1, Freshness.parseCadenceMillis("ad-hoc"));
+        assertEquals(-1, Freshness.parseCadenceMillis(""));
+        assertEquals(Freshness.HOUR, Freshness.parseCadenceMillis("hourly"));
+        assertEquals(Freshness.HOUR, Freshness.parseCadenceMillis("every hour"));
+        assertEquals(12 * Freshness.HOUR, Freshness.parseCadenceMillis("twice daily"));
+        assertEquals(6 * Freshness.HOUR, Freshness.parseCadenceMillis("every 6 hours"));
+        assertEquals(Freshness.DAY, Freshness.parseCadenceMillis("daily while active"));
+        assertEquals(Freshness.DAY, Freshness.parseCadenceMillis("Weekdays"));
+        assertEquals(7 * Freshness.DAY / 3, Freshness.parseCadenceMillis("3x/week"));
+        assertEquals(14 * Freshness.DAY, Freshness.parseCadenceMillis("every 2 weeks"));
+        assertEquals(30 * Freshness.DAY, Freshness.parseCadenceMillis("monthly"));
+        // unreadable cadence -> UNKNOWN with a truthful reason, never stale, even for an old timestamp
+        Freshness f = Freshness.of(NOW - 40 * Freshness.DAY, "whenever", NOW);
+        assertEquals(Freshness.State.UNKNOWN, f.state);
+        assertEquals(Freshness.Reason.NO_CADENCE, f.reason);
+        assertTrue(f.cadenceUnknown());
+        assertFalse(f.isStale());
+        assertEquals("קצב צפוי לא הוגדר בלוח — לא ניתן לקבוע אם המידע ישן", f.note());
+        assertTrue(f.ageMillis > 0);
+    }
+
+    @Test public void freshnessBoundariesAreExact() {
+        long c = Freshness.DAY;
+        assertEquals(Freshness.State.FRESH, Freshness.of(NOW - c, "daily", NOW).state);
+        assertEquals(Freshness.State.AGING, Freshness.of(NOW - c - 1, "daily", NOW).state);
+        assertEquals(Freshness.State.AGING, Freshness.of(NOW - 2 * c, "daily", NOW).state);
+        assertEquals(Freshness.State.STALE, Freshness.of(NOW - 2 * c - 1, "daily", NOW).state);
+        assertEquals(Freshness.State.FRESH, Freshness.of(NOW + 5 * 60_000L, "daily", NOW).state); // clock skew: future = fresh
+        Freshness noTs = Freshness.of(-1, "", NOW);
+        assertEquals(Freshness.Reason.NO_TIMESTAMP, noTs.reason);
+        assertEquals("אין חותמת פעילות עדכנית", noTs.note());
+    }
+
+    @Test public void timestampShapesAcceptedAndRejected() {
+        long expected = TimeText.parse("2026-09-18T11:23:00Z");
+        assertEquals(expected, TimeText.parse("2026-09-18T14:23:00+03:00"));
+        assertEquals(expected, TimeText.parse("2026-09-18T14:23:00.250+0300") - 250);
+        assertEquals(expected, TimeText.parse("2026-09-18 14:23"));
+        assertEquals(expected, TimeText.parse("2026-09-18T14:23"));
+        assertEquals(expected, TimeText.parse("18/09/2026 14:23"));
+        assertEquals(expected, TimeText.parse("18-09-2026 14:23"));
+        assertEquals(expected, TimeText.parse("VERIFIED 2026-09-18 14:23: nightly sync ran"));
+        assertEquals(expected, TimeText.parse("reported: 18/09/2026 14:23 — APK sent"));
+        assertEquals(expected, TimeText.parse("מאומת 2026-09-18 14:23 סנכרון"));
+        assertEquals("18/09/2026 00:00", TimeText.absolutePlain(TimeText.parse("2026-09-18")));
+        assertEquals("15/01/2026 09:00", TimeText.absolutePlain(TimeText.parse("2026-01-15 09:00"))); // winter time
+        // rejected
+        assertEquals(-1, TimeText.parse("nightly sync ran on 2026-09-18 14:23"));
+        assertEquals(-1, TimeText.parse("yesterday"));
+        assertEquals(-1, TimeText.parse("VERIFIED yesterday morning"));
+        assertEquals(-1, TimeText.parse("20260918"));
+        assertEquals(-1, TimeText.parse("18/09/26"));
+        assertEquals(-1, TimeText.parse("ongoing"));
     }
 
     @Test public void freshnessStatesFollowCadence() {
