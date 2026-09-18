@@ -6,7 +6,7 @@
         <item name="android:windowActionModeOverlay">true</item>
         <item name="android:colorAccent">@color/ct_accent</item>
         <item name="android:statusBarColor">@color/ct_bg</item>
-        <item name="android:navigationBarColor">@color/ct_bg</item>
+        <item name="android:navigationBarColor">@color/ct_nav</item>
         <item name="android:windowLightStatusBar">false</item>
         <item name="android:windowLightNavigationBar">false</item>
         <item name="android:windowBackground">@color/ct_bg</item>

@@ -35,13 +35,17 @@ var PROJECT_FIELD_ALIASES = {
   name:         ['project', 'project name', 'name', 'title', 'פרויקט', 'שם פרויקט', 'שם'],
   lifecycle:    ['lifecycle', 'stage', 'status', 'state', 'phase', 'שלב', 'סטטוס', 'מצב'],
   rag:          ['rag', 'health', 'traffic light', 'color', 'רמזור'],
-  confidence:   ['confidence', 'evidence level', 'evidence', 'ביטחון', 'רמת ראיות'],
+  confidence:   ['confidence', 'evidence level', 'confidence level', 'ביטחון', 'רמת ביטחון'],
   milestone:    ['current milestone', 'milestone', 'אבן דרך נוכחית', 'אבן דרך'],
   next_action:  ['next action', 'next step', 'הפעולה הבאה', 'צעד הבא'],
   blocker:      ['blocker', 'blocker dependency', 'blocker / dependency', 'dependency', 'blockers', 'חסם', 'חסם תלות'],
   needs_ariel:  ['needs ariel', 'ariel needed', 'needs owner', 'צריך את אריאל', 'דורש אריאל'],
   ariel_input:  ['ariel input', 'ariel decision input', 'decision input', 'ariel decision', 'decision needed', 'קלט אריאל', 'החלטה נדרשת'],
-  last_check:   ['last control check', 'last check', 'last meaningful progress', 'last progress', 'last update', 'updated', 'last updated', 'בדיקת שליטה אחרונה', 'עדכון אחרון'],
+  // Two distinct timestamps. Never present a Control Tower check as project activity.
+  last_meaningful_progress: ['last meaningful progress', 'last meaningful action', 'last progress', 'last activity', 'last meaningful activity', 'פעילות אחרונה', 'התקדמות אחרונה'],
+  last_control_check: ['last control check', 'last check', 'control check', 'last ct check', 'בדיקת שליטה אחרונה', 'בדיקה אחרונה'],
+  expected_cadence: ['expected cadence', 'cadence', 'expected rhythm', 'rhythm', 'קצב צפוי', 'קצב'],
+  progress_evidence: ['progress evidence', 'latest evidence', 'evidence summary', 'ראיות'],
   link:         ['primary link', 'link', 'url', 'drive link', 'קישור'],
   objective:    ['objective', 'goal', 'יעד', 'מטרה'],
   risk:         ['risk', 'risk drift', 'risk / drift', 'drift', 'סיכון']
@@ -80,3 +84,10 @@ function isFcmConfigured_() {
     return false;
   }
 }
+
+// Rows that are infrastructure/capabilities rather than child projects (e.g. Control Tower itself).
+// They are still returned, flagged role = 'infrastructure', so clients can show them apart.
+var INFRASTRUCTURE_NAME_PATTERNS = [/control\s*tower/i, /מגדל\s*הפיקוח/];
+
+// Contract version reported by health/portfolio so clients can detect a stale deployment.
+var GATEWAY_CONTRACT_VERSION = 2;

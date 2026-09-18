@@ -38,6 +38,28 @@ jobs:
         with:
           gradle-version: '8.9'
 
+      - name: Set up Node (gateway tests)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # Secret hygiene: fail if private keys, service-account material or a literal gateway token reach Git.
+      - name: Secret scan
+        shell: bash
+        run: |
+          set -e
+          PATTERNS='BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY|"private_key"|"client_email"|service_role|sb_secret_|CT_GATEWAY_TOKEN=[A-Za-z0-9]'
+          if git grep -n -E "$PATTERNS" -- ':!docs' ':!*.md' ':!.github/workflows/control-tower-apk.yml' ':!google-apps-script/control-tower-gateway/test'; then
+            echo "::error::secret-like material found in tracked files"; exit 1
+          fi
+          test ! -f control-tower-android/app/service-account.json
+          echo "Secret scan: clean"
+
+      - name: Gateway tests (mapping contract + CombinedCode sync)
+        run: |
+          node --test google-apps-script/control-tower-gateway/test/portfolio.test.mjs
+          node google-apps-script/control-tower-gateway/build-combined.mjs --check
+
       - name: Read app version from build.gradle
         id: version
         shell: bash
@@ -92,6 +114,14 @@ jobs:
           CT_GATEWAY_TOKEN: ${{ secrets.CT_GATEWAY_TOKEN }}
         run: gradle :app:assembleDebug --stacktrace
 
+      - name: Unit tests (presentation model)
+        working-directory: control-tower-android
+        env:
+          CT_GIT_SHA: ${{ github.sha }}
+          CT_GATEWAY_URL: ${{ secrets.CT_GATEWAY_URL }}
+          CT_GATEWAY_TOKEN: ${{ secrets.CT_GATEWAY_TOKEN }}
+        run: gradle :app:testDebugUnitTest --stacktrace
+
       - name: Lint (non-blocking)
         working-directory: control-tower-android
         continue-on-error: true
@@ -125,6 +155,15 @@ jobs:
             ${{ steps.version.outputs.artifact }}.apk.sha256
           if-no-files-found: error
           retention-days: 30
+
+      - name: Upload unit test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.version.outputs.artifact }}-unit-tests
+          path: control-tower-android/app/build/reports/tests/testDebugUnitTest
+          if-no-files-found: ignore
+          retention-days: 14
 
       - name: Upload lint report
         if: always()

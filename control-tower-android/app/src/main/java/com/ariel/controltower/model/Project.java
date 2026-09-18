@@ -1,0 +1,123 @@
+package com.ariel.controltower.model;
+
+import org.json.JSONObject;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/** One portfolio row as the gateway (contract v1 or v2) returns it, plus derived presentation state. */
+public final class Project {
+    public final String id;
+    public final String name;
+    public final String role;            // project | infrastructure
+    public final String lifecycle;
+    public final String rag;             // RED | YELLOW | GREEN | UNKNOWN
+    public final String confidence;
+    public final String objective;
+    public final String milestone;
+    public final String progressEvidence;
+    public final String nextAction;
+    public final String blocker;
+    public final boolean needsAriel;
+    public final String arielInput;
+    public final String risk;
+    public final String link;
+    public final String expectedCadence;
+    public final boolean userTestRequired;
+    public final long lastProgressMillis;     // -1 when absent/unparseable
+    public final String lastProgressRaw;      // original text when the sheet cell was not a date
+    public final long lastControlCheckMillis; // -1 when absent
+    public final String lastControlCheckRaw;
+    public final Freshness freshness;
+
+    private Project(JSONObject o, long now) {
+        id = o.optString("id", "");
+        name = o.optString("name", "פרויקט");
+        role = o.optString("role", "project");
+        lifecycle = o.optString("lifecycle", "");
+        rag = o.optString("rag", "UNKNOWN");
+        confidence = o.optString("confidence", "");
+        objective = o.optString("objective", "");
+        milestone = o.optString("milestone", "");
+        progressEvidence = o.optString("progress_evidence", "");
+        nextAction = o.optString("next_action", "");
+        blocker = o.optString("blocker", "");
+        needsAriel = o.optBoolean("needs_ariel", false);
+        arielInput = o.optString("ariel_input", "");
+        risk = o.optString("risk", "");
+        link = o.optString("link", "");
+        expectedCadence = o.optString("expected_cadence", "");
+        userTestRequired = o.optBoolean("user_test_required", false) || Hebrew.lifecycle(lifecycle).equals("מחכה לבדיקה שלך");
+
+        // v2: explicit progress timestamp (ISO) with raw fallback. v1 gateways have neither -> unknown.
+        String progressIso = o.optString("last_meaningful_progress", "");
+        lastProgressRaw = o.optString("last_meaningful_progress_raw", "");
+        long progress = TimeText.parse(progressIso);
+        if (progress <= 0 && !lastProgressRaw.isEmpty()) progress = TimeText.parse(lastProgressRaw);
+        lastProgressMillis = progress;
+
+        // Control check: v2 field, else v1 last_check (which always meant Last Control Check).
+        String checkIso = o.optString("last_control_check", "");
+        if (checkIso.isEmpty()) checkIso = o.optString("last_check", "");
+        lastControlCheckRaw = o.optString("last_control_check_raw", "");
+        long check = TimeText.parse(checkIso);
+        if (check <= 0 && !lastControlCheckRaw.isEmpty()) check = TimeText.parse(lastControlCheckRaw);
+        lastControlCheckMillis = check;
+
+        freshness = Freshness.of(lastProgressMillis, expectedCadence, now);
+    }
+
+    public static Project from(JSONObject o, long now) {
+        return new Project(o, now);
+    }
+
+    public boolean isInfrastructure() { return "infrastructure".equalsIgnoreCase(role); }
+    public boolean isRed() { return "RED".equalsIgnoreCase(rag); }
+    public boolean isGreen() { return "GREEN".equalsIgnoreCase(rag); }
+    public boolean isStale() { return freshness.isStale(); }
+
+    /** Actionable for Ariel right now: needs him, waiting for his test, or red. */
+    public boolean needsAttention() { return needsAriel || userTestRequired || isRed(); }
+
+    /**
+     * Ordering weight: needs-Ariel first, then user test, then red, then stale, then aging, then yellow.
+     * Ties break by most recent activity (unknown activity sinks).
+     */
+    public int urgencyScore() {
+        int s = 0;
+        if (needsAriel) s += 100;
+        if (userTestRequired) s += 90;
+        if (isRed()) s += 80;
+        if (freshness.state == Freshness.State.STALE) s += 40;
+        if (freshness.state == Freshness.State.AGING) s += 10;
+        // UNKNOWN activity is a data gap, not evidence of trouble: it sinks via the comparator tie-break.
+        if (!isRed() && !isGreen()) s += 5;
+        return s;
+    }
+
+    /** Hebrew reasons explaining why this project is in the attention list. */
+    public List<String> attentionReasons() {
+        List<String> r = new ArrayList<>();
+        if (needsAriel) r.add("צריך אותך");
+        if (userTestRequired) r.add("מחכה לבדיקה שלך");
+        if (isRed()) r.add("אדום · דורש טיפול");
+        if (freshness.state == Freshness.State.STALE) r.add("המידע ישן");
+        return r;
+    }
+
+    /** The one thing Ariel should do, in priority order: his input, blocker, next action. */
+    public String arielAction() {
+        if (needsAriel && !arielInput.isEmpty()) return arielInput;
+        if (userTestRequired) return nextAction.isEmpty() ? "לבדוק את הגרסה בטלפון ולדווח" : nextAction;
+        if (needsAriel) return nextAction.isEmpty() ? "נדרשת החלטה או פעולה שלך" : nextAction;
+        if (isRed() && !blocker.isEmpty()) return "לשחרר חסם: " + blocker;
+        return nextAction;
+    }
+
+    /** One-sentence "where it stands" for cards: milestone, else lifecycle in Hebrew. */
+    public String statusSentence() {
+        if (!milestone.isEmpty()) return milestone;
+        String l = Hebrew.lifecycle(lifecycle);
+        return l.isEmpty() ? "" : l;
+    }
+}

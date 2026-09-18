@@ -26,14 +26,14 @@ import java.util.concurrent.Executors;
  * MobileInbox tab of PROJECT_CONTROL_BOARD as REPORTED (never VERIFIED by intake alone).
  */
 public class ShareReportActivity extends Activity {
-    private static final int BG = Color.rgb(9, 13, 22);
-    private static final int SURFACE = Color.rgb(20, 27, 40);
-    private static final int BORDER = Color.rgb(49, 61, 81);
-    private static final int TEXT = Color.rgb(237, 242, 250);
-    private static final int MUTED = Color.rgb(158, 170, 191);
-    private static final int BLUE = Color.rgb(100, 168, 255);
-    private static final int GREEN = Color.rgb(77, 200, 139);
-    private static final int RED = Color.rgb(240, 91, 91);
+    private static final int BG = Theme.BG;
+    private static final int SURFACE = Theme.SURFACE;
+    private static final int BORDER = Theme.BORDER;
+    private static final int TEXT = Theme.TEXT;
+    private static final int MUTED = Theme.MUTED;
+    private static final int BLUE = Theme.BLUE;
+    private static final int GREEN = Theme.GREEN;
+    private static final int RED = Theme.RED;
 
     private final ExecutorService io = Executors.newSingleThreadExecutor();
     private EditText reportText;
@@ -94,13 +94,13 @@ public class ShareReportActivity extends Activity {
         col.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
         col.setPadding(dp(20), dp(28), dp(20), dp(28));
 
-        col.addView(label("CONTROL TOWER", 11, BLUE, true));
+        col.addView(label("מגדל הפיקוח", 11, BLUE, true));
         TextView title = label("דיווח פרויקט חיצוני", 28, TEXT, true);
         LinearLayout.LayoutParams titleLp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         titleLp.topMargin = dp(4);
         col.addView(title, titleLp);
 
-        TextView explainer = label("שתף לכאן את דוח Claude / Gemini / Copilot. הוא ייכנס ל-MobileInbox כ-REPORTED, ומגדל הפיקוח יאמת ראיות לפני שיעלה אותו ל-VERIFIED.", 14, MUTED, false);
+        TextView explainer = label("שתף לכאן דוח מ-Claude / Gemini / Copilot. הוא נרשם בלוח כדיווח, ומגדל הפיקוח מאמת ראיות לפני שהוא נחשב מאומת.", 14, MUTED, false);
         LinearLayout.LayoutParams exLp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         exLp.topMargin = dp(8);
         exLp.bottomMargin = dp(16);
@@ -160,6 +160,7 @@ public class ShareReportActivity extends Activity {
 
         scroll.addView(col);
         setContentView(scroll);
+        Insets.applySystemBars(scroll);
     }
 
     private void submitReport() {
@@ -170,7 +171,7 @@ public class ShareReportActivity extends Activity {
             return;
         }
         send.setEnabled(false);
-        status.setText("שולח ל-MobileInbox…");
+        status.setText("שולח למגדל הפיקוח…");
         status.setTextColor(MUTED);
 
         io.execute(() -> {
@@ -187,7 +188,7 @@ public class ShareReportActivity extends Activity {
             Gateway.Result done = r;
             runOnUiThread(() -> {
                 if (done.ok()) {
-                    status.setText("הדיווח נרשם ב-MobileInbox כ-REPORTED (שורה " + done.body.optInt("row") + "). מגדל הפיקוח יאמת את הראיות.");
+                    status.setText("הדיווח נרשם בלוח וממתין לאימות ראיות.");
                     status.setTextColor(GREEN);
                     Toast.makeText(this, "הדיווח נשלח ל-Control Tower", Toast.LENGTH_SHORT).show();
                     send.postDelayed(this::finish, 1400);

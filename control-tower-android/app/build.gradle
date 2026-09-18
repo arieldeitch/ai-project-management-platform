@@ -19,6 +19,11 @@ def gitSha = (System.getenv('CT_GIT_SHA') ?: 'local').take(12)
 def defaultGatewayUrl = 'https://script.google.com/macros/s/AKfycby-YyosI2EYgvsaylDI1f82yFdTR7XuDHwRKshM-K9ODWadXWx3193GfiQKjItnrvqO/exec'
 def gatewayUrl = (System.getenv('CT_GATEWAY_URL') ?: defaultGatewayUrl).trim()
 def gatewayToken = (System.getenv('CT_GATEWAY_TOKEN') ?: '').trim()
+// Local UX review only: point the app at a fixture gateway on the host (http://10.0.2.2:PORT) and allow
+// cleartext for that build. Never set in CI; the flag stays false and cleartext stays off.
+def reviewGatewayUrl = (System.getenv('CT_REVIEW_GATEWAY_URL') ?: '').trim()
+def reviewBuild = !reviewGatewayUrl.isEmpty()
+if (reviewBuild) gatewayUrl = reviewGatewayUrl
 // Quote a value as a Java string literal for BuildConfig (escape backslash and double quote).
 def jstr = { String s -> '"' + s.replace('\\', '\\\\').replace('"', '\\"') + '"' }
 
@@ -30,12 +35,14 @@ android {
         applicationId 'com.ariel.controltower'
         minSdk 26
         targetSdk 35
-        versionCode 6
-        versionName '0.5.0'
+        versionCode 7
+        versionName '0.6.0'
         buildConfigField 'String', 'GATEWAY_URL', jstr(gatewayUrl)
         buildConfigField 'String', 'GATEWAY_TOKEN', jstr(gatewayToken)
         buildConfigField 'String', 'GIT_SHA', "\"${gitSha}\""
         buildConfigField 'boolean', 'FIREBASE_CONFIGURED', "${firebaseConfigured}"
+        buildConfigField 'boolean', 'REVIEW_BUILD', "${reviewBuild}"
+        manifestPlaceholders = [cleartext: reviewBuild ? 'true' : 'false']
     }
 
     buildFeatures {
@@ -51,10 +58,18 @@ android {
         abortOnError false
         checkReleaseBuilds false
     }
+
+    testOptions {
+        unitTests.returnDefaultValues = true
+    }
 }
 
 dependencies {
     // Pinned Firebase BoM; firebase-messaging version is resolved from the BoM. Push transport only.
     implementation platform('com.google.firebase:firebase-bom:33.7.0')
     implementation 'com.google.firebase:firebase-messaging'
+
+    // Unit tests run on the JVM: JUnit 4 plus the real org.json (android.jar only carries stubs).
+    testImplementation 'junit:junit:4.13.2'
+    testImplementation 'org.json:json:20240303'
 }

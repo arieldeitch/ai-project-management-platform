@@ -69,14 +69,87 @@ function normalizeRag_(value) {
   return s ? 'YELLOW' : 'UNKNOWN';
 }
 
+function isDate_(value) {
+  return Object.prototype.toString.call(value) === '[object Date]';
+}
+
 function cellIso_(value) {
-  if (value instanceof Date) return isNaN(value.getTime()) ? '' : value.toISOString();
+  if (isDate_(value)) return isNaN(value.getTime()) ? '' : value.toISOString();
   return str_(value, 64);
 }
 
 function isUserTestState_(lifecycle) {
   var s = String(lifecycle || '').toLowerCase();
   return USER_TEST_MARKERS.some(function (m) { return s.indexOf(m.toLowerCase()) >= 0; });
+}
+
+/**
+ * Timestamp cells: a real Date, or text such as "18/09/2026 14:23", "2026-09-18T11:23:00Z", "18.9.2026".
+ * Returns { iso: '' | ISO-8601, raw: original text }. Unparseable text keeps raw so the client can
+ * say "no usable activity timestamp" instead of pretending.
+ */
+function parseCellDate_(value) {
+  if (isDate_(value)) return { iso: isNaN(value.getTime()) ? '' : value.toISOString(), raw: '' };
+  var raw = str_(value, 120).trim();
+  if (!raw) return { iso: '', raw: '' };
+  var m = raw.match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{4})(?:[ T,]+(\d{1,2}):(\d{2}))?/);
+  if (m) {
+    var d = new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]), m[4] ? Number(m[4]) : 0, m[5] ? Number(m[5]) : 0, 0);
+    return { iso: isNaN(d.getTime()) ? '' : d.toISOString(), raw: raw };
+  }
+  if (/^\d{4}-\d{2}-\d{2}/.test(raw)) {
+    var iso = new Date(raw);
+    return { iso: isNaN(iso.getTime()) ? '' : iso.toISOString(), raw: raw };
+  }
+  return { iso: '', raw: raw };
+}
+
+function projectRole_(name) {
+  for (var i = 0; i < INFRASTRUCTURE_NAME_PATTERNS.length; i++) {
+    if (INFRASTRUCTURE_NAME_PATTERNS[i].test(name)) return 'infrastructure';
+  }
+  return 'project';
+}
+
+/**
+ * Maps one Projects row (array of cell values) to the portfolio contract (v2).
+ * Contract v1 fields are preserved; v2 adds explicit timestamps, cadence, evidence and role.
+ */
+function mapProjectRow_(row, map, rowNumber) {
+  var get = function (field, max) { return map[field] >= 0 ? str_(row[map[field]], max || 400) : ''; };
+  var name = get('name', 160);
+  if (!name) return null; // blank/spacer rows
+  var id = get('id', 80) || ('row-' + rowNumber);
+  var lifecycle = get('lifecycle', 80);
+  var progress = map.last_meaningful_progress >= 0 ? parseCellDate_(row[map.last_meaningful_progress]) : { iso: '', raw: '' };
+  var check = map.last_control_check >= 0 ? parseCellDate_(row[map.last_control_check]) : { iso: '', raw: '' };
+  return {
+    id: id,
+    key: name.toLowerCase().replace(/\s+/g, ' ').trim(),
+    name: name,
+    role: projectRole_(name),
+    lifecycle: lifecycle,
+    rag: normalizeRag_(get('rag', 40)),
+    confidence: get('confidence', 60),
+    milestone: get('milestone'),
+    next_action: get('next_action'),
+    blocker: get('blocker'),
+    needs_ariel: map.needs_ariel >= 0 ? truthy_(row[map.needs_ariel]) : false,
+    ariel_input: get('ariel_input'),
+    // v1 compatibility: last_check keeps meaning "Last Control Check".
+    last_check: check.iso,
+    // v2 explicit semantics.
+    last_meaningful_progress: progress.iso,
+    last_meaningful_progress_raw: progress.raw,
+    last_control_check: check.iso,
+    last_control_check_raw: check.raw,
+    expected_cadence: get('expected_cadence', 80),
+    progress_evidence: get('progress_evidence', 600),
+    link: get('link', 500),
+    objective: get('objective'),
+    risk: get('risk'),
+    user_test_required: isUserTestState_(lifecycle)
+  };
 }
 
 function readPortfolio_() {
@@ -88,33 +161,15 @@ function readPortfolio_() {
   var lastCol = sheet.getLastColumn();
   if (lastRow < 2) return [];
   var rows = sheet.getRange(2, 1, lastRow - 1, lastCol).getValues();
-  var get = function (row, field, max) { return map[field] >= 0 ? str_(row[map[field]], max || 400) : ''; };
   var projects = [];
   rows.forEach(function (row, i) {
-    var name = get(row, 'name', 160);
-    if (!name) return; // blank/spacer rows
-    var id = get(row, 'id', 80) || ('row-' + (i + 2));
-    projects.push({
-      id: id,
-      key: name.toLowerCase().replace(/\s+/g, ' ').trim(),
-      name: name,
-      lifecycle: get(row, 'lifecycle', 80),
-      rag: normalizeRag_(get(row, 'rag', 40)),
-      confidence: get(row, 'confidence', 60),
-      milestone: get(row, 'milestone'),
-      next_action: get(row, 'next_action'),
-      blocker: get(row, 'blocker'),
-      needs_ariel: map.needs_ariel >= 0 ? truthy_(row[map.needs_ariel]) : false,
-      ariel_input: get(row, 'ariel_input'),
-      last_check: map.last_check >= 0 ? cellIso_(row[map.last_check]) : '',
-      link: get(row, 'link', 500),
-      objective: get(row, 'objective'),
-      risk: get(row, 'risk'),
-      user_test_required: isUserTestState_(get(row, 'lifecycle', 80))
-    });
+    var p = mapProjectRow_(row, map, i + 2);
+    if (p) projects.push(p);
   });
-  // Most recently checked first; rows without a date sink to the bottom.
-  projects.sort(function (a, b) { return (b.last_check || '').localeCompare(a.last_check || ''); });
+  // Most recent project activity first (falls back to control check); rows without a date sink to the bottom.
+  projects.sort(function (a, b) {
+    return ((b.last_meaningful_progress || b.last_check) || '').localeCompare((a.last_meaningful_progress || a.last_check) || '');
+  });
   return projects;
 }
 

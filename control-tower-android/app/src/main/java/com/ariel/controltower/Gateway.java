@@ -44,13 +44,18 @@ public final class Gateway {
         return override.isEmpty() ? BuildConfig.GATEWAY_TOKEN : override;
     }
 
+    /** https only — except a review build, which may talk to a fixture gateway on the host machine. */
+    private static boolean acceptableUrl(String u) {
+        if (u.startsWith("https://")) return true;
+        return BuildConfig.REVIEW_BUILD && u.startsWith("http://10.0.2.2");
+    }
+
     public static boolean isConfigured(Context context) {
-        String u = url(context);
-        return u.startsWith("https://") && token(context).length() >= 32;
+        return acceptableUrl(url(context)) && token(context).length() >= 32;
     }
 
     public static boolean isBuildConfigured() {
-        return BuildConfig.GATEWAY_URL.startsWith("https://") && BuildConfig.GATEWAY_TOKEN.length() >= 32;
+        return acceptableUrl(BuildConfig.GATEWAY_URL) && BuildConfig.GATEWAY_TOKEN.length() >= 32;
     }
 
     /** Store an on-device override (empty values clear it and fall back to the build values). */
@@ -138,7 +143,7 @@ public final class Gateway {
         while ((code == 301 || code == 302 || code == 303 || code == 307) && hops < 3) {
             String location = c.getHeaderField("Location");
             c.disconnect();
-            if (location == null || !location.startsWith("https://")) throw new IllegalStateException("bad redirect");
+            if (location == null || !acceptableUrl(location)) throw new IllegalStateException("bad redirect");
             c = open(location, "GET");
             code = c.getResponseCode();
             hops++;

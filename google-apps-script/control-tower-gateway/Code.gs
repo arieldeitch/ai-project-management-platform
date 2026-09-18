@@ -15,11 +15,11 @@
  *   PROJECTS_COLUMN_MAP        optional  — JSON {field: "Exact Header"} overriding header auto-detection.
  */
 
-var GATEWAY_VERSION = '0.4.0';
+var GATEWAY_VERSION = '0.6.0';
 
 var ACTIONS = {
   health: function () { return healthReport_(); },
-  portfolio: function (p) { return { projects: readPortfolio_(), connections: p.include_connections ? readConnections_() : undefined }; },
+  portfolio: function (p) { return { projects: readPortfolio_(), connections: p.include_connections ? readConnections_() : undefined, snapshot_at: nowIso_(), contract_version: GATEWAY_CONTRACT_VERSION }; },
   inbox: function (p) { return { items: listInbox_(clampInt_(p.limit, 1, 100, 30)) }; },
   submit_report: function (p) { return submitReport_(p); },
   register_device: function (p) { return registerDevice_(p); },
@@ -59,6 +59,7 @@ function doPost(e) {
     result.ok = true;
     result.action = action;
     result.gateway_version = GATEWAY_VERSION;
+    result.contract_version = GATEWAY_CONTRACT_VERSION;
     result.elapsed_ms = Date.now() - started;
     return reply_(200, result);
   } catch (err) {
@@ -129,6 +130,7 @@ function healthReport_() {
     active_devices: countActiveDevices_(),
     fcm_configured: isFcmConfigured_(),
     scanner_trigger_installed: isScannerTriggerInstalled_(),
+    contract_version: GATEWAY_CONTRACT_VERSION,
     server_time: nowIso_()
   };
 }

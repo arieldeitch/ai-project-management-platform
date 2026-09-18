@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- Control Tower brand palette (matches in-app dark surface + accent). -->
-    <color name="ct_bg">#090D16</color>
+    <color name="ct_bg">#171C24</color>
+    <color name="ct_nav">#202733</color>
     <color name="ic_launcher_background">#0B1220</color>
     <color name="ct_signal">#5CC8FF</color>
     <color name="ct_accent">#64A8FF</color>

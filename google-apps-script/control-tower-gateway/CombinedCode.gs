@@ -2,8 +2,8 @@
  * MANUAL DEPLOYMENT HELPER — generated from the canonical modular gateway files.
  * Paste this entire file into Apps Script Code.gs when deploying manually.
  * Canonical source remains the sibling modular files in this repository.
+ * Regenerate with: node google-apps-script/control-tower-gateway/build-combined.mjs
  */
-
 
 
 /* ===== Config.gs ===== */
@@ -45,13 +45,17 @@ var PROJECT_FIELD_ALIASES = {
   name:         ['project', 'project name', 'name', 'title', 'פרויקט', 'שם פרויקט', 'שם'],
   lifecycle:    ['lifecycle', 'stage', 'status', 'state', 'phase', 'שלב', 'סטטוס', 'מצב'],
   rag:          ['rag', 'health', 'traffic light', 'color', 'רמזור'],
-  confidence:   ['confidence', 'evidence level', 'evidence', 'ביטחון', 'רמת ראיות'],
+  confidence:   ['confidence', 'evidence level', 'confidence level', 'ביטחון', 'רמת ביטחון'],
   milestone:    ['current milestone', 'milestone', 'אבן דרך נוכחית', 'אבן דרך'],
   next_action:  ['next action', 'next step', 'הפעולה הבאה', 'צעד הבא'],
   blocker:      ['blocker', 'blocker dependency', 'blocker / dependency', 'dependency', 'blockers', 'חסם', 'חסם תלות'],
   needs_ariel:  ['needs ariel', 'ariel needed', 'needs owner', 'צריך את אריאל', 'דורש אריאל'],
   ariel_input:  ['ariel input', 'ariel decision input', 'decision input', 'ariel decision', 'decision needed', 'קלט אריאל', 'החלטה נדרשת'],
-  last_check:   ['last control check', 'last check', 'last meaningful progress', 'last progress', 'last update', 'updated', 'last updated', 'בדיקת שליטה אחרונה', 'עדכון אחרון'],
+  // Two distinct timestamps. Never present a Control Tower check as project activity.
+  last_meaningful_progress: ['last meaningful progress', 'last meaningful action', 'last progress', 'last activity', 'last meaningful activity', 'פעילות אחרונה', 'התקדמות אחרונה'],
+  last_control_check: ['last control check', 'last check', 'control check', 'last ct check', 'בדיקת שליטה אחרונה', 'בדיקה אחרונה'],
+  expected_cadence: ['expected cadence', 'cadence', 'expected rhythm', 'rhythm', 'קצב צפוי', 'קצב'],
+  progress_evidence: ['progress evidence', 'latest evidence', 'evidence summary', 'ראיות'],
   link:         ['primary link', 'link', 'url', 'drive link', 'קישור'],
   objective:    ['objective', 'goal', 'יעד', 'מטרה'],
   risk:         ['risk', 'risk drift', 'risk / drift', 'drift', 'סיכון']
@@ -90,6 +94,13 @@ function isFcmConfigured_() {
     return false;
   }
 }
+
+// Rows that are infrastructure/capabilities rather than child projects (e.g. Control Tower itself).
+// They are still returned, flagged role = 'infrastructure', so clients can show them apart.
+var INFRASTRUCTURE_NAME_PATTERNS = [/control\s*tower/i, /מגדל\s*הפיקוח/];
+
+// Contract version reported by health/portfolio so clients can detect a stale deployment.
+var GATEWAY_CONTRACT_VERSION = 2;
 
 
 /* ===== Portfolio.gs ===== */
@@ -165,14 +176,87 @@ function normalizeRag_(value) {
   return s ? 'YELLOW' : 'UNKNOWN';
 }
 
+function isDate_(value) {
+  return Object.prototype.toString.call(value) === '[object Date]';
+}
+
 function cellIso_(value) {
-  if (value instanceof Date) return isNaN(value.getTime()) ? '' : value.toISOString();
+  if (isDate_(value)) return isNaN(value.getTime()) ? '' : value.toISOString();
   return str_(value, 64);
 }
 
 function isUserTestState_(lifecycle) {
   var s = String(lifecycle || '').toLowerCase();
   return USER_TEST_MARKERS.some(function (m) { return s.indexOf(m.toLowerCase()) >= 0; });
+}
+
+/**
+ * Timestamp cells: a real Date, or text such as "18/09/2026 14:23", "2026-09-18T11:23:00Z", "18.9.2026".
+ * Returns { iso: '' | ISO-8601, raw: original text }. Unparseable text keeps raw so the client can
+ * say "no usable activity timestamp" instead of pretending.
+ */
+function parseCellDate_(value) {
+  if (isDate_(value)) return { iso: isNaN(value.getTime()) ? '' : value.toISOString(), raw: '' };
+  var raw = str_(value, 120).trim();
+  if (!raw) return { iso: '', raw: '' };
+  var m = raw.match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{4})(?:[ T,]+(\d{1,2}):(\d{2}))?/);
+  if (m) {
+    var d = new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]), m[4] ? Number(m[4]) : 0, m[5] ? Number(m[5]) : 0, 0);
+    return { iso: isNaN(d.getTime()) ? '' : d.toISOString(), raw: raw };
+  }
+  if (/^\d{4}-\d{2}-\d{2}/.test(raw)) {
+    var iso = new Date(raw);
+    return { iso: isNaN(iso.getTime()) ? '' : iso.toISOString(), raw: raw };
+  }
+  return { iso: '', raw: raw };
+}
+
+function projectRole_(name) {
+  for (var i = 0; i < INFRASTRUCTURE_NAME_PATTERNS.length; i++) {
+    if (INFRASTRUCTURE_NAME_PATTERNS[i].test(name)) return 'infrastructure';
+  }
+  return 'project';
+}
+
+/**
+ * Maps one Projects row (array of cell values) to the portfolio contract (v2).
+ * Contract v1 fields are preserved; v2 adds explicit timestamps, cadence, evidence and role.
+ */
+function mapProjectRow_(row, map, rowNumber) {
+  var get = function (field, max) { return map[field] >= 0 ? str_(row[map[field]], max || 400) : ''; };
+  var name = get('name', 160);
+  if (!name) return null; // blank/spacer rows
+  var id = get('id', 80) || ('row-' + rowNumber);
+  var lifecycle = get('lifecycle', 80);
+  var progress = map.last_meaningful_progress >= 0 ? parseCellDate_(row[map.last_meaningful_progress]) : { iso: '', raw: '' };
+  var check = map.last_control_check >= 0 ? parseCellDate_(row[map.last_control_check]) : { iso: '', raw: '' };
+  return {
+    id: id,
+    key: name.toLowerCase().replace(/\s+/g, ' ').trim(),
+    name: name,
+    role: projectRole_(name),
+    lifecycle: lifecycle,
+    rag: normalizeRag_(get('rag', 40)),
+    confidence: get('confidence', 60),
+    milestone: get('milestone'),
+    next_action: get('next_action'),
+    blocker: get('blocker'),
+    needs_ariel: map.needs_ariel >= 0 ? truthy_(row[map.needs_ariel]) : false,
+    ariel_input: get('ariel_input'),
+    // v1 compatibility: last_check keeps meaning "Last Control Check".
+    last_check: check.iso,
+    // v2 explicit semantics.
+    last_meaningful_progress: progress.iso,
+    last_meaningful_progress_raw: progress.raw,
+    last_control_check: check.iso,
+    last_control_check_raw: check.raw,
+    expected_cadence: get('expected_cadence', 80),
+    progress_evidence: get('progress_evidence', 600),
+    link: get('link', 500),
+    objective: get('objective'),
+    risk: get('risk'),
+    user_test_required: isUserTestState_(lifecycle)
+  };
 }
 
 function readPortfolio_() {
@@ -184,33 +268,15 @@ function readPortfolio_() {
   var lastCol = sheet.getLastColumn();
   if (lastRow < 2) return [];
   var rows = sheet.getRange(2, 1, lastRow - 1, lastCol).getValues();
-  var get = function (row, field, max) { return map[field] >= 0 ? str_(row[map[field]], max || 400) : ''; };
   var projects = [];
   rows.forEach(function (row, i) {
-    var name = get(row, 'name', 160);
-    if (!name) return; // blank/spacer rows
-    var id = get(row, 'id', 80) || ('row-' + (i + 2));
-    projects.push({
-      id: id,
-      key: name.toLowerCase().replace(/\s+/g, ' ').trim(),
-      name: name,
-      lifecycle: get(row, 'lifecycle', 80),
-      rag: normalizeRag_(get(row, 'rag', 40)),
-      confidence: get(row, 'confidence', 60),
-      milestone: get(row, 'milestone'),
-      next_action: get(row, 'next_action'),
-      blocker: get(row, 'blocker'),
-      needs_ariel: map.needs_ariel >= 0 ? truthy_(row[map.needs_ariel]) : false,
-      ariel_input: get(row, 'ariel_input'),
-      last_check: map.last_check >= 0 ? cellIso_(row[map.last_check]) : '',
-      link: get(row, 'link', 500),
-      objective: get(row, 'objective'),
-      risk: get(row, 'risk'),
-      user_test_required: isUserTestState_(get(row, 'lifecycle', 80))
-    });
+    var p = mapProjectRow_(row, map, i + 2);
+    if (p) projects.push(p);
   });
-  // Most recently checked first; rows without a date sink to the bottom.
-  projects.sort(function (a, b) { return (b.last_check || '').localeCompare(a.last_check || ''); });
+  // Most recent project activity first (falls back to control check); rows without a date sink to the bottom.
+  projects.sort(function (a, b) {
+    return ((b.last_meaningful_progress || b.last_check) || '').localeCompare((a.last_meaningful_progress || a.last_check) || '');
+  });
   return projects;
 }
 
@@ -658,11 +724,11 @@ function debugTestPush() {
  *   PROJECTS_COLUMN_MAP        optional  — JSON {field: "Exact Header"} overriding header auto-detection.
  */
 
-var GATEWAY_VERSION = '0.4.0';
+var GATEWAY_VERSION = '0.6.0';
 
 var ACTIONS = {
   health: function () { return healthReport_(); },
-  portfolio: function (p) { return { projects: readPortfolio_(), connections: p.include_connections ? readConnections_() : undefined }; },
+  portfolio: function (p) { return { projects: readPortfolio_(), connections: p.include_connections ? readConnections_() : undefined, snapshot_at: nowIso_(), contract_version: GATEWAY_CONTRACT_VERSION }; },
   inbox: function (p) { return { items: listInbox_(clampInt_(p.limit, 1, 100, 30)) }; },
   submit_report: function (p) { return submitReport_(p); },
   register_device: function (p) { return registerDevice_(p); },
@@ -702,6 +768,7 @@ function doPost(e) {
     result.ok = true;
     result.action = action;
     result.gateway_version = GATEWAY_VERSION;
+    result.contract_version = GATEWAY_CONTRACT_VERSION;
     result.elapsed_ms = Date.now() - started;
     return reply_(200, result);
   } catch (err) {
@@ -772,6 +839,7 @@ function healthReport_() {
     active_devices: countActiveDevices_(),
     fcm_configured: isFcmConfigured_(),
     scanner_trigger_installed: isScannerTriggerInstalled_(),
+    contract_version: GATEWAY_CONTRACT_VERSION,
     server_time: nowIso_()
   };
 }
