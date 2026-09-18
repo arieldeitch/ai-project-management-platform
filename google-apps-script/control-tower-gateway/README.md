@@ -14,7 +14,7 @@ Response is always JSON with `ok`, `status` (HTTP-like code carried in the body 
 | action | params | returns |
 |---|---|---|
 | `health` | — | spreadsheet title, tabs, resolved/unresolved Projects columns, active_devices, fcm_configured, scanner_trigger_installed |
-| `portfolio` | `include_connections?` | `projects[]` (id, key, name, lifecycle, rag, confidence, milestone, next_action, blocker, needs_ariel, ariel_input, last_check, link, objective, risk, user_test_required) |
+| `portfolio` | `include_connections?` | `projects[]` + `snapshot_at` + `contract_version` (2). Each project: id, key, name, **role** (`project` | `infrastructure`), lifecycle, rag, confidence, milestone, **progress_evidence**, next_action, blocker, needs_ariel, ariel_input, **last_meaningful_progress** (ISO) + `_raw`, **last_control_check** (ISO) + `_raw`, `last_check` (= last_control_check, v1 compatibility), **expected_cadence**, link, objective, risk, user_test_required |
 | `inbox` | `limit?` | latest MobileInbox rows, newest first |
 | `submit_report` | `report_text`, `source` (`share`/`deputy_command`/`manual`), `project_hint?`, `device_id?`, `app_version?` | row appended as **REPORTED** |
 | `register_device` | `token`, `device_id?`, `device_label?`, `app_version?` | upsert in MobileDevices |
@@ -23,6 +23,20 @@ Response is always JSON with `ok`, `status` (HTTP-like code carried in the body 
 | `activity` | `limit?` | recent push events from MobilePushState |
 
 Anything else → `unknown_action`. Wrong/missing token → `unauthorized` (after a 250 ms delay).
+
+## Contract v2 (0.6.0) — timestamps are distinct
+
+- `last_meaningful_progress` = board column **Last Meaningful Progress** (real project activity).
+- `last_control_check` = board column **Last Control Check** (when Control Tower last looked). Never shown as activity.
+- `expected_cadence` = board column **Expected Cadence**; the client derives fresh / aging / stale / unknown from it.
+- Date cells are emitted as ISO-8601; text cells such as `18/09/2026 14:23` are parsed, unparseable text is kept in `*_raw`.
+- `role = infrastructure` for rows whose name matches "Control Tower" (never a child project).
+- Every response carries `contract_version`; the Android Activity tab warns when a deployed gateway is still v1.
+
+Old clients keep working: v1 fields are unchanged. **Redeploying is required for the new fields** — paste the regenerated
+`CombinedCode.gs` (`node google-apps-script/control-tower-gateway/build-combined.mjs`) and create a new deployment version.
+
+Tests: `node --test google-apps-script/control-tower-gateway/test/portfolio.test.mjs` (mapping, timestamps, cadence, role, override, health, CombinedCode sync).
 
 ## Mobile tabs (created idempotently on first use)
 
