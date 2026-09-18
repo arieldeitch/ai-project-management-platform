@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "98757865347",
+    "project_id": "control-tower-ab535",
+    "storage_bucket": "control-tower-ab535.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:98757865347:android:44cd763cda82d9d10090b6",
+        "android_client_info": {
+          "package_name": "com.ariel.controltower"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBqb54Wds0QgN0HM_ZRlt8Rjv7y3Hqnc68"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
