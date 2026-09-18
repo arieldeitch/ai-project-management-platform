@@ -13,6 +13,13 @@ if (firebaseConfigured) {
 
 def gitSha = (System.getenv('CT_GIT_SHA') ?: 'local').take(12)
 
+// Apps Script gateway in front of PROJECT_CONTROL_BOARD. Both values come from CI secrets
+// (CT_GATEWAY_URL / CT_GATEWAY_TOKEN); they are never committed. When absent the app shows
+// its setup screen and accepts them on-device.
+def gatewayUrl = (System.getenv('CT_GATEWAY_URL') ?: '').trim()
+def gatewayToken = (System.getenv('CT_GATEWAY_TOKEN') ?: '').trim()
+def jstr = { String s -> '"' + s.replace('\', '\\').replace('"', '\\"') + '"' }
+
 android {
     namespace 'com.ariel.controltower'
     compileSdk 35
@@ -21,11 +28,10 @@ android {
         applicationId 'com.ariel.controltower'
         minSdk 26
         targetSdk 35
-        versionCode 3
-        versionName '0.3.0'
-        buildConfigField 'String', 'SUPABASE_URL', '"https://tbqdpvmlhtlrngoxbouf.supabase.co"'
-        buildConfigField 'String', 'SUPABASE_KEY', '"sb_publishable_PXzKC8MBsEGCk_4ccJ-A5w_HFaekiCK"'
-        buildConfigField 'String', 'AUTHORIZED_EMAIL', '"arieldeitch@gmail.com"'
+        versionCode 4
+        versionName '0.4.0'
+        buildConfigField 'String', 'GATEWAY_URL', jstr(gatewayUrl)
+        buildConfigField 'String', 'GATEWAY_TOKEN', jstr(gatewayToken)
         buildConfigField 'String', 'GIT_SHA', "\"${gitSha}\""
         buildConfigField 'boolean', 'FIREBASE_CONFIGURED', "${firebaseConfigured}"
     }
@@ -46,7 +52,7 @@ android {
 }
 
 dependencies {
-    // Pinned Firebase BoM; firebase-messaging version is resolved from the BoM.
+    // Pinned Firebase BoM; firebase-messaging version is resolved from the BoM. Push transport only.
     implementation platform('com.google.firebase:firebase-bom:33.7.0')
     implementation 'com.google.firebase:firebase-messaging'
 }

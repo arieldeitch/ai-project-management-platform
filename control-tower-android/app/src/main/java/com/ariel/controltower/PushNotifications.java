@@ -17,23 +17,15 @@ import com.google.firebase.messaging.FirebaseMessaging;
 
 import org.json.JSONObject;
 
-import java.io.BufferedReader;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.OutputStream;
-import java.net.HttpURLConnection;
-import java.net.URL;
-import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.function.Consumer;
 
 /**
- * Push readiness for Control Tower: notification channel, Android 13+ permission,
- * FCM token lifecycle and owner-scoped token registration in Supabase.
- *
- * Nothing here weakens auth: the token row is written with the owner's own JWT and
- * the table is RLS-scoped to auth.uid() (see supabase/migrations/*_control_push_tokens.sql).
+ * Push readiness: notification channel, Android 13+ permission, FCM token lifecycle and
+ * device registration through the Apps Script gateway (MobileDevices tab).
+ * Firebase is transport only; no portfolio data ever goes through it.
  */
 public final class PushNotifications {
     public static final String CHANNEL_ID = "control_tower_alerts";
@@ -42,8 +34,9 @@ public final class PushNotifications {
     /** Intent extras preserved from the push payload for (future) deep-link routing. */
     public static final String EXTRA_TARGET = "ct_target";       // now | projects | deputy | activity
     public static final String EXTRA_PROJECT_ID = "ct_project_id";
-    public static final String EXTRA_EVENT = "ct_event";         // test | project_red | needs_ariel | ...
+    public static final String EXTRA_EVENT = "ct_event";         // test | project_red | needs_ariel | user_test_required
 
+    private static final String PREFS = "control_tower_push";
     static final String PREF_TOKEN = "fcm_token";
     static final String PREF_TOKEN_REGISTERED = "fcm_token_registered";
     static final String PREF_PERMISSION_ASKED = "notif_permission_asked";
@@ -51,6 +44,10 @@ public final class PushNotifications {
     private static final ExecutorService io = Executors.newSingleThreadExecutor();
 
     private PushNotifications() {}
+
+    public static SharedPreferences prefs(Context context) {
+        return context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+    }
 
     /** True only when a google-services.json was compiled in and Firebase initialised at startup. */
     public static boolean isFirebaseAvailable(Context context) {
@@ -79,110 +76,104 @@ public final class PushNotifications {
     }
 
     /**
-     * Called once the owner is authenticated and the main screen exists:
+     * Called once the gateway is configured and the main screen exists:
      * create the channel, ask for permission on Android 13+ (once), and register the FCM token.
      */
-    public static void onSessionReady(Activity activity, SharedPreferences prefs) {
+    public static void onAppReady(Activity activity) {
         ensureChannel(activity);
-        if (Build.VERSION.SDK_INT >= 33 && !hasPermission(activity) && !prefs.getBoolean(PREF_PERMISSION_ASKED, false)) {
-            prefs.edit().putBoolean(PREF_PERMISSION_ASKED, true).apply();
+        SharedPreferences p = prefs(activity);
+        if (Build.VERSION.SDK_INT >= 33 && !hasPermission(activity) && !p.getBoolean(PREF_PERMISSION_ASKED, false)) {
+            p.edit().putBoolean(PREF_PERMISSION_ASKED, true).apply();
             activity.requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, PERMISSION_REQUEST);
         }
-        refreshAndRegisterToken(activity, prefs);
+        refreshAndRegisterToken(activity);
     }
 
-    public static void refreshAndRegisterToken(Context context, SharedPreferences prefs) {
-        if (!isFirebaseAvailable(context)) return;
-        if (prefs.getString("access_token", null) == null) return;
+    public static void refreshAndRegisterToken(Context context) {
+        if (!isFirebaseAvailable(context) || !Gateway.isConfigured(context)) return;
         try {
             FirebaseMessaging.getInstance().getToken().addOnCompleteListener(task -> {
                 if (!task.isSuccessful() || task.getResult() == null) return;
-                registerToken(context, prefs, task.getResult());
+                registerToken(context, task.getResult());
             });
         } catch (Exception ignored) {
             // Firebase not initialised (no google-services.json) — push stays "not configured".
         }
     }
 
-    /** Upsert the token for the authenticated owner. Safe to call repeatedly; keyed on the token itself. */
-    public static void registerToken(Context context, SharedPreferences prefs, String token) {
+    /** Upsert the token in MobileDevices. Safe to call repeatedly; the gateway keys on the token. */
+    public static void registerToken(Context context, String token) {
         if (token == null || token.isEmpty()) return;
-        String previous = prefs.getString(PREF_TOKEN, null);
-        prefs.edit().putString(PREF_TOKEN, token).apply();
-        if (prefs.getString("access_token", null) == null) return; // only registered for a logged-in owner
+        SharedPreferences p = prefs(context);
+        String previous = p.getString(PREF_TOKEN, null);
+        p.edit().putString(PREF_TOKEN, token).apply();
+        if (!Gateway.isConfigured(context)) return;
         io.execute(() -> {
             try {
-                JSONObject row = new JSONObject()
+                JSONObject params = new JSONObject()
                         .put("token", token)
-                        .put("platform", "android")
-                        .put("app_version", BuildConfig.VERSION_NAME + "+" + BuildConfig.VERSION_CODE)
-                        .put("build_sha", BuildConfig.GIT_SHA)
-                        .put("device_label", (Build.MANUFACTURER + " " + Build.MODEL).trim());
-                // last_seen_at / updated_at are maintained by the table trigger, not the client.
-                Response r = authedRequest(prefs, "POST", "/rest/v1/control_push_tokens?on_conflict=token", row.toString(),
-                        "resolution=merge-duplicates,return=minimal");
-                boolean ok = r.ok();
-                prefs.edit().putBoolean(PREF_TOKEN_REGISTERED, ok).apply();
-                if (ok && previous != null && !previous.equals(token)) {
-                    authedRequest(prefs, "DELETE", "/rest/v1/control_push_tokens?token=eq." + java.net.URLEncoder.encode(previous, "UTF-8"), null, "return=minimal");
+                        .put("device_id", Gateway.deviceId(context))
+                        .put("device_label", Gateway.deviceLabel());
+                Gateway.Result r = Gateway.call(context, "register_device", params);
+                p.edit().putBoolean(PREF_TOKEN_REGISTERED, r.ok()).apply();
+                if (r.ok() && previous != null && !previous.equals(token)) {
+                    Gateway.call(context, "unregister_device", new JSONObject().put("token", previous));
                 }
             } catch (Exception e) {
-                prefs.edit().putBoolean(PREF_TOKEN_REGISTERED, false).apply();
+                p.edit().putBoolean(PREF_TOKEN_REGISTERED, false).apply();
             }
         });
     }
 
-    /** Best-effort removal on logout: delete the row (while we still hold the JWT) and drop the FCM token. */
-    public static void unregisterOnLogout(Context context, SharedPreferences prefs, Runnable then) {
-        String token = prefs.getString(PREF_TOKEN, null);
-        String access = prefs.getString("access_token", null);
-        if (token == null || access == null) {
-            then.run();
-            return;
-        }
+    /** Best-effort disconnect: remove the row in MobileDevices and drop the FCM token. */
+    public static void unregister(Context context, Runnable then) {
+        SharedPreferences p = prefs(context);
+        String token = p.getString(PREF_TOKEN, null);
         io.execute(() -> {
             try {
-                authedRequest(prefs, "DELETE", "/rest/v1/control_push_tokens?token=eq." + java.net.URLEncoder.encode(token, "UTF-8"), null, "return=minimal");
+                if (token != null && Gateway.isConfigured(context)) {
+                    Gateway.call(context, "unregister_device", new JSONObject().put("token", token));
+                }
             } catch (Exception ignored) {}
             try {
                 if (isFirebaseAvailable(context)) FirebaseMessaging.getInstance().deleteToken();
             } catch (Exception ignored) {}
+            p.edit().remove(PREF_TOKEN).putBoolean(PREF_TOKEN_REGISTERED, false).apply();
             if (context instanceof Activity) ((Activity) context).runOnUiThread(then);
             else then.run();
         });
     }
 
-    /** Ask the owner-only Edge Function to send a bounded test push to this owner's devices. */
-    public static void requestTestPush(SharedPreferences prefs, java.util.function.Consumer<String> onResult) {
+    /** Ask the gateway to send a bounded test push to registered Control Tower devices. */
+    public static void requestTestPush(Context context, Consumer<String> onResult) {
         io.execute(() -> {
+            Gateway.Result r = Gateway.call(context, "test_push", new JSONObject());
             String message;
-            try {
-                JSONObject body = new JSONObject().put("mode", "test");
-                Response r = authedRequest(prefs, "POST", "/functions/v1/control-tower-push", body.toString(), null);
-                if (r.ok()) {
-                    JSONObject o = new JSONObject(r.body.isEmpty() ? "{}" : r.body);
-                    message = "נשלח ל-" + o.optInt("sent", 0) + " מכשירים" + (o.optInt("failed", 0) > 0 ? " (" + o.optInt("failed") + " נכשלו)" : "");
-                } else if (r.code == 404) {
-                    message = "פונקציית השרת control-tower-push עדיין לא פרוסה.";
-                } else if (r.code == 401 || r.code == 403) {
-                    message = "השרת דחה את הבקשה (" + r.code + "). בדוק הרשאת בעלים.";
+            if (r.ok()) {
+                if (!r.body.optBoolean("fcm_configured", true)) {
+                    message = "השער עובד, אבל FCM_SERVICE_ACCOUNT_JSON עדיין לא הוגדר בסקריפט.";
                 } else {
-                    message = "השליחה נכשלה (" + r.code + ").";
+                    int sent = r.body.optInt("sent", 0);
+                    int failed = r.body.optInt("failed", 0);
+                    message = sent == 0 && failed == 0
+                            ? "אין מכשירים רשומים בשער (MobileDevices ריק)."
+                            : "נשלח ל-" + sent + " מכשירים" + (failed > 0 ? " (" + failed + " נכשלו)" : "");
                 }
-            } catch (Exception e) {
-                message = "לא ניתן להגיע לשרת ההתראות.";
+            } else {
+                message = r.describe();
             }
             onResult.accept(message);
         });
     }
 
     /** Human-readable push state for the Activity tab. */
-    public static String statusLine(Context context, SharedPreferences prefs) {
+    public static String statusLine(Context context) {
+        SharedPreferences p = prefs(context);
         if (!BuildConfig.FIREBASE_CONFIGURED) return "התראות: לא מוגדר (חסר google-services.json בבנייה)";
         if (!isFirebaseAvailable(context)) return "התראות: Firebase לא אותחל";
         if (!hasPermission(context)) return "התראות: הרשאה נדחתה במכשיר";
-        if (prefs.getString(PREF_TOKEN, null) == null) return "התראות: ממתין לטוקן מ-FCM";
-        return prefs.getBoolean(PREF_TOKEN_REGISTERED, false) ? "התראות: המכשיר רשום" : "התראות: הטוקן טרם נרשם בשרת";
+        if (p.getString(PREF_TOKEN, null) == null) return "התראות: ממתין לטוקן מ-FCM";
+        return p.getBoolean(PREF_TOKEN_REGISTERED, false) ? "התראות: המכשיר רשום ב-MobileDevices" : "התראות: הטוקן טרם נרשם בשער";
     }
 
     /** Build and post a system notification; tapping it opens MainActivity with routing extras preserved. */
@@ -214,70 +205,5 @@ public final class PushNotifications {
                 .build();
         NotificationManager nm = context.getSystemService(NotificationManager.class);
         if (nm != null) nm.notify(requestCode, n);
-    }
-
-    // ---- minimal authenticated HTTP (mirrors MainActivity.raw; refreshes once on 401) ----
-
-    private static Response authedRequest(SharedPreferences prefs, String method, String path, String body, String prefer) throws Exception {
-        Response r = raw(prefs, method, path, body, prefer, true);
-        if (r.code == 401 && refreshSession(prefs)) r = raw(prefs, method, path, body, prefer, true);
-        return r;
-    }
-
-    private static boolean refreshSession(SharedPreferences prefs) {
-        try {
-            String refresh = prefs.getString("refresh_token", null);
-            if (refresh == null) return false;
-            JSONObject p = new JSONObject().put("refresh_token", refresh);
-            Response r = raw(prefs, "POST", "/auth/v1/token?grant_type=refresh_token", p.toString(), null, false);
-            if (!r.ok()) return false;
-            JSONObject o = new JSONObject(r.body);
-            String access = o.optString("access_token", "");
-            if (access.isEmpty()) return false;
-            prefs.edit().putString("access_token", access).putString("refresh_token", o.optString("refresh_token", refresh)).apply();
-            return true;
-        } catch (Exception e) {
-            return false;
-        }
-    }
-
-    private static Response raw(SharedPreferences prefs, String method, String path, String body, String prefer, boolean authenticated) throws Exception {
-        URL url = new URL(BuildConfig.SUPABASE_URL + path);
-        HttpURLConnection c = (HttpURLConnection) url.openConnection();
-        c.setConnectTimeout(15000);
-        c.setReadTimeout(20000);
-        c.setRequestMethod(method);
-        c.setRequestProperty("apikey", BuildConfig.SUPABASE_KEY);
-        c.setRequestProperty("Accept", "application/json");
-        if (prefer != null) c.setRequestProperty("Prefer", prefer);
-        if (authenticated) {
-            String access = prefs.getString("access_token", null);
-            if (access != null) c.setRequestProperty("Authorization", "Bearer " + access);
-        }
-        if (body != null) {
-            c.setDoOutput(true);
-            c.setRequestProperty("Content-Type", "application/json; charset=utf-8");
-            try (OutputStream os = c.getOutputStream()) {
-                os.write(body.getBytes(StandardCharsets.UTF_8));
-            }
-        }
-        int code = c.getResponseCode();
-        InputStream in = code >= 200 && code < 400 ? c.getInputStream() : c.getErrorStream();
-        StringBuilder sb = new StringBuilder();
-        if (in != null) {
-            try (BufferedReader br = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8))) {
-                String line;
-                while ((line = br.readLine()) != null) sb.append(line);
-            }
-        }
-        c.disconnect();
-        return new Response(code, sb.toString());
-    }
-
-    private static final class Response {
-        final int code;
-        final String body;
-        Response(int code, String body) { this.code = code; this.body = body == null ? "" : body; }
-        boolean ok() { return code >= 200 && code < 300; }
     }
 }

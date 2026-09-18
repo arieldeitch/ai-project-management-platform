@@ -50,6 +50,20 @@ jobs:
           echo "artifact=ControlTower-$NAME-debug" >> "$GITHUB_OUTPUT"
           echo "Building Control Tower $NAME ($CODE) @ ${GITHUB_SHA::12}"
 
+      # Gateway config (Apps Script Web App URL + shared token) comes from secrets; absent -> in-app setup screen.
+      - name: Check gateway configuration
+        id: gateway
+        shell: bash
+        env:
+          CT_GATEWAY_URL: ${{ secrets.CT_GATEWAY_URL }}
+          CT_GATEWAY_TOKEN: ${{ secrets.CT_GATEWAY_TOKEN }}
+        run: |
+          if [ -n "$CT_GATEWAY_URL" ] && [ "${#CT_GATEWAY_TOKEN}" -ge 32 ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"; echo "Gateway: URL + token embedded from secrets"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"; echo "Gateway: CT_GATEWAY_URL/CT_GATEWAY_TOKEN not set — app will show its setup screen"
+          fi
+
       # Firebase client config is an external secret, never committed. Absent -> app builds with push "not configured".
       - name: Materialise google-services.json (if secret is set)
         id: firebase
@@ -70,6 +84,8 @@ jobs:
         working-directory: control-tower-android
         env:
           CT_GIT_SHA: ${{ github.sha }}
+          CT_GATEWAY_URL: ${{ secrets.CT_GATEWAY_URL }}
+          CT_GATEWAY_TOKEN: ${{ secrets.CT_GATEWAY_TOKEN }}
         run: gradle :app:assembleDebug --stacktrace
 
       - name: Lint (non-blocking)
@@ -77,6 +93,8 @@ jobs:
         continue-on-error: true
         env:
           CT_GIT_SHA: ${{ github.sha }}
+          CT_GATEWAY_URL: ${{ secrets.CT_GATEWAY_URL }}
+          CT_GATEWAY_TOKEN: ${{ secrets.CT_GATEWAY_TOKEN }}
         run: gradle :app:lintDebug
 
       - name: Name artifact after the real version
@@ -90,6 +108,7 @@ jobs:
             echo "- Artifact: \`$OUT\`"
             echo "- Commit: \`${GITHUB_SHA}\`"
             echo "- Firebase configured in build: \`${{ steps.firebase.outputs.configured }}\`"
+            echo "- Gateway configured in build: \`${{ steps.gateway.outputs.configured }}\`"
             echo "- SHA-256: \`$(cut -d' ' -f1 "$OUT.sha256")\`"
           } >> "$GITHUB_STEP_SUMMARY"
 

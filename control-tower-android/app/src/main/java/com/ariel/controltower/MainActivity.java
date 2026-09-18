@@ -6,6 +6,7 @@ import android.content.Intent;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
+import android.net.Uri;
 import android.os.Bundle;
 import android.text.InputType;
 import android.view.Gravity;
@@ -25,16 +26,14 @@ import android.widget.Toast;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-import java.io.BufferedReader;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.OutputStream;
-import java.net.HttpURLConnection;
-import java.net.URL;
-import java.nio.charset.StandardCharsets;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+/**
+ * Control Tower — private single-owner Android client.
+ * Data: PROJECT_CONTROL_BOARD Sheet via the Apps Script gateway ({@link Gateway}).
+ * Push: FCM, transport only ({@link PushNotifications}).
+ */
 public class MainActivity extends Activity {
     private static final int BG = Color.rgb(9, 13, 22);
     private static final int SURFACE = Color.rgb(20, 27, 40);
@@ -48,7 +47,6 @@ public class MainActivity extends Activity {
     private static final int GREEN = Color.rgb(77, 200, 139);
 
     private final ExecutorService io = Executors.newSingleThreadExecutor();
-    private android.content.SharedPreferences prefs;
     private FrameLayout contentHost;
     private LinearLayout nav;
     private int activeTab = 0;
@@ -58,13 +56,20 @@ public class MainActivity extends Activity {
         super.onCreate(savedInstanceState);
         getWindow().setStatusBarColor(BG);
         getWindow().setNavigationBarColor(BG);
-        prefs = getSharedPreferences("control_tower_session", MODE_PRIVATE);
+        // 0.3.0 kept Supabase session tokens here; the Drive-first client has no login, so purge them.
+        getSharedPreferences("control_tower_session", MODE_PRIVATE).edit().clear().apply();
         applyRoutingIntent(getIntent());
-        if (prefs.getString("refresh_token", null) != null || prefs.getString("access_token", null) != null) {
+        if (Gateway.isConfigured(this)) {
             showApp();
         } else {
-            showLogin();
+            showSetup(null);
         }
+    }
+
+    @Override
+    protected void onDestroy() {
+        io.shutdownNow();
+        super.onDestroy();
     }
 
     @Override
@@ -96,15 +101,11 @@ public class MainActivity extends Activity {
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode == PushNotifications.PERMISSION_REQUEST) {
-            PushNotifications.refreshAndRegisterToken(this, prefs);
+            PushNotifications.refreshAndRegisterToken(this);
         }
     }
 
-    @Override
-    protected void onDestroy() {
-        io.shutdownNow();
-        super.onDestroy();
-    }
+    // ---------- small UI helpers (unchanged visual language) ----------
 
     private int dp(int n) {
         return Math.round(n * getResources().getDisplayMetrics().density);
@@ -137,7 +138,32 @@ public class MainActivity extends Activity {
         return p;
     }
 
-    private void showLogin() {
+    private Button actionButton(String label, boolean primary) {
+        Button b = new Button(this);
+        b.setText(label);
+        b.setTextSize(15);
+        b.setAllCaps(false);
+        b.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        b.setTextColor(primary ? BG : TEXT);
+        b.setBackground(box(primary ? BLUE : SURFACE_2, primary ? BLUE : BORDER, 14));
+        return b;
+    }
+
+    private EditText input(String hint, boolean multiline) {
+        EditText e = new EditText(this);
+        e.setHint(hint);
+        e.setTextColor(TEXT);
+        e.setHintTextColor(MUTED);
+        e.setBackground(box(SURFACE, BORDER, 12));
+        e.setPadding(dp(14), dp(multiline ? 14 : 0), dp(14), dp(multiline ? 14 : 0));
+        if (!multiline) e.setSingleLine(true);
+        return e;
+    }
+
+    // ---------- setup state (replaces the old login) ----------
+
+    /** One clear configuration state: shown only when no gateway URL/token is available. */
+    private void showSetup(String problem) {
         ScrollView scroll = new ScrollView(this);
         scroll.setFillViewport(true);
         scroll.setBackgroundColor(BG);
@@ -155,141 +181,67 @@ public class MainActivity extends Activity {
         markLp.gravity = Gravity.START;
         wrap.addView(mark, markLp);
 
-        TextView eyebrow = text("CONTROL TOWER", 12, BLUE, true);
-        wrap.addView(eyebrow);
-        TextView title = text("הסגן שלך", 32, TEXT, true);
-        wrap.addView(title, lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 6, 0));
-        TextView subtitle = text("כניסה מאובטחת למגדל הפיקוח. רק החשבון המורשה יכול לגשת לנתונים.", 15, MUTED, false);
-        wrap.addView(subtitle, lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 8, 26));
+        wrap.addView(text("CONTROL TOWER", 12, BLUE, true));
+        wrap.addView(text("חיבור לשער", 32, TEXT, true), lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 6, 0));
+        String explain = Gateway.isBuildConfigured()
+                ? "הגרסה נבנתה עם שער, אבל ההגדרה שנשמרה במכשיר אינה תקינה."
+                : "הגרסה הזו נבנתה בלי כתובת שער (CT_GATEWAY_URL / CT_GATEWAY_TOKEN). אפשר להדביק אותם כאן פעם אחת, או לבנות מחדש עם הסודות ב-GitHub.";
+        wrap.addView(text(explain, 15, MUTED, false), lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 8, 22));
 
-        EditText email = new EditText(this);
-        email.setText(BuildConfig.AUTHORIZED_EMAIL);
-        email.setHint("אימייל");
-        email.setSingleLine(true);
-        email.setTextColor(TEXT);
-        email.setHintTextColor(MUTED);
-        email.setBackground(box(SURFACE, BORDER, 12));
-        email.setPadding(dp(14), 0, dp(14), 0);
-        email.setTextDirection(View.TEXT_DIRECTION_LTR);
-        wrap.addView(email, lp(ViewGroup.LayoutParams.MATCH_PARENT, dp(54), 0, 12));
+        EditText url = input("כתובת Web App של Apps Script (https://script.google.com/macros/s/…/exec)", false);
+        url.setText(Gateway.url(this));
+        url.setTextDirection(View.TEXT_DIRECTION_LTR);
+        url.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
+        wrap.addView(url, lp(ViewGroup.LayoutParams.MATCH_PARENT, dp(54), 0, 12));
 
-        EditText password = new EditText(this);
-        password.setHint("סיסמה");
-        password.setSingleLine(true);
-        password.setTextColor(TEXT);
-        password.setHintTextColor(MUTED);
-        password.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
-        password.setBackground(box(SURFACE, BORDER, 12));
-        password.setPadding(dp(14), 0, dp(14), 0);
-        password.setTextDirection(View.TEXT_DIRECTION_LTR);
-        wrap.addView(password, lp(ViewGroup.LayoutParams.MATCH_PARENT, dp(54), 0, 16));
+        EditText token = input("GATEWAY_TOKEN (לפחות 32 תווים)", false);
+        token.setTextDirection(View.TEXT_DIRECTION_LTR);
+        token.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        wrap.addView(token, lp(ViewGroup.LayoutParams.MATCH_PARENT, dp(54), 0, 16));
 
-        TextView status = text("", 13, MUTED, false);
-        status.setVisibility(View.GONE);
-
-        Button login = actionButton("התחברות", true);
-        wrap.addView(login, lp(ViewGroup.LayoutParams.MATCH_PARENT, dp(52), 0, 10));
-        Button signup = actionButton("יצירת חשבון ראשונית", false);
-        wrap.addView(signup, lp(ViewGroup.LayoutParams.MATCH_PARENT, dp(52), 0, 8));
+        TextView status = text(problem == null ? "" : problem, 13, problem == null ? MUTED : RED, false);
+        Button connect = actionButton("בדוק והתחבר", true);
+        wrap.addView(connect, lp(ViewGroup.LayoutParams.MATCH_PARENT, dp(52), 0, 10));
         wrap.addView(status, lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 8, 0));
 
-        login.setOnClickListener(v -> authenticate(email.getText().toString().trim(), password.getText().toString(), false, status, login, signup));
-        signup.setOnClickListener(v -> authenticate(email.getText().toString().trim(), password.getText().toString(), true, status, login, signup));
+        connect.setOnClickListener(v -> {
+            String u = url.getText().toString().trim();
+            String t = token.getText().toString().trim();
+            if (!u.startsWith("https://script.google.com/")) {
+                status.setText("הכתובת צריכה להתחיל ב-https://script.google.com/");
+                status.setTextColor(RED);
+                return;
+            }
+            if (t.length() < 32) {
+                status.setText("הטוקן קצר מדי.");
+                status.setTextColor(RED);
+                return;
+            }
+            connect.setEnabled(false);
+            status.setText("בודק מול השער…");
+            status.setTextColor(MUTED);
+            Gateway.saveOverride(this, u, t);
+            io.execute(() -> {
+                Gateway.Result r = Gateway.call(this, "health", new JSONObject());
+                runOnUiThread(() -> {
+                    if (r.ok()) {
+                        Toast.makeText(this, "מחובר ל-" + r.body.optString("spreadsheet_title", "PROJECT_CONTROL_BOARD"), Toast.LENGTH_SHORT).show();
+                        showApp();
+                    } else {
+                        Gateway.saveOverride(this, "", "");
+                        connect.setEnabled(true);
+                        status.setText(r.describe());
+                        status.setTextColor(RED);
+                    }
+                });
+            });
+        });
 
         scroll.addView(wrap);
         setContentView(scroll);
     }
 
-    private Button actionButton(String label, boolean primary) {
-        Button b = new Button(this);
-        b.setText(label);
-        b.setTextSize(15);
-        b.setAllCaps(false);
-        b.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        b.setTextColor(primary ? BG : TEXT);
-        b.setBackground(box(primary ? BLUE : SURFACE_2, primary ? BLUE : BORDER, 14));
-        return b;
-    }
-
-    private void authenticate(String email, String password, boolean signup, TextView status, Button login, Button signupButton) {
-        if (!BuildConfig.AUTHORIZED_EMAIL.equalsIgnoreCase(email)) {
-            status.setText("החשבון הזה אינו מורשה ל-Control Tower.");
-            status.setTextColor(RED);
-            status.setVisibility(View.VISIBLE);
-            return;
-        }
-        if (password.length() < 6) {
-            status.setText("נדרשת סיסמה של לפחות 6 תווים.");
-            status.setTextColor(YELLOW);
-            status.setVisibility(View.VISIBLE);
-            return;
-        }
-        login.setEnabled(false);
-        signupButton.setEnabled(false);
-        status.setText(signup ? "יוצר חשבון מאובטח…" : "מתחבר…");
-        status.setTextColor(MUTED);
-        status.setVisibility(View.VISIBLE);
-        io.execute(() -> {
-            try {
-                JSONObject payload = new JSONObject().put("email", email).put("password", password);
-                String endpoint = signup ? "/auth/v1/signup" : "/auth/v1/token?grant_type=password";
-                Response r = raw("POST", endpoint, payload.toString(), false, false);
-                if (r.ok()) {
-                    JSONObject data = new JSONObject(r.body);
-                    String access = data.optString("access_token", "");
-                    String refresh = data.optString("refresh_token", "");
-                    if (!access.isEmpty() && !refresh.isEmpty()) {
-                        saveSession(access, refresh);
-                        runOnUiThread(this::showApp);
-                    } else {
-                        runOnUiThread(() -> {
-                            login.setEnabled(true);
-                            signupButton.setEnabled(true);
-                            status.setText("החשבון נוצר. אם נשלח אליך מייל אימות — אשר אותו ואז לחץ התחברות.");
-                            status.setTextColor(GREEN);
-                        });
-                    }
-                } else {
-                    String msg = parseApiError(r.body);
-                    runOnUiThread(() -> {
-                        login.setEnabled(true);
-                        signupButton.setEnabled(true);
-                        status.setText(msg);
-                        status.setTextColor(RED);
-                    });
-                }
-            } catch (Exception e) {
-                runOnUiThread(() -> {
-                    login.setEnabled(true);
-                    signupButton.setEnabled(true);
-                    status.setText("לא ניתן להתחבר כרגע. בדוק חיבור לרשת ונסה שוב.");
-                    status.setTextColor(RED);
-                });
-            }
-        });
-    }
-
-    private String parseApiError(String body) {
-        try {
-            JSONObject o = new JSONObject(body);
-            String s = o.optString("msg", o.optString("message", o.optString("error_description", "")));
-            if (s.toLowerCase().contains("invalid login")) return "האימייל או הסיסמה אינם נכונים.";
-            if (s.toLowerCase().contains("already registered")) return "החשבון כבר קיים. השתמש בהתחברות.";
-            if (s.toLowerCase().contains("password")) return "הסיסמה אינה עומדת בדרישות האבטחה.";
-        } catch (Exception ignored) {}
-        return "הפעולה נכשלה. נסה שוב בעוד רגע.";
-    }
-
-    private void saveSession(String access, String refresh) {
-        prefs.edit().putString("access_token", access).putString("refresh_token", refresh).apply();
-    }
-
-    private void logout() {
-        PushNotifications.unregisterOnLogout(this, prefs, () -> {
-            prefs.edit().clear().apply();
-            showLogin();
-        });
-    }
+    // ---------- main shell ----------
 
     private void showApp() {
         LinearLayout root = new LinearLayout(this);
@@ -309,8 +261,8 @@ public class MainActivity extends Activity {
         root.addView(nav, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(70)));
         setContentView(root);
         selectTab(activeTab);
-        // Context now exists (owner authenticated, main screen visible): channel, permission, token.
-        PushNotifications.onSessionReady(this, prefs);
+        // Context now exists (gateway configured, main screen visible): channel, permission, token.
+        PushNotifications.onAppReady(this);
     }
 
     private void buildNav() {
@@ -350,7 +302,7 @@ public class MainActivity extends Activity {
         col.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
         col.addView(text(eyebrow, 11, BLUE, true));
         col.addView(text(title, 28, TEXT, true), lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 4, 0));
-        TextView sync = text("ענן מאובטח • MIRRORED", 11, MUTED, false);
+        TextView sync = text("Google Drive • PROJECT_CONTROL_BOARD", 11, MUTED, false);
         col.addView(sync, lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 4, 18));
         scroll.addView(col);
         return scroll;
@@ -396,20 +348,23 @@ public class MainActivity extends Activity {
         return YELLOW;
     }
 
+    // ---------- עכשיו ----------
+
     private void showHome() {
         ScrollView s = screen("CONTROL TOWER", "בוקר טוב, אריאל");
         contentHost.addView(s);
         LinearLayout c = column(s);
         View load = loading();
         c.addView(load, lp(ViewGroup.LayoutParams.MATCH_PARENT, dp(80), 10, 0));
-        fetchArray("/rest/v1/control_portfolio?select=*&order=last_control_check.desc.nullslast", arr -> {
+        fetchArray("portfolio", new JSONObject(), "projects", arr -> {
             c.removeView(load);
             renderHome(c, arr);
-        }, () -> replaceWithError(c, load));
+        }, msg -> replaceWithError(c, load, msg));
     }
 
     private void renderHome(LinearLayout c, JSONArray arr) {
         JSONObject need = null;
+        JSONObject userTest = null;
         int red = 0, yellow = 0, green = 0;
         for (int i = 0; i < arr.length(); i++) {
             JSONObject p = arr.optJSONObject(i);
@@ -417,18 +372,23 @@ public class MainActivity extends Activity {
             String rag = p.optString("rag", "YELLOW");
             if ("RED".equals(rag)) red++; else if ("GREEN".equals(rag)) green++; else yellow++;
             if (need == null && p.optBoolean("needs_ariel", false)) need = p;
+            if (userTest == null && p.optBoolean("user_test_required", false)) userTest = p;
         }
 
         LinearLayout needCard = card();
         needCard.setBackground(box(Color.rgb(15, 29, 48), Color.rgb(53, 104, 159), 12));
         needCard.addView(text("מה צריך ממך עכשיו", 14, BLUE, true));
-        if (need == null) {
+        if (need == null && userTest == null) {
             needCard.addView(text("אין כרגע החלטה שעוצרת עבודה", 16, TEXT, true), lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 10, 0));
         } else {
-            needCard.addView(text(need.optString("project_name"), 18, TEXT, true), lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 10, 0));
-            needCard.addView(text(need.optString("ariel_decision_input", "נדרשת פעולה שלך"), 14, MUTED, false), lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 7, 0));
-            JSONObject finalNeed = need;
-            needCard.setOnClickListener(v -> showProjectDialog(finalNeed));
+            JSONObject top = need != null ? need : userTest;
+            String prompt = need != null
+                    ? top.optString("ariel_input", "נדרשת פעולה שלך")
+                    : "🧪 מחכה לאריאל — בדיקת משתמש";
+            if (prompt.isEmpty()) prompt = "נדרשת פעולה שלך";
+            needCard.addView(text(top.optString("name"), 18, TEXT, true), lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 10, 0));
+            needCard.addView(text(prompt, 14, MUTED, false), lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 7, 0));
+            needCard.setOnClickListener(v -> showProjectDialog(top));
         }
         c.addView(needCard, lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 8, 12));
 
@@ -464,31 +424,44 @@ public class MainActivity extends Activity {
         LinearLayout top = new LinearLayout(this);
         top.setOrientation(LinearLayout.HORIZONTAL);
         top.setGravity(Gravity.CENTER_VERTICAL | Gravity.RIGHT);
-        TextView name = text(p.optString("project_name", "פרויקט"), 17, TEXT, true);
+        TextView name = text(p.optString("name", "פרויקט"), 17, TEXT, true);
         top.addView(name, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        if (p.optBoolean("user_test_required", false)) {
+            TextView t = badge("🧪", BLUE);
+            LinearLayout.LayoutParams tl = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            tl.setMarginEnd(dp(6));
+            top.addView(t, tl);
+        }
         top.addView(badge(p.optString("rag", "YELLOW"), ragColor(p.optString("rag", "YELLOW"))));
         card.addView(top);
-        String body = compact ? p.optString("next_action", "") : p.optString("current_milestone", "");
+        String body = compact ? p.optString("next_action", "") : p.optString("milestone", "");
+        if (body.isEmpty()) body = p.optString("lifecycle", "");
         if (!body.isEmpty()) card.addView(text(body, 13, MUTED, false), lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 9, 0));
         card.setOnClickListener(v -> showProjectDialog(p));
         parent.addView(card, lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 0, 8));
     }
 
+    // ---------- פרויקטים ----------
+
     private void showProjects() {
         ScrollView s = screen("PORTFOLIO", "פרויקטים");
         contentHost.addView(s);
         LinearLayout c = column(s);
-        TextView hint = text("מקור האמת נשאר ב-PROJECT_CONTROL_BOARD. כאן מוצגת מראה מאובטחת.", 13, MUTED, false);
+        TextView hint = text("מקור האמת הוא PROJECT_CONTROL_BOARD ב-Google Drive. כאן מוצגת מראה לקריאה בלבד.", 13, MUTED, false);
         c.addView(hint, lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 0, 10));
         View load = loading();
         c.addView(load, lp(ViewGroup.LayoutParams.MATCH_PARENT, dp(80), 0, 0));
-        fetchArray("/rest/v1/control_portfolio?select=*&order=project_name.asc", arr -> {
+        fetchArray("portfolio", new JSONObject(), "projects", arr -> {
             c.removeView(load);
+            if (arr.length() == 0) {
+                c.addView(text("לא נמצאו פרויקטים בגיליון Projects.", 13, MUTED, false));
+                return;
+            }
             for (int i = 0; i < arr.length(); i++) {
                 JSONObject p = arr.optJSONObject(i);
                 if (p != null) addProjectCard(c, p, false);
             }
-        }, () -> replaceWithError(c, load));
+        }, msg -> replaceWithError(c, load, msg));
     }
 
     private void showProjectDialog(JSONObject p) {
@@ -497,25 +470,37 @@ public class MainActivity extends Activity {
         c.setOrientation(LinearLayout.VERTICAL);
         c.setPadding(dp(18), dp(8), dp(18), dp(12));
         c.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
-        c.addView(badge(p.optString("rag", "YELLOW") + " • " + p.optString("confidence", ""), ragColor(p.optString("rag", "YELLOW"))));
+        String badgeText = p.optString("rag", "YELLOW") + (p.optString("confidence", "").isEmpty() ? "" : " • " + p.optString("confidence"));
+        c.addView(badge(badgeText, ragColor(p.optString("rag", "YELLOW"))));
+        addField(c, "שלב", p.optString("lifecycle", ""));
         addField(c, "יעד", p.optString("objective", ""));
-        addField(c, "אבן דרך נוכחית", p.optString("current_milestone", ""));
-        addField(c, "ראיות", p.optString("progress_evidence", ""));
+        addField(c, "אבן דרך נוכחית", p.optString("milestone", ""));
         addField(c, "הפעולה הבאה", p.optString("next_action", ""));
-        addField(c, "חסם / תלות", p.optString("blocker_dependency", ""));
-        addField(c, "צריך את אריאל", p.optBoolean("needs_ariel", false) ? p.optString("ariel_decision_input", "כן") : "לא נדרשת פעולה כרגע");
-        addField(c, "סיכון / סחיפה", p.optString("risk_drift", ""));
-        addField(c, "בדיקת שליטה אחרונה", p.optString("last_control_check", ""));
-        addField(c, "מקור אמת", p.optString("source_of_truth", ""));
+        addField(c, "חסם / תלות", p.optString("blocker", ""));
+        addField(c, "צריך את אריאל", p.optBoolean("needs_ariel", false) ? (p.optString("ariel_input", "").isEmpty() ? "כן" : p.optString("ariel_input")) : "לא נדרשת פעולה כרגע");
+        addField(c, "סיכון / סחיפה", p.optString("risk", ""));
+        addField(c, "בדיקת שליטה אחרונה", p.optString("last_check", ""));
         s.addView(c);
-        AlertDialog dialog = new AlertDialog.Builder(this)
-                .setTitle(p.optString("project_name", "פרויקט"))
+        AlertDialog.Builder builder = new AlertDialog.Builder(this)
+                .setTitle(p.optString("name", "פרויקט"))
                 .setView(s)
-                .setPositiveButton("סגור", null)
-                .create();
+                .setPositiveButton("סגור", null);
+        String link = p.optString("link", "");
+        if (link.startsWith("http")) {
+            builder.setNeutralButton("פתח קישור", (d, w) -> {
+                try {
+                    startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(link)));
+                } catch (Exception e) {
+                    Toast.makeText(this, "לא ניתן לפתוח את הקישור", Toast.LENGTH_SHORT).show();
+                }
+            });
+        }
+        AlertDialog dialog = builder.create();
         dialog.setOnShowListener(d -> {
             dialog.getWindow().setBackgroundDrawable(box(SURFACE, BORDER, 10));
             dialog.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(BLUE);
+            Button neutral = dialog.getButton(AlertDialog.BUTTON_NEUTRAL);
+            if (neutral != null) neutral.setTextColor(MUTED);
         });
         dialog.show();
     }
@@ -526,21 +511,19 @@ public class MainActivity extends Activity {
         c.addView(text(value, 14, TEXT, false), lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 4, 0));
     }
 
+    // ---------- סגן ----------
+
     private void showDeputy() {
         ScrollView s = screen("COMMAND INBOX", "סגן");
         contentHost.addView(s);
         LinearLayout c = column(s);
-        c.addView(text("כתוב מה לנהל, לבדוק או לקדם. הפקודה נכנסת לתור ענן אמיתי; היא לא תסומן כהושלמה בלי ראיה.", 13, MUTED, false));
+        c.addView(text("כתוב מה לנהל, לבדוק או לקדם. הפקודה נכנסת ל-MobileInbox בגיליון כ-REPORTED; היא לא תסומן כמאומתת בלי ראיה.", 13, MUTED, false));
 
-        EditText command = new EditText(this);
-        command.setHint("מה אתה רוצה שאנהל/אבדוק/אקדם?");
-        command.setTextColor(TEXT);
-        command.setHintTextColor(MUTED);
+        EditText command = input("מה אתה רוצה שאנהל/אבדוק/אקדם?", true);
         command.setTextSize(16);
         command.setGravity(Gravity.TOP | Gravity.RIGHT);
         command.setTextDirection(View.TEXT_DIRECTION_RTL);
         command.setMinHeight(dp(120));
-        command.setPadding(dp(14), dp(14), dp(14), dp(14));
         command.setBackground(box(SURFACE, Color.rgb(53, 104, 159), 12));
         c.addView(command, lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 16, 10));
 
@@ -568,25 +551,40 @@ public class MainActivity extends Activity {
             String q = command.getText().toString().trim();
             if (q.isEmpty()) return;
             send.setEnabled(false);
-            result.setText("שולח לתור…");
-            postCommand(q, () -> {
-                send.setEnabled(true);
-                command.setText("");
-                result.setText("הפקודה התקבלה בתור הענן.");
-                result.setTextColor(GREEN);
-                loadCommands(c);
-            }, () -> {
-                send.setEnabled(true);
-                result.setText("השליחה נכשלה. נסה שוב.");
-                result.setTextColor(RED);
+            result.setText("שולח ל-MobileInbox…");
+            result.setTextColor(MUTED);
+            io.execute(() -> {
+                Gateway.Result r;
+                try {
+                    JSONObject params = new JSONObject()
+                            .put("report_text", q)
+                            .put("source", "deputy_command")
+                            .put("device_id", Gateway.deviceId(this));
+                    r = Gateway.call(this, "submit_report", params);
+                } catch (Exception e) {
+                    r = new Gateway.Result(0, null, "השליחה נכשלה.");
+                }
+                Gateway.Result done = r;
+                runOnUiThread(() -> {
+                    send.setEnabled(true);
+                    if (done.ok()) {
+                        command.setText("");
+                        result.setText("הפקודה נרשמה ב-MobileInbox (שורה " + done.body.optInt("row") + ").");
+                        result.setTextColor(GREEN);
+                        loadInbox(c);
+                    } else {
+                        result.setText("השליחה נכשלה: " + done.describe());
+                        result.setTextColor(RED);
+                    }
+                });
             });
         });
 
-        c.addView(section("היסטוריית פקודות"));
-        loadCommands(c);
+        c.addView(section("היסטוריית פקודות ודיווחים"));
+        loadInbox(c);
     }
 
-    private void loadCommands(LinearLayout c) {
+    private void loadInbox(LinearLayout c) {
         View old = c.findViewWithTag("commands-list");
         if (old != null) c.removeView(old);
         LinearLayout holder = new LinearLayout(this);
@@ -595,58 +593,67 @@ public class MainActivity extends Activity {
         c.addView(holder);
         ProgressBar p = new ProgressBar(this);
         holder.addView(p, new LinearLayout.LayoutParams(dp(38), dp(38)));
-        fetchArray("/rest/v1/control_commands?select=*&order=created_at.desc&limit=50", arr -> {
+        JSONObject params = new JSONObject();
+        try { params.put("limit", 30); } catch (Exception ignored) {}
+        fetchArray("inbox", params, "items", arr -> {
             holder.removeAllViews();
             if (arr.length() == 0) {
-                holder.addView(text("עדיין אין פקודות.", 13, MUTED, false));
+                holder.addView(text("עדיין אין פקודות או דיווחים.", 13, MUTED, false));
                 return;
             }
             for (int i = 0; i < arr.length(); i++) {
                 JSONObject o = arr.optJSONObject(i);
                 if (o == null) continue;
                 LinearLayout card = card();
-                card.addView(badge(statusHe(o.optString("status")), statusColor(o.optString("status"))));
-                card.addView(text(o.optString("command_text", ""), 14, TEXT, true), lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 9, 0));
-                String summary = o.optString("result_summary", "");
-                if (!summary.isEmpty() && !"null".equals(summary)) card.addView(text(summary, 13, MUTED, false), lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 8, 0));
-                card.addView(text(o.optString("updated_at", o.optString("created_at", "")), 10, MUTED, false), lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 8, 0));
+                LinearLayout top = new LinearLayout(this);
+                top.setOrientation(LinearLayout.HORIZONTAL);
+                top.setGravity(Gravity.RIGHT);
+                top.addView(badge(statusHe(o.optString("status")), statusColor(o.optString("status"))));
+                TextView src = badge(sourceHe(o.optString("source")), MUTED);
+                LinearLayout.LayoutParams sl = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+                sl.setMarginStart(dp(6));
+                top.addView(src, sl);
+                card.addView(top);
+                card.addView(text(o.optString("report_text", ""), 14, TEXT, true), lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 9, 0));
+                String notes = o.optString("notes", "");
+                if (!notes.isEmpty()) card.addView(text(notes, 13, MUTED, false), lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 8, 0));
+                card.addView(text(o.optString("received_at", ""), 10, MUTED, false), lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 8, 0));
                 holder.addView(card, lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 0, 8));
             }
-        }, () -> {
+        }, msg -> {
             holder.removeAllViews();
-            holder.addView(text("לא ניתן לטעון את תור הפקודות כרגע.", 13, RED, false));
+            holder.addView(text("לא ניתן לטעון את MobileInbox: " + msg, 13, RED, false));
         });
     }
 
     private String statusHe(String s) {
         switch (s) {
-            case "QUEUED": return "ממתינה לסוכן";
-            case "RUNNING": return "בביצוע";
-            case "COMPLETED": return "הושלמה";
-            case "NEEDS_DECISION": return "דורשת החלטה";
-            case "FAILED": return "נכשלה";
-            default: return "התקבלה";
+            case "REPORTED": return "דווח — ממתין לאימות";
+            case "VERIFIED": return "אומת";
+            case "IN_PROGRESS": return "בביצוע";
+            case "DONE": case "COMPLETED": return "הושלם";
+            case "NEEDS_DECISION": return "דורש החלטה";
+            case "REJECTED": case "FAILED": return "נדחה";
+            default: return s.isEmpty() ? "התקבל" : s;
+        }
+    }
+
+    private String sourceHe(String s) {
+        switch (s) {
+            case "share": return "שיתוף";
+            case "deputy_command": return "פקודה";
+            default: return "ידני";
         }
     }
 
     private int statusColor(String s) {
-        if ("COMPLETED".equals(s)) return GREEN;
-        if ("FAILED".equals(s)) return RED;
+        if ("VERIFIED".equals(s) || "DONE".equals(s) || "COMPLETED".equals(s)) return GREEN;
+        if ("REJECTED".equals(s) || "FAILED".equals(s)) return RED;
         if ("NEEDS_DECISION".equals(s)) return YELLOW;
         return BLUE;
     }
 
-    private void postCommand(String command, Runnable ok, Runnable fail) {
-        io.execute(() -> {
-            try {
-                JSONObject payload = new JSONObject().put("command_text", command).put("status", "RECEIVED");
-                Response r = rest("POST", "/rest/v1/control_commands", payload.toString(), true);
-                runOnUiThread(r.ok() ? ok : fail);
-            } catch (Exception e) {
-                runOnUiThread(fail);
-            }
-        });
-    }
+    // ---------- פעילות ----------
 
     private void showActivity() {
         ScrollView s = screen("CONTROL EVENTS", "פעילות");
@@ -654,139 +661,110 @@ public class MainActivity extends Activity {
         LinearLayout c = column(s);
         LinearLayout security = card();
         security.addView(text("מצב מערכת", 13, BLUE, true));
-        security.addView(text("DB מאובטח מחובר • RLS פעיל • Google Drive נשאר מקור האמת", 13, TEXT, true), lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 7, 0));
-        TextView pushStatus = text(PushNotifications.statusLine(this, prefs), 12, MUTED, false);
+        TextView gatewayLine = text("שער: בודק…", 13, TEXT, true);
+        security.addView(gatewayLine, lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 7, 0));
+        TextView pushStatus = text(PushNotifications.statusLine(this), 12, MUTED, false);
         security.addView(pushStatus, lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 8, 0));
-        security.addView(text("גרסה " + BuildConfig.VERSION_NAME + " (" + BuildConfig.VERSION_CODE + ") • " + BuildConfig.GIT_SHA, 11, MUTED, false),
+        security.addView(text("גרסה " + BuildConfig.VERSION_NAME + " (" + BuildConfig.VERSION_CODE + ") • " + BuildConfig.GIT_SHA
+                        + (Gateway.isBuildConfigured() ? " • שער מהבנייה" : " • שער מהמכשיר"), 11, MUTED, false),
                 lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 4, 0));
+
         Button testPush = actionButton("שלח התראת בדיקה", false);
         security.addView(testPush, lp(ViewGroup.LayoutParams.MATCH_PARENT, dp(46), 12, 0));
         testPush.setOnClickListener(v -> {
             testPush.setEnabled(false);
             pushStatus.setText("שולח התראת בדיקה…");
-            PushNotifications.requestTestPush(prefs, msg -> runOnUiThread(() -> {
+            PushNotifications.requestTestPush(this, msg -> runOnUiThread(() -> {
                 testPush.setEnabled(true);
                 pushStatus.setText(msg);
             }));
         });
-        Button logout = actionButton("התנתקות", false);
-        security.addView(logout, lp(ViewGroup.LayoutParams.MATCH_PARENT, dp(46), 8, 0));
-        logout.setOnClickListener(v -> logout());
+        Button disconnect = actionButton("נתק מכשיר והגדר מחדש", false);
+        security.addView(disconnect, lp(ViewGroup.LayoutParams.MATCH_PARENT, dp(46), 8, 0));
+        disconnect.setOnClickListener(v -> PushNotifications.unregister(this, () -> {
+            Gateway.saveOverride(this, "", "");
+            if (Gateway.isBuildConfigured()) {
+                Toast.makeText(this, "המכשיר נותק מ-MobileDevices. השער מהבנייה נשאר פעיל.", Toast.LENGTH_LONG).show();
+                selectTab(3);
+            } else {
+                showSetup(null);
+            }
+        }));
         c.addView(security, lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 0, 16));
-        c.addView(section("שינויים משמעותיים"));
+
+        io.execute(() -> {
+            Gateway.Result r = Gateway.call(this, "health", new JSONObject());
+            runOnUiThread(() -> {
+                if (r.ok()) {
+                    JSONArray missing = r.body.optJSONArray("unresolved_columns");
+                    String miss = missing != null && missing.length() > 0 ? " • עמודות לא זוהו: " + missing.length() : "";
+                    gatewayLine.setText("שער מחובר • " + r.body.optString("spreadsheet_title", "PROJECT_CONTROL_BOARD")
+                            + " • " + r.body.optInt("projects_rows", 0) + " פרויקטים"
+                            + " • מכשירים רשומים: " + r.body.optInt("active_devices", 0)
+                            + (r.body.optBoolean("fcm_configured", false) ? " • FCM מוגדר" : " • FCM לא מוגדר בסקריפט")
+                            + (r.body.optBoolean("scanner_trigger_installed", false) ? " • סורק פעיל" : " • סורק לא מותקן")
+                            + miss);
+                    gatewayLine.setTextColor(TEXT);
+                } else {
+                    gatewayLine.setText("שער לא זמין: " + r.describe());
+                    gatewayLine.setTextColor(RED);
+                }
+            });
+        });
+
+        c.addView(section("התראות שנשלחו"));
         View load = loading();
         c.addView(load, lp(ViewGroup.LayoutParams.MATCH_PARENT, dp(80), 0, 0));
-        fetchArray("/rest/v1/control_activity?select=*&order=occurred_at.desc&limit=50", arr -> {
+        JSONObject params = new JSONObject();
+        try { params.put("limit", 30); } catch (Exception ignored) {}
+        fetchArray("activity", params, "items", arr -> {
             c.removeView(load);
+            if (arr.length() == 0) {
+                c.addView(text("עדיין לא נשלחו התראות אוטומטיות.", 13, MUTED, false));
+                return;
+            }
             for (int i = 0; i < arr.length(); i++) {
                 JSONObject o = arr.optJSONObject(i);
                 if (o == null) continue;
                 LinearLayout card = card();
-                card.addView(badge(o.optString("evidence_level", "VERIFIED"), BLUE));
-                card.addView(text(o.optString("title", ""), 16, TEXT, true), lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 8, 0));
-                card.addView(text(o.optString("detail", ""), 13, MUTED, false), lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 5, 0));
+                card.addView(badge(eventHe(o.optString("event")), BLUE));
+                card.addView(text(o.optString("project_key", ""), 16, TEXT, true), lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 8, 0));
+                card.addView(text(o.optString("rag", "") + " • " + o.optString("lifecycle", ""), 13, MUTED, false), lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 5, 0));
                 card.addView(text(o.optString("occurred_at", ""), 10, MUTED, false), lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 8, 0));
                 c.addView(card, lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 0, 8));
             }
-        }, () -> replaceWithError(c, load));
+        }, msg -> replaceWithError(c, load, msg));
     }
 
-    private void replaceWithError(LinearLayout parent, View loading) {
+    private String eventHe(String ev) {
+        String out = ev.replace("project_red", "הפך לאדום").replace("needs_ariel", "צריך את אריאל").replace("user_test_required", "מחכה לאריאל").replace("+", " + ");
+        return out.isEmpty() ? "אירוע" : out;
+    }
+
+    // ---------- plumbing ----------
+
+    private void replaceWithError(LinearLayout parent, View loading, String message) {
         if (loading.getParent() == parent) parent.removeView(loading);
         LinearLayout err = card();
         err.addView(text("לא ניתן לטעון נתונים כרגע.", 15, RED, true));
-        err.addView(text("בדוק חיבור לרשת או התחבר מחדש.", 13, MUTED, false), lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 5, 0));
+        err.addView(text(message == null || message.isEmpty() ? "בדוק חיבור לרשת או את הגדרת השער." : message, 13, MUTED, false), lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 5, 0));
         parent.addView(err, lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 8, 0));
     }
 
     private interface ArraySuccess { void run(JSONArray data); }
+    private interface Failure { void run(String message); }
 
-    private void fetchArray(String path, ArraySuccess ok, Runnable fail) {
+    private void fetchArray(String action, JSONObject params, String arrayKey, ArraySuccess ok, Failure fail) {
         io.execute(() -> {
-            try {
-                Response r = rest("GET", path, null, false);
-                if (!r.ok()) {
-                    runOnUiThread(fail);
-                    return;
-                }
-                JSONArray a = new JSONArray(r.body);
-                runOnUiThread(() -> ok.run(a));
-            } catch (Exception e) {
-                runOnUiThread(fail);
+            Gateway.Result r = Gateway.call(this, action, params);
+            if (!r.ok()) {
+                String msg = r.describe();
+                runOnUiThread(() -> fail.run(msg));
+                return;
             }
+            JSONArray a = r.body.optJSONArray(arrayKey);
+            JSONArray data = a == null ? new JSONArray() : a;
+            runOnUiThread(() -> ok.run(data));
         });
-    }
-
-    private Response rest(String method, String path, String body, boolean preferRepresentation) throws Exception {
-        Response r = raw(method, path, body, true, preferRepresentation);
-        if (r.code == 401 && refreshSession()) {
-            r = raw(method, path, body, true, preferRepresentation);
-        }
-        if (r.code == 401) {
-            runOnUiThread(() -> {
-                prefs.edit().clear().apply();
-                Toast.makeText(this, "פג תוקף החיבור. התחבר מחדש.", Toast.LENGTH_LONG).show();
-                showLogin();
-            });
-        }
-        return r;
-    }
-
-    private boolean refreshSession() {
-        try {
-            String refresh = prefs.getString("refresh_token", null);
-            if (refresh == null) return false;
-            JSONObject p = new JSONObject().put("refresh_token", refresh);
-            Response r = raw("POST", "/auth/v1/token?grant_type=refresh_token", p.toString(), false, false);
-            if (!r.ok()) return false;
-            JSONObject o = new JSONObject(r.body);
-            String access = o.optString("access_token", "");
-            String nextRefresh = o.optString("refresh_token", refresh);
-            if (access.isEmpty()) return false;
-            saveSession(access, nextRefresh);
-            return true;
-        } catch (Exception e) {
-            return false;
-        }
-    }
-
-    private Response raw(String method, String path, String body, boolean authenticated, boolean preferRepresentation) throws Exception {
-        URL url = new URL(BuildConfig.SUPABASE_URL + path);
-        HttpURLConnection c = (HttpURLConnection) url.openConnection();
-        c.setConnectTimeout(15000);
-        c.setReadTimeout(20000);
-        c.setRequestMethod(method);
-        c.setRequestProperty("apikey", BuildConfig.SUPABASE_KEY);
-        c.setRequestProperty("Accept", "application/json");
-        if (authenticated) {
-            String access = prefs.getString("access_token", null);
-            if (access != null) c.setRequestProperty("Authorization", "Bearer " + access);
-        }
-        if (preferRepresentation) c.setRequestProperty("Prefer", "return=representation");
-        if (body != null) {
-            c.setDoOutput(true);
-            c.setRequestProperty("Content-Type", "application/json; charset=utf-8");
-            try (OutputStream os = c.getOutputStream()) {
-                os.write(body.getBytes(StandardCharsets.UTF_8));
-            }
-        }
-        int code = c.getResponseCode();
-        InputStream in = code >= 200 && code < 400 ? c.getInputStream() : c.getErrorStream();
-        StringBuilder sb = new StringBuilder();
-        if (in != null) {
-            try (BufferedReader br = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8))) {
-                String line;
-                while ((line = br.readLine()) != null) sb.append(line);
-            }
-        }
-        c.disconnect();
-        return new Response(code, sb.toString());
-    }
-
-    private static class Response {
-        final int code;
-        final String body;
-        Response(int code, String body) { this.code = code; this.body = body == null ? "" : body; }
-        boolean ok() { return code >= 200 && code < 300; }
     }
 }

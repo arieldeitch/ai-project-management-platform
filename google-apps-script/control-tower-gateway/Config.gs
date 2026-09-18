@@ -1,0 +1,82 @@
+/**
+ * Fixed resources. Nothing in this file is ever taken from a request.
+ */
+
+// Canonical portfolio truth: PROJECT_CONTROL_BOARD.
+var BOARD_SPREADSHEET_ID = '1EYeDgSd1yMUz7bPbreDlJX130yCay2BMtT_RyQoi2HA';
+var PROJECTS_SHEET = 'Projects';
+var CONNECTIONS_SHEET = 'Connections';
+
+// Mobile-only operational tabs (transport state, never a second source of truth).
+var INBOX_SHEET = 'MobileInbox';
+var DEVICES_SHEET = 'MobileDevices';
+var PUSH_STATE_SHEET = 'MobilePushState';
+
+var INBOX_HEADERS = ['received_at', 'source', 'status', 'evidence_level', 'report_text', 'project_hint', 'device_id', 'app_version', 'processed_at', 'notes'];
+var DEVICES_HEADERS = ['token', 'device_id', 'device_label', 'platform', 'app_version', 'registered_at', 'last_seen_at', 'active'];
+var PUSH_STATE_HEADERS = ['project_key', 'last_rag', 'last_needs_ariel', 'last_lifecycle', 'last_event', 'last_event_at', 'updated_at'];
+
+var MAX_BODY_BYTES = 64 * 1024;
+var MAX_REPORT_CHARS = 20000;
+
+// Firebase project id is derived from the service-account JSON (project_id); never client-supplied.
+var FCM_CHANNEL_ID = 'control_tower_alerts';
+
+// Lifecycle values that mean "waiting for Ariel's physical test" (case-insensitive substring match).
+var USER_TEST_MARKERS = ['user test required', 'user_test_required', 'מחכה לאריאל'];
+
+/**
+ * Header aliases for the Projects tab. Matching is case/whitespace/punctuation-insensitive,
+ * exact alias first, then "header contains alias". Override any field with the
+ * PROJECTS_COLUMN_MAP script property: {"name":"Project Name","rag":"Health", ...}.
+ */
+var PROJECT_FIELD_ALIASES = {
+  id:           ['id', 'project id', 'key', 'project key', 'מזהה'],
+  name:         ['project', 'project name', 'name', 'title', 'פרויקט', 'שם פרויקט', 'שם'],
+  lifecycle:    ['lifecycle', 'stage', 'status', 'state', 'phase', 'שלב', 'סטטוס', 'מצב'],
+  rag:          ['rag', 'health', 'traffic light', 'color', 'רמזור'],
+  confidence:   ['confidence', 'evidence level', 'evidence', 'ביטחון', 'רמת ראיות'],
+  milestone:    ['current milestone', 'milestone', 'אבן דרך נוכחית', 'אבן דרך'],
+  next_action:  ['next action', 'next step', 'הפעולה הבאה', 'צעד הבא'],
+  blocker:      ['blocker', 'blocker dependency', 'blocker / dependency', 'dependency', 'blockers', 'חסם', 'חסם תלות'],
+  needs_ariel:  ['needs ariel', 'ariel needed', 'needs owner', 'צריך את אריאל', 'דורש אריאל'],
+  ariel_input:  ['ariel input', 'ariel decision input', 'decision input', 'ariel decision', 'decision needed', 'קלט אריאל', 'החלטה נדרשת'],
+  last_check:   ['last control check', 'last check', 'last meaningful progress', 'last progress', 'last update', 'updated', 'last updated', 'בדיקת שליטה אחרונה', 'עדכון אחרון'],
+  link:         ['primary link', 'link', 'url', 'drive link', 'קישור'],
+  objective:    ['objective', 'goal', 'יעד', 'מטרה'],
+  risk:         ['risk', 'risk drift', 'risk / drift', 'drift', 'סיכון']
+};
+
+function openBoard_() {
+  return SpreadsheetApp.openById(BOARD_SPREADSHEET_ID);
+}
+
+/** Idempotently ensure a mobile tab exists with the expected header row. */
+function ensureSheet_(name, headers) {
+  var ss = openBoard_();
+  var sheet = ss.getSheetByName(name);
+  if (!sheet) {
+    sheet = ss.insertSheet(name);
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]).setFontWeight('bold');
+    sheet.setFrozenRows(1);
+    return sheet;
+  }
+  var lastCol = Math.max(sheet.getLastColumn(), headers.length);
+  var existing = sheet.getRange(1, 1, 1, lastCol).getValues()[0].map(function (h) { return String(h || '').trim(); });
+  headers.forEach(function (h, i) {
+    if (existing[i] !== h) sheet.getRange(1, i + 1).setValue(h).setFontWeight('bold');
+  });
+  if (sheet.getFrozenRows() < 1) sheet.setFrozenRows(1);
+  return sheet;
+}
+
+function isFcmConfigured_() {
+  var json = PropertiesService.getScriptProperties().getProperty('FCM_SERVICE_ACCOUNT_JSON');
+  if (!json) return false;
+  try {
+    var sa = JSON.parse(json);
+    return !!(sa.project_id && sa.client_email && sa.private_key);
+  } catch (e) {
+    return false;
+  }
+}
