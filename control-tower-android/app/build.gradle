@@ -2,9 +2,9 @@ plugins {
     id 'com.android.application'
 }
 
-// Firebase config is an external, per-environment file and is never committed.
-// The CI workflow materialises it from the GOOGLE_SERVICES_JSON secret when present.
-// Without it the app still builds and runs; push is reported as "not configured" in-app.
+// Firebase Android client config contains app/project identifiers, not a server credential.
+// The tracked google-services.json enables autonomous CI builds. Service-account JSON/private
+// keys remain external secrets and must never be committed.
 def googleServicesFile = file('google-services.json')
 def firebaseConfigured = googleServicesFile.exists()
 if (firebaseConfigured) {
@@ -13,10 +13,11 @@ if (firebaseConfigured) {
 
 def gitSha = (System.getenv('CT_GIT_SHA') ?: 'local').take(12)
 
-// Apps Script gateway in front of PROJECT_CONTROL_BOARD. Both values come from CI secrets
-// (CT_GATEWAY_URL / CT_GATEWAY_TOKEN); they are never committed. When absent the app shows
-// its setup screen and accepts them on-device.
-def gatewayUrl = (System.getenv('CT_GATEWAY_URL') ?: '').trim()
+// Apps Script gateway in front of PROJECT_CONTROL_BOARD.
+// The public Web App URL is safe to compile into the private-use client.
+// The shared gateway token remains secret and is supplied either by CI secret or once on-device.
+def defaultGatewayUrl = 'https://script.google.com/macros/s/AKfycby-YyosI2EYgvsaylDI1f82yFdTR7XuDHwRKshM-K9ODWadXWx3193GfiQKjItnrvqO/exec'
+def gatewayUrl = (System.getenv('CT_GATEWAY_URL') ?: defaultGatewayUrl).trim()
 def gatewayToken = (System.getenv('CT_GATEWAY_TOKEN') ?: '').trim()
 // Quote a value as a Java string literal for BuildConfig (escape backslash and double quote).
 def jstr = { String s -> '"' + s.replace('\\', '\\\\').replace('"', '\\"') + '"' }
@@ -29,8 +30,8 @@ android {
         applicationId 'com.ariel.controltower'
         minSdk 26
         targetSdk 35
-        versionCode 4
-        versionName '0.4.0'
+        versionCode 5
+        versionName '0.4.1'
         buildConfigField 'String', 'GATEWAY_URL', jstr(gatewayUrl)
         buildConfigField 'String', 'GATEWAY_TOKEN', jstr(gatewayToken)
         buildConfigField 'String', 'GIT_SHA', "\"${gitSha}\""
