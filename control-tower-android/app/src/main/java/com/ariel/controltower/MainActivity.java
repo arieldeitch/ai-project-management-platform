@@ -503,7 +503,8 @@ public class MainActivity extends Activity {
         long age = now() - p.syncedAt;
         int color = age < 15 * 60_000L ? GREEN : age < 2 * Freshness.HOUR ? AMBER : RED;
         box.addView(text("עודכן לאחרונה: " + TimeText.wall(p.syncedAt, now()), 13, color, true));
-        if (p.fromCache && warnIfCached) {
+        // Only a real failed refresh earns the warning; a fresh cached snapshot is simply the data.
+        if (warnIfCached && refreshError != null && !refreshError.isEmpty()) {
             String why = refreshError == null || refreshError.isEmpty() ? "" : " · " + refreshError;
             box.addView(text("מוצג עותק שמור מהמכשיר — הרענון האחרון נכשל" + why, 12, AMBER, false), full(2, 0));
         }
@@ -672,7 +673,8 @@ public class MainActivity extends Activity {
         summary.addView(strip, lp(ViewGroup.LayoutParams.MATCH_PARENT, dp(64), 0, 0));
         Project latest = p.latestActiveProject();
         if (latest != null) summary.addView(text("הכי עדכני: " + latest.name + " · " + TimeText.wall(latest.lastProgressMillis, now()), 12, MUTED, false), full(8, 0));
-        if (p.unknownActivity > 0) summary.addView(text(p.unknownActivity + " פרויקטים בלי חותמת פעילות בלוח", 12, MUTED, false), full(3, 0));
+        if (p.unknownActivity > 0) summary.addView(text(p.unknownActivity == 1 ? "פרויקט אחד בלי חותמת פעילות בלוח" : p.unknownActivity + " פרויקטים בלי חותמת פעילות בלוח", 12, MUTED, false), full(3, 0));
+        if (p.unknownCadence > 0) summary.addView(text(p.unknownCadence == 1 ? "פרויקט אחד בלי קצב צפוי מוגדר" : p.unknownCadence + " פרויקטים בלי קצב צפוי מוגדר", 12, MUTED, false), full(3, 0));
         c.addView(summary, full(0, 14));
 
         // צריך אותי עכשיו

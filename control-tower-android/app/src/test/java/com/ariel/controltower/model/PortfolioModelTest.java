@@ -208,8 +208,25 @@ public class PortfolioModelTest {
         assertEquals(4, p.green);
         assertEquals(1, p.stale);
         assertEquals(1, p.unknownActivity);
+        assertEquals(0, p.unknownCadence);
         assertEquals(2, p.contractVersion);
         assertTrue(p.serverSnapshotAt > 0);
+    }
+
+    @Test public void rawStatusPrefixedCellBecomesActivityAndUnknownCadenceIsNotStale() throws Exception {
+        JSONObject cos = new JSONObject().put("id", "P-006").put("name", "Chief of Staff").put("rag", "GREEN").put("lifecycle", "Active")
+                .put("last_meaningful_progress", "").put("last_meaningful_progress_raw", "VERIFIED 2026-09-18 12:03: live read confirmed")
+                .put("last_control_check", T_CHECK).put("expected_cadence", "as needed");
+        Portfolio p = Portfolio.from(new JSONObject().put("projects", new JSONArray().put(cos)), NOW, false);
+        Project x = p.projects.get(0);
+        assertEquals("18/09/2026 12:03", TimeText.absolutePlain(x.lastProgressMillis));
+        assertEquals(Freshness.State.UNKNOWN, x.freshness.state);
+        assertEquals(Freshness.Reason.NO_CADENCE, x.freshness.reason);
+        assertFalse(x.isStale());
+        assertEquals(0, p.stale);
+        assertEquals(0, p.unknownActivity);
+        assertEquals(1, p.unknownCadence);
+        assertEquals("Chief of Staff", p.latestActiveProject().name);
     }
 
     @Test public void projectActivityIsDistinctFromControlCheck() throws Exception {

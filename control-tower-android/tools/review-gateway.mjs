@@ -36,7 +36,7 @@ const projects = [
     objective: 'דלת כניסה אחת ורגועה לכל האקוסיסטם', milestone: 'קריאה חיה מ-Control Tower',
     progress_evidence: 'קריאה חיה אומתה מול השער', next_action: 'לסקור את מסך "היום" עם נתונים חיים',
     blocker: '', needs_ariel: false, ariel_input: '', risk: '',
-    last_meaningful_progress: iso(4 * H), last_control_check: iso(3 * H), expected_cadence: 'weekly', link: '' },
+    last_meaningful_progress: '', last_meaningful_progress_raw: 'VERIFIED 2026-09-18 12:03: live read confirmed against the gateway', last_control_check: iso(3 * H), expected_cadence: 'as needed', link: '' },
   { id: 'P-003', name: 'Personal News Radar', lifecycle: 'Active', rag: 'GREEN', confidence: 'HIGH',
     objective: 'תקציר יומי מסונן', milestone: 'תקציר בוקר יציב',
     progress_evidence: '', next_action: 'להוסיף מקור חדשות אחד', blocker: '', needs_ariel: false, ariel_input: '', risk: '',

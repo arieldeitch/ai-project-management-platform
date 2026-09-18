@@ -17,7 +17,7 @@ public final class Portfolio {
     public final int contractVersion;           // 1 for gateways without the v2 fields
     public final boolean fromCache;
 
-    public final int red, watch, green, needsAttention, stale, unknownActivity;
+    public final int red, watch, green, needsAttention, stale, unknownActivity, unknownCadence;
 
     private Portfolio(List<Project> projects, List<Project> infrastructure, long syncedAt, long serverSnapshotAt, int contractVersion, boolean fromCache) {
         this.projects = Collections.unmodifiableList(projects);
@@ -26,14 +26,15 @@ public final class Portfolio {
         this.serverSnapshotAt = serverSnapshotAt;
         this.contractVersion = contractVersion;
         this.fromCache = fromCache;
-        int r = 0, w = 0, g = 0, n = 0, s = 0, u = 0;
+        int r = 0, w = 0, g = 0, n = 0, s = 0, u = 0, uc = 0;
         for (Project p : projects) {
             if (p.isRed()) r++; else if (p.isGreen()) g++; else w++;
             if (p.needsAttention()) n++;
             if (p.isStale()) s++;
-            if (p.freshness.state == Freshness.State.UNKNOWN) u++;
+            if (p.freshness.reason == Freshness.Reason.NO_TIMESTAMP) u++;
+            if (p.freshness.reason == Freshness.Reason.NO_CADENCE) uc++;
         }
-        red = r; watch = w; green = g; needsAttention = n; stale = s; unknownActivity = u;
+        red = r; watch = w; green = g; needsAttention = n; stale = s; unknownActivity = u; unknownCadence = uc;
     }
 
     /** Build from a gateway `portfolio` response body. */
