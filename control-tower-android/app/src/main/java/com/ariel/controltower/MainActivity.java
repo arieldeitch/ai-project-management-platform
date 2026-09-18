@@ -35,16 +35,18 @@ import java.util.concurrent.Executors;
  * Push: FCM, transport only ({@link PushNotifications}).
  */
 public class MainActivity extends Activity {
-    private static final int BG = Color.rgb(9, 13, 22);
-    private static final int SURFACE = Color.rgb(20, 27, 40);
-    private static final int SURFACE_2 = Color.rgb(28, 37, 53);
-    private static final int BORDER = Color.rgb(49, 61, 81);
-    private static final int TEXT = Color.rgb(237, 242, 250);
-    private static final int MUTED = Color.rgb(158, 170, 191);
-    private static final int BLUE = Color.rgb(100, 168, 255);
-    private static final int YELLOW = Color.rgb(245, 190, 45);
-    private static final int RED = Color.rgb(240, 91, 91);
-    private static final int GREEN = Color.rgb(77, 200, 139);
+    // Calm, high-contrast light palette: portfolio information should dominate the screen,
+    // not the chrome around it.
+    private static final int BG = Color.rgb(246, 248, 251);
+    private static final int SURFACE = Color.rgb(255, 255, 255);
+    private static final int SURFACE_2 = Color.rgb(235, 241, 248);
+    private static final int BORDER = Color.rgb(215, 222, 232);
+    private static final int TEXT = Color.rgb(27, 34, 46);
+    private static final int MUTED = Color.rgb(92, 104, 121);
+    private static final int BLUE = Color.rgb(45, 101, 174);
+    private static final int YELLOW = Color.rgb(169, 112, 0);
+    private static final int RED = Color.rgb(188, 52, 52);
+    private static final int GREEN = Color.rgb(35, 134, 83);
 
     private final ExecutorService io = Executors.newSingleThreadExecutor();
     private FrameLayout contentHost;
@@ -77,6 +79,16 @@ public class MainActivity extends Activity {
         super.onNewIntent(intent);
         setIntent(intent);
         if (applyRoutingIntent(intent) && contentHost != null) selectTab(activeTab);
+    }
+
+    @Override
+    public void onBackPressed() {
+        // Ariel should never get "lost" in the app. Secondary sections always return Home first.
+        if (contentHost != null && activeTab != 0) {
+            selectTab(0);
+            return;
+        }
+        super.onBackPressed();
     }
 
     /**
@@ -255,30 +267,35 @@ public class MainActivity extends Activity {
 
         nav = new LinearLayout(this);
         nav.setOrientation(LinearLayout.HORIZONTAL);
-        nav.setPadding(dp(6), dp(4), dp(6), dp(8));
+        nav.setPadding(dp(8), dp(6), dp(8), dp(8));
         nav.setGravity(Gravity.CENTER);
-        nav.setBackgroundColor(Color.rgb(12, 18, 29));
-        root.addView(nav, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(70)));
+        nav.setBackgroundColor(SURFACE);
+        root.addView(nav, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(76)));
         setContentView(root);
         selectTab(activeTab);
-        // Context now exists (gateway configured, main screen visible): channel, permission, token.
         PushNotifications.onAppReady(this);
     }
 
     private void buildNav() {
         nav.removeAllViews();
-        String[] labels = {"עכשיו", "פרויקטים", "סגן", "פעילות"};
+        String[] labels = {"⌂ בית", "פרויקטים", "סגן", "פעילות"};
         for (int i = 0; i < labels.length; i++) {
             final int index = i;
             Button b = new Button(this);
             b.setText(labels[i]);
             b.setAllCaps(false);
-            b.setTextSize(12);
+            b.setTextSize(activeTab == i ? 13 : 12);
             b.setTypeface(Typeface.DEFAULT, activeTab == i ? Typeface.BOLD : Typeface.NORMAL);
-            b.setTextColor(activeTab == i ? BLUE : MUTED);
-            b.setBackgroundColor(Color.TRANSPARENT);
+            b.setTextColor(activeTab == i ? BLUE : TEXT);
+            if (activeTab == i) {
+                b.setBackground(box(Color.rgb(232, 240, 250), Color.rgb(184, 203, 227), 12));
+            } else {
+                b.setBackgroundColor(Color.TRANSPARENT);
+            }
             b.setOnClickListener(v -> selectTab(index));
-            nav.addView(b, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f));
+            LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f);
+            p.setMargins(dp(2), 0, dp(2), 0);
+            nav.addView(b, p);
         }
     }
 
@@ -295,15 +312,25 @@ public class MainActivity extends Activity {
     private ScrollView screen(String eyebrow, String title) {
         ScrollView scroll = new ScrollView(this);
         scroll.setFillViewport(true);
+        scroll.setBackgroundColor(BG);
         LinearLayout col = new LinearLayout(this);
         col.setTag("screen-column");
         col.setOrientation(LinearLayout.VERTICAL);
-        col.setPadding(dp(18), dp(20), dp(18), dp(30));
+        col.setPadding(dp(18), dp(18), dp(18), dp(30));
         col.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+
+        if (activeTab != 0) {
+            Button home = actionButton("⌂ חזרה לבית", false);
+            home.setTextColor(BLUE);
+            home.setBackground(box(Color.rgb(238, 244, 251), Color.rgb(196, 211, 230), 12));
+            home.setOnClickListener(v -> selectTab(0));
+            col.addView(home, lp(ViewGroup.LayoutParams.MATCH_PARENT, dp(44), 0, 14));
+        }
+
         col.addView(text(eyebrow, 11, BLUE, true));
         col.addView(text(title, 28, TEXT, true), lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 4, 0));
-        TextView sync = text("Google Drive • PROJECT_CONTROL_BOARD", 11, MUTED, false);
-        col.addView(sync, lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 4, 18));
+        TextView sync = text("נתוני Control Tower • קריאה חיה מהלוח", 11, MUTED, false);
+        col.addView(sync, lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 4, 16));
         scroll.addView(col);
         return scroll;
     }
@@ -351,7 +378,7 @@ public class MainActivity extends Activity {
     // ---------- עכשיו ----------
 
     private void showHome() {
-        ScrollView s = screen("CONTROL TOWER", "בוקר טוב, אריאל");
+        ScrollView s = screen("CONTROL TOWER", "תמונת מצב");
         contentHost.addView(s);
         LinearLayout c = column(s);
         View load = loading();
@@ -363,49 +390,77 @@ public class MainActivity extends Activity {
     }
 
     private void renderHome(LinearLayout c, JSONArray arr) {
-        JSONObject need = null;
-        JSONObject userTest = null;
-        int red = 0, yellow = 0, green = 0;
+        int red = 0, yellow = 0, green = 0, urgent = 0;
         for (int i = 0; i < arr.length(); i++) {
             JSONObject p = arr.optJSONObject(i);
             if (p == null) continue;
             String rag = p.optString("rag", "YELLOW");
-            if ("RED".equals(rag)) red++; else if ("GREEN".equals(rag)) green++; else yellow++;
-            if (need == null && p.optBoolean("needs_ariel", false)) need = p;
-            if (userTest == null && p.optBoolean("user_test_required", false)) userTest = p;
+            if ("RED".equals(rag)) red++;
+            else if ("GREEN".equals(rag)) green++;
+            else yellow++;
+            if (isUrgent(p)) urgent++;
         }
 
-        LinearLayout needCard = card();
-        needCard.setBackground(box(Color.rgb(15, 29, 48), Color.rgb(53, 104, 159), 12));
-        needCard.addView(text("מה צריך ממך עכשיו", 14, BLUE, true));
-        if (need == null && userTest == null) {
-            needCard.addView(text("אין כרגע החלטה שעוצרת עבודה", 16, TEXT, true), lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 10, 0));
-        } else {
-            JSONObject top = need != null ? need : userTest;
-            String prompt = need != null
-                    ? top.optString("ariel_input", "נדרשת פעולה שלך")
-                    : "🧪 מחכה לאריאל — בדיקת משתמש";
-            if (prompt.isEmpty()) prompt = "נדרשת פעולה שלך";
-            needCard.addView(text(top.optString("name"), 18, TEXT, true), lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 10, 0));
-            needCard.addView(text(prompt, 14, MUTED, false), lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 7, 0));
-            needCard.setOnClickListener(v -> showProjectDialog(top));
-        }
-        c.addView(needCard, lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 8, 12));
-
-        c.addView(section("המיקוד עכשיו"));
-        for (int i = 0; i < Math.min(3, arr.length()); i++) {
-            JSONObject p = arr.optJSONObject(i);
-            if (p != null) addProjectCard(c, p, true);
-        }
-
-        c.addView(section("מצב הפורטפוליו"));
+        // Portfolio state comes first: Ariel should understand the situation before reading details.
+        LinearLayout summary = card();
+        summary.setBackground(box(SURFACE, Color.rgb(196, 207, 221), 14));
+        summary.addView(text(arr.length() + " פרויקטים פעילים", 20, TEXT, true));
+        summary.addView(text(urgent > 0 ? urgent + " דורשים תשומת לב" : "אין כרגע פרויקט שדורש פעולה מיידית", 14,
+                urgent > 0 ? RED : GREEN, true), lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 6, 10));
         LinearLayout strip = new LinearLayout(this);
         strip.setOrientation(LinearLayout.HORIZONTAL);
-        strip.setBackground(box(SURFACE, BORDER, 12));
+        strip.setBackground(box(Color.rgb(248, 250, 252), BORDER, 12));
         addCount(strip, "אדום", red, RED);
         addCount(strip, "צהוב", yellow, YELLOW);
         addCount(strip, "ירוק", green, GREEN);
-        c.addView(strip, lp(ViewGroup.LayoutParams.MATCH_PARENT, dp(76), 0, 8));
+        summary.addView(strip, lp(ViewGroup.LayoutParams.MATCH_PARENT, dp(72), 0, 0));
+        c.addView(summary, lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 4, 16));
+
+        c.addView(section("דורש תשומת לב"));
+        boolean anyUrgent = false;
+        for (int i = 0; i < arr.length(); i++) {
+            JSONObject p = arr.optJSONObject(i);
+            if (p != null && isUrgent(p)) {
+                anyUrgent = true;
+                addProjectCard(c, p, false);
+            }
+        }
+        if (!anyUrgent) {
+            LinearLayout ok = card();
+            ok.addView(text("✓ אין כרגע חסם או החלטה שמחכים לך", 14, GREEN, true));
+            c.addView(ok, lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 0, 10));
+        }
+
+        c.addView(section("שאר הפרויקטים"));
+        boolean anyNormal = false;
+        for (int i = 0; i < arr.length(); i++) {
+            JSONObject p = arr.optJSONObject(i);
+            if (p != null && !isUrgent(p)) {
+                anyNormal = true;
+                addProjectCard(c, p, false);
+            }
+        }
+        if (!anyNormal) {
+            c.addView(text("כל הפרויקטים כרגע נמצאים באזור תשומת הלב.", 13, MUTED, false));
+        }
+    }
+
+    private boolean isUrgent(JSONObject p) {
+        return "RED".equals(p.optString("rag"))
+                || p.optBoolean("needs_ariel", false)
+                || p.optBoolean("user_test_required", false);
+    }
+
+    private String ragHe(String rag) {
+        if ("RED".equals(rag)) return "אדום";
+        if ("GREEN".equals(rag)) return "ירוק";
+        return "צהוב";
+    }
+
+    private String shortText(String value, int max) {
+        String v = value == null ? "" : value.trim();
+        if (v.length() <= max) return v;
+        return v.substring(0, Math.max(0, max - 1)).trim() + "…";
     }
 
     private void addCount(LinearLayout strip, String label, int count, int color) {
@@ -420,25 +475,47 @@ public class MainActivity extends Activity {
     }
 
     private void addProjectCard(LinearLayout parent, JSONObject p, boolean compact) {
-        LinearLayout card = card();
+        LinearLayout projectCard = card();
+        String rag = p.optString("rag", "YELLOW");
+        int color = ragColor(rag);
+        if ("RED".equals(rag)) {
+            projectCard.setBackground(box(Color.rgb(255, 247, 247), Color.rgb(231, 181, 181), 13));
+        }
+
         LinearLayout top = new LinearLayout(this);
         top.setOrientation(LinearLayout.HORIZONTAL);
         top.setGravity(Gravity.CENTER_VERTICAL | Gravity.RIGHT);
-        TextView name = text(p.optString("name", "פרויקט"), 17, TEXT, true);
+        TextView name = text(p.optString("name", "פרויקט"), 18, TEXT, true);
         top.addView(name, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-        if (p.optBoolean("user_test_required", false)) {
-            TextView t = badge("🧪", BLUE);
-            LinearLayout.LayoutParams tl = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-            tl.setMarginEnd(dp(6));
-            top.addView(t, tl);
+        top.addView(badge(ragHe(rag), color));
+        projectCard.addView(top);
+
+        String milestone = p.optString("milestone", "");
+        if (milestone.isEmpty()) milestone = p.optString("lifecycle", "");
+        if (!milestone.isEmpty()) {
+            projectCard.addView(text(shortText(milestone, compact ? 110 : 150), 13, TEXT, false),
+                    lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 9, 0));
         }
-        top.addView(badge(p.optString("rag", "YELLOW"), ragColor(p.optString("rag", "YELLOW"))));
-        card.addView(top);
-        String body = compact ? p.optString("next_action", "") : p.optString("milestone", "");
-        if (body.isEmpty()) body = p.optString("lifecycle", "");
-        if (!body.isEmpty()) card.addView(text(body, 13, MUTED, false), lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 9, 0));
-        card.setOnClickListener(v -> showProjectDialog(p));
-        parent.addView(card, lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 0, 8));
+
+        String next = p.optString("next_action", "");
+        if (!next.isEmpty()) {
+            projectCard.addView(text("הבא: " + shortText(next, compact ? 110 : 170), 13, MUTED, false),
+                    lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 7, 0));
+        }
+
+        if (p.optBoolean("user_test_required", false)) {
+            projectCard.addView(text("🧪 מחכה לבדיקה שלך", 13, BLUE, true),
+                    lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 7, 0));
+        } else if (p.optBoolean("needs_ariel", false)) {
+            String ask = p.optString("ariel_input", "");
+            projectCard.addView(text("צריך ממך: " + shortText(ask.isEmpty() ? "החלטה או פעולה" : ask, 150), 13, RED, true),
+                    lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 7, 0));
+        }
+
+        TextView open = text("פתח פרטים  ›", 12, BLUE, true);
+        projectCard.addView(open, lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 10, 0));
+        projectCard.setOnClickListener(v -> showProjectDialog(p));
+        parent.addView(projectCard, lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 0, 9));
     }
 
     // ---------- פרויקטים ----------
@@ -447,7 +524,7 @@ public class MainActivity extends Activity {
         ScrollView s = screen("PORTFOLIO", "פרויקטים");
         contentHost.addView(s);
         LinearLayout c = column(s);
-        TextView hint = text("מקור האמת הוא PROJECT_CONTROL_BOARD ב-Google Drive. כאן מוצגת מראה לקריאה בלבד.", 13, MUTED, false);
+        TextView hint = text("כל הפרויקטים במקום אחד. הקש על פרויקט כדי לראות יעד, חסמים והפעולה הבאה.", 13, MUTED, false);
         c.addView(hint, lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 0, 10));
         View load = loading();
         c.addView(load, lp(ViewGroup.LayoutParams.MATCH_PARENT, dp(80), 0, 0));
