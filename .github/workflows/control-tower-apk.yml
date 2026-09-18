@@ -64,8 +64,9 @@ jobs:
             echo "configured=false" >> "$GITHUB_OUTPUT"; echo "Gateway: CT_GATEWAY_URL/CT_GATEWAY_TOKEN not set — app will show its setup screen"
           fi
 
-      # Firebase client config is an external secret, never committed. Absent -> app builds with push "not configured".
-      - name: Materialise google-services.json (if secret is set)
+      # Firebase Android client config contains non-secret app/project identifiers.
+      # A repository secret may override the tracked config, but autonomous CI works with the tracked file.
+      - name: Prepare Firebase client configuration
         id: firebase
         shell: bash
         env:
@@ -74,10 +75,13 @@ jobs:
           if [ -n "$GOOGLE_SERVICES_JSON" ]; then
             printf '%s' "$GOOGLE_SERVICES_JSON" > control-tower-android/app/google-services.json
             echo "configured=true" >> "$GITHUB_OUTPUT"
-            echo "Firebase: google-services.json materialised from secret"
+            echo "Firebase: google-services.json materialised from repository secret"
+          elif [ -s control-tower-android/app/google-services.json ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+            echo "Firebase: using tracked Android client configuration"
           else
             echo "configured=false" >> "$GITHUB_OUTPUT"
-            echo "Firebase: GOOGLE_SERVICES_JSON secret not set — building without push configuration"
+            echo "Firebase: no Android client configuration found"
           fi
 
       - name: Build debug APK
