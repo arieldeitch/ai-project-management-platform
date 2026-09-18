@@ -2,7 +2,7 @@
 // app can be reviewed on an emulator without the real token. FIXTURE DATA ONLY — never portfolio truth.
 //
 //   node control-tower-android/tools/review-gateway.mjs
-//   CT_REVIEW_GATEWAY_URL=http://10.0.2.2:8787/exec CT_GATEWAY_TOKEN=review-token-0123456789abcdef0123456789 gradle :app:assembleDebug
+//   CT_REVIEW_GATEWAY_URL=http://10.0.2.2:8787/exec CT_GATEWAY_TOKEN=<any 32+ character review string> gradle :app:assembleDebug
 import { createServer } from 'node:http';
 
 const PORT = Number(process.env.PORT || 8787);
