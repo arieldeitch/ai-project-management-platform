@@ -5,8 +5,8 @@ local.properties
 *.iml
 .idea/
 
-# Never commit Firebase / signing material
-app/google-services.json
-google-services.json
+# Firebase Android client config is tracked intentionally.
+# Firebase documents google-services.json as containing non-secret app/project identifiers.
+# NEVER commit Firebase service-account JSON / private keys.
 *.jks
 *.keystore
