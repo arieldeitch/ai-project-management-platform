@@ -47,3 +47,8 @@ from a stale fixture is ever presented as live truth.
   scope — recorded here so it is not forgotten.
 - No "OS Project Registry" artefact exists to reconcile against; if one is created, it should be derived from
   the board, not the other way round.
+
+
+## Re-check 2026-09-18 (0.7.0 hardening run)
+
+Facts unchanged. Gateway `role=infrastructure` and the six-name acceptance fixture are re-verified by the 0.7.0 test suites (gateway 12, Android 15). The Chief of Staff fixture discrepancy remains a Chief-of-Staff-repo follow-up; runtime renders live rows only.
