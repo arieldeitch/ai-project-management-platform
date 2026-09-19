@@ -209,3 +209,25 @@ Engineering GREEN only when:
 - docs/run reports/commits are pushed.
 
 Product remains USER TEST REQUIRED until Ariel validates the new phone build(s).
+
+
+## Phase 10 — OS-alignment rollout across all managed apps/projects
+
+Ariel explicitly authorized this run to make the connected portfolio consistently managed through Control Tower, not only to change Control Tower and Chief of Staff.
+
+After the Control Tower + Chief of Staff contract is stable, perform a bounded rollout across every active project currently registered in PROJECT_CONTROL_BOARD (currently P-001..P-006), using each project's actual source-of-truth/access path.
+
+For each project:
+1. identify its canonical repo/Drive source from ActivitySources / Projects / existing mappings;
+2. inspect whether its run-start instructions already require checking the canonical AI OS and leaving an OS Access Receipt/equivalent evidence;
+3. if a repository is directly writable with existing credentials, add the smallest repo-local pointer/instruction needed so the execution agent checks OS at substantial run start and emits evidence; do not copy/fork the OS itself;
+4. do not change product code merely to satisfy governance unless the project itself needs an in-app integration;
+5. if the source is Drive-only or not writable from this environment, generate the exact migration/handoff artifact and leave the portfolio state truthfully UNKNOWN/NEVER_SEEN/ACCESS_FAILED as appropriate;
+6. never mark CURRENT without evidence from the project after the rule is actually consumed;
+7. preserve each project's product/architecture/permission boundaries;
+8. commit/push each repo separately and sequentially; never create concurrent same-repo work.
+
+Produce a rollout matrix:
+project_id | project | canonical source | OS check mechanism | evidence path | alignment after run | exact next action.
+
+The goal is not to force all rows green artificially; it is to make every active app observable and governed so Control Tower can tell Ariel which apps are aligned and which still require one future project run to acknowledge the current OS.
