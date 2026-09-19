@@ -23,15 +23,18 @@ var DEVICES_SHEET = 'MobileDevices';
 var PUSH_STATE_SHEET = 'MobilePushState';
 var ACTIVITY_SOURCES_SHEET = 'ActivitySources';
 var ACTIVITY_LEDGER_SHEET = 'ActivityLedger';
+var IDEAS_SHEET = 'Ideas';
 
 var INBOX_HEADERS = ['received_at', 'source', 'status', 'evidence_level', 'report_text', 'project_hint', 'device_id', 'app_version', 'processed_at', 'notes'];
 var DEVICES_HEADERS = ['token', 'device_id', 'device_label', 'platform', 'app_version', 'registered_at', 'last_seen_at', 'active'];
 var PUSH_STATE_HEADERS = ['project_key', 'last_rag', 'last_needs_ariel', 'last_lifecycle', 'last_event', 'last_event_at', 'updated_at'];
 var ACTIVITY_SOURCE_HEADERS = ['project_id', 'project_name', 'source_type', 'locator', 'branch', 'include_automation', 'enabled', 'last_poll_at', 'last_seen_at', 'notes'];
 var ACTIVITY_LEDGER_HEADERS = ['event_id', 'occurred_at', 'observed_at', 'project_id', 'project_name', 'source_type', 'source_locator', 'activity_type', 'summary', 'evidence_url', 'evidence_level', 'metadata_json'];
+var IDEA_HEADERS = ['idea_id', 'created_at', 'updated_at', 'title', 'stage', 'need', 'target_user', 'desired_outcome', 'core_functionality', 'usage_frequency', 'urgency', 'surface', 'automation_level', 'data_needed', 'success_metric', 'constraints', 'next_step', 'notes'];
 
 var MAX_BODY_BYTES = 64 * 1024;
 var MAX_REPORT_CHARS = 20000;
+var MAX_IDEA_TEXT = 4000;
 
 // Firebase project id is derived from the service-account JSON (project_id); never client-supplied.
 var FCM_CHANNEL_ID = 'control_tower_alerts';
@@ -104,7 +107,7 @@ function isFcmConfigured_() {
 var INFRASTRUCTURE_NAME_PATTERNS = [/control\s*tower/i, /מגדל\s*הפיקוח/];
 
 // Contract version reported by health/portfolio so clients can detect a stale deployment.
-var GATEWAY_CONTRACT_VERSION = 3;
+var GATEWAY_CONTRACT_VERSION = 4;
 
 
 /* ===== Portfolio.gs ===== */
@@ -855,6 +858,90 @@ function listInbox_(limit) {
 }
 
 
+/* ===== Ideas.gs ===== */
+
+/**
+ * Ideas is the canonical idea incubator for Control Tower.
+ * An idea stays here until it is promoted deliberately; it never becomes a project by accident.
+ */
+var IDEA_STAGES = ['INBOX', 'CLARIFY', 'SHAPE', 'VALIDATE', 'READY', 'PARKED', 'PROMOTED', 'ARCHIVED'];
+var IDEA_ENUMS = {
+  usage_frequency: ['ONE_OFF', 'OCCASIONAL', 'WEEKLY', 'DAILY'],
+  urgency: ['LOW', 'MEDIUM', 'HIGH'],
+  surface: ['MOBILE', 'WEB', 'AUTOMATION', 'AGENT', 'PROCESS', 'UNDECIDED'],
+  automation_level: ['MANUAL', 'ASSISTED', 'AUTOMATIC', 'UNDECIDED']
+};
+
+function ideaValue_(p, key, max) { return str_(p[key], max || MAX_IDEA_TEXT).trim(); }
+function ideaEnum_(p, key, allowed, fallback) {
+  var value = ideaValue_(p, key, 40).toUpperCase();
+  return allowed.indexOf(value) >= 0 ? value : fallback;
+}
+function ideaId_() { return 'IDEA-' + Utilities.getUuid().slice(0, 8).toUpperCase(); }
+
+function createIdea_(p) {
+  var title = ideaValue_(p, 'title', 180);
+  if (!title) throw new Error('title is required');
+  var now = nowIso_();
+  var row = {
+    idea_id: ideaId_(), created_at: now, updated_at: now, title: title,
+    stage: ideaEnum_(p, 'stage', IDEA_STAGES, 'INBOX'),
+    need: ideaValue_(p, 'need'), target_user: ideaValue_(p, 'target_user', 200),
+    desired_outcome: ideaValue_(p, 'desired_outcome'), core_functionality: ideaValue_(p, 'core_functionality'),
+    usage_frequency: ideaEnum_(p, 'usage_frequency', IDEA_ENUMS.usage_frequency, 'OCCASIONAL'),
+    urgency: ideaEnum_(p, 'urgency', IDEA_ENUMS.urgency, 'MEDIUM'),
+    surface: ideaEnum_(p, 'surface', IDEA_ENUMS.surface, 'UNDECIDED'),
+    automation_level: ideaEnum_(p, 'automation_level', IDEA_ENUMS.automation_level, 'UNDECIDED'),
+    data_needed: ideaValue_(p, 'data_needed'), success_metric: ideaValue_(p, 'success_metric'),
+    constraints: ideaValue_(p, 'constraints'), next_step: ideaValue_(p, 'next_step'), notes: ideaValue_(p, 'notes')
+  };
+  var sheet = ensureSheet_(IDEAS_SHEET, IDEA_HEADERS);
+  sheet.appendRow(IDEA_HEADERS.map(function (h) { return row[h] || ''; }));
+  return { item: row, row: sheet.getLastRow() };
+}
+
+function listIdeas_(limit) {
+  var sheet = ensureSheet_(IDEAS_SHEET, IDEA_HEADERS);
+  if (sheet.getLastRow() < 2) return [];
+  var values = sheet.getRange(2, 1, sheet.getLastRow() - 1, IDEA_HEADERS.length).getValues();
+  var items = values.map(function (row) {
+    var out = {};
+    IDEA_HEADERS.forEach(function (h, i) { out[h] = h.indexOf('_at') > 0 ? cellIso_(row[i]) : str_(row[i], MAX_IDEA_TEXT); });
+    out.maturity_score = ideaMaturity_(out);
+    return out;
+  }).filter(function (x) { return x.idea_id && x.title && x.stage !== 'ARCHIVED'; });
+  items.sort(function (a, b) { return String(b.updated_at).localeCompare(String(a.updated_at)); });
+  return items.slice(0, limit);
+}
+
+function ideaMaturity_(x) {
+  var keys = ['need', 'target_user', 'desired_outcome', 'core_functionality', 'usage_frequency', 'urgency', 'surface', 'automation_level', 'success_metric', 'next_step'];
+  var filled = keys.filter(function (k) { return x[k] && x[k] !== 'UNDECIDED'; }).length;
+  return Math.round(filled * 100 / keys.length);
+}
+
+function updateIdea_(p) {
+  var id = ideaValue_(p, 'idea_id', 40);
+  if (!id) throw new Error('idea_id is required');
+  var sheet = ensureSheet_(IDEAS_SHEET, IDEA_HEADERS);
+  if (sheet.getLastRow() < 2) throw new Error('idea not found');
+  var values = sheet.getRange(2, 1, sheet.getLastRow() - 1, IDEA_HEADERS.length).getValues();
+  var rowIndex = -1;
+  for (var i = 0; i < values.length; i++) if (String(values[i][0]) === id) { rowIndex = i + 2; break; }
+  if (rowIndex < 0) throw new Error('idea not found');
+  var editable = ['title', 'need', 'target_user', 'desired_outcome', 'core_functionality', 'data_needed', 'success_metric', 'constraints', 'next_step', 'notes'];
+  editable.forEach(function (key) {
+    if (Object.prototype.hasOwnProperty.call(p, key)) sheet.getRange(rowIndex, IDEA_HEADERS.indexOf(key) + 1).setValue(ideaValue_(p, key, key === 'title' ? 180 : MAX_IDEA_TEXT));
+  });
+  Object.keys(IDEA_ENUMS).forEach(function (key) {
+    if (Object.prototype.hasOwnProperty.call(p, key)) sheet.getRange(rowIndex, IDEA_HEADERS.indexOf(key) + 1).setValue(ideaEnum_(p, key, IDEA_ENUMS[key], 'UNDECIDED'));
+  });
+  if (Object.prototype.hasOwnProperty.call(p, 'stage')) sheet.getRange(rowIndex, IDEA_HEADERS.indexOf('stage') + 1).setValue(ideaEnum_(p, 'stage', IDEA_STAGES, 'INBOX'));
+  sheet.getRange(rowIndex, IDEA_HEADERS.indexOf('updated_at') + 1).setValue(nowIso_());
+  return { idea_id: id, updated_at: nowIso_() };
+}
+
+
 /* ===== Devices.gs ===== */
 
 /**
@@ -1221,7 +1308,7 @@ function debugTestPush() {
  *   GITHUB_READ_TOKEN          optional  — raises GitHub API quota / enables intentionally configured private repos. Never required for public repos.
  */
 
-var GATEWAY_VERSION = '0.8.0';
+var GATEWAY_VERSION = '0.9.0';
 
 var ACTIONS = {
   health: function () { return healthReport_(); },
@@ -1234,6 +1321,9 @@ var ACTIONS = {
   activity: function (p) { return { items: listPushEvents_(clampInt_(p.limit, 1, 100, 30)) }; },
   project_activity: function (p) { return { items: listProjectActivity_(clampInt_(p.limit, 1, 200, 50), str_(p.project_id, 80)) }; },
   activity_heartbeat: function (p) { return recordActivityHeartbeat_(p); }
+  ,ideas: function (p) { return { items: listIdeas_(clampInt_(p.limit, 1, 200, 100)) }; }
+  ,create_idea: function (p) { return createIdea_(p); }
+  ,update_idea: function (p) { return updateIdea_(p); }
 };
 
 function doPost(e) {
@@ -1335,7 +1425,7 @@ function healthReport_() {
     spreadsheet_title: ss.getName(),
     tabs: tabs,
     projects_rows: Math.max(0, ss.getSheetByName(PROJECTS_SHEET) ? ss.getSheetByName(PROJECTS_SHEET).getLastRow() - 1 : 0),
-    mobile_tabs_ready: [INBOX_SHEET, DEVICES_SHEET, PUSH_STATE_SHEET, ACTIVITY_SOURCES_SHEET, ACTIVITY_LEDGER_SHEET].every(function (n) { return tabs.indexOf(n) >= 0; }),
+    mobile_tabs_ready: [INBOX_SHEET, DEVICES_SHEET, PUSH_STATE_SHEET, ACTIVITY_SOURCES_SHEET, ACTIVITY_LEDGER_SHEET, IDEAS_SHEET].every(function (n) { return tabs.indexOf(n) >= 0; }),
     resolved_columns: resolved,
     unresolved_columns: missing,
     active_devices: countActiveDevices_(),
