@@ -512,6 +512,27 @@ function githubCommitEvent_(source, commit) {
   };
 }
 
+function pollDriveFileSource_(source, seen) {
+  var file = DriveApp.getFileById(source.locator);
+  var updated = file.getLastUpdated();
+  if (!updated || isNaN(updated.getTime())) return { inserted: 0, latest: '', errors: ['no_modified_time'] };
+  var iso = updated.toISOString();
+  var event = {
+    event_id: 'drive_file:' + source.locator + ':' + iso,
+    occurred_at: iso,
+    project_id: source.project_id,
+    project_name: source.project_name,
+    source_type: 'drive_file',
+    source_locator: source.locator,
+    activity_type: 'report',
+    summary: 'עודכן המקור הקנוני ב-Drive: ' + file.getName(),
+    evidence_url: file.getUrl(),
+    evidence_level: 'OBSERVED',
+    metadata_json: JSON.stringify({ name: file.getName() })
+  };
+  return { inserted: appendActivityEvent_(event, seen) ? 1 : 0, latest: iso, errors: [] };
+}
+
 function githubPrEvent_(source, pr) {
   if (!pr || !pr.number || !pr.updated_at) return null;
   var parsed = parseCellDate_(pr.updated_at);
@@ -579,6 +600,7 @@ function pollActivitySources_() {
     var result = { inserted: 0, latest: '', errors: [] };
     try {
       if (source.source_type === 'github_repo') result = pollGithubSource_(source, seen);
+      else if (source.source_type === 'drive_file') result = pollDriveFileSource_(source, seen);
       else result.errors.push('unsupported:' + source.source_type);
     } catch (err) {
       result.errors.push(String(err && err.message ? err.message : err));
