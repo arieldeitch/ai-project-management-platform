@@ -28,6 +28,20 @@ public final class Project {
     public final String lastProgressRaw;      // original text when the sheet cell was not a date
     public final long lastControlCheckMillis; // -1 when absent
     public final String lastControlCheckRaw;
+
+    // Contract v3 observability. Latest observed activity may be automation; meaningful activity never is.
+    public final long latestActivityMillis;
+    public final String latestActivityType;
+    public final String latestActivitySource;
+    public final String latestActivitySummary;
+    public final String latestActivityEvidenceUrl;
+    public final long latestMeaningfulActivityMillis;
+    public final String latestMeaningfulActivityType;
+    public final String latestMeaningfulActivitySource;
+    public final String latestMeaningfulActivitySummary;
+    public final String latestMeaningfulActivityEvidenceUrl;
+
+    /** Freshness is based on meaningful progress, never on repetitive automation. */
     public final Freshness freshness;
 
     private Project(JSONObject o, long now) {
@@ -64,7 +78,22 @@ public final class Project {
         if (check <= 0 && !lastControlCheckRaw.isEmpty()) check = TimeText.parse(lastControlCheckRaw);
         lastControlCheckMillis = check;
 
-        freshness = Freshness.of(lastProgressMillis, expectedCadence, now);
+        // v3: live activity observer. v1/v2 fall back honestly to curated board progress.
+        long observed = TimeText.parse(o.optString("latest_activity_at", ""));
+        latestActivityMillis = observed > 0 ? observed : lastProgressMillis;
+        latestActivityType = o.optString("latest_activity_type", lastProgressMillis > 0 ? "progress" : "");
+        latestActivitySource = o.optString("latest_activity_source", lastProgressMillis > 0 ? "project_board" : "");
+        latestActivitySummary = o.optString("latest_activity_summary", lastProgressMillis > 0 ? progressEvidence : "");
+        latestActivityEvidenceUrl = o.optString("latest_activity_evidence_url", lastProgressMillis > 0 ? link : "");
+
+        long meaningful = TimeText.parse(o.optString("latest_meaningful_activity_at", ""));
+        latestMeaningfulActivityMillis = meaningful > 0 ? meaningful : lastProgressMillis;
+        latestMeaningfulActivityType = o.optString("latest_meaningful_activity_type", lastProgressMillis > 0 ? "progress" : "");
+        latestMeaningfulActivitySource = o.optString("latest_meaningful_activity_source", lastProgressMillis > 0 ? "project_board" : "");
+        latestMeaningfulActivitySummary = o.optString("latest_meaningful_activity_summary", lastProgressMillis > 0 ? progressEvidence : "");
+        latestMeaningfulActivityEvidenceUrl = o.optString("latest_meaningful_activity_evidence_url", lastProgressMillis > 0 ? link : "");
+
+        freshness = Freshness.of(latestMeaningfulActivityMillis, expectedCadence, now);
     }
 
     public static Project from(JSONObject o, long now) {
@@ -75,6 +104,7 @@ public final class Project {
     public boolean isRed() { return "RED".equalsIgnoreCase(rag); }
     public boolean isGreen() { return "GREEN".equalsIgnoreCase(rag); }
     public boolean isStale() { return freshness.isStale(); }
+    public boolean latestActivityIsAutomation() { return "automation".equalsIgnoreCase(latestActivityType); }
 
     /** Actionable for Ariel right now: needs him, waiting for his test, or red. */
     public boolean needsAttention() { return needsAriel || userTestRequired || isRed(); }
