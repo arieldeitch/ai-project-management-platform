@@ -16,8 +16,10 @@ PROJECT_CONTROL_BOARD Sheet → Apps Script gateway (contract v2) → Android ·
 - Home: "הכי עדכני: <project> · time", split counts for "בלי חותמת פעילות" vs "בלי קצב צפוי מוגדר"; scroll position kept on refresh; no refetch within 45 s of a fresh snapshot (explicit refresh forces); FCM registration throttled to 24 h; long evidence collapsible in detail; TalkBack labels on nav/refresh; 44 dp link buttons.
 - Gateway 0.7.0: Connections mapping fixed for the real headers (Platform / Verification Status / Evidence / Connector); every reply carries `contract_version`/`gateway_version` so `verify-deployment.mjs` can check the deployment without the token.
 
-## Gateway deployment state (VERIFIED 2026-09-18 16:40 IDT, token-free probe)
-The deployed Web App is still **contract v1**. The app works against it, but shows "אין חותמת פעילות עדכנית" for every project until the one manual redeploy in `GATEWAY_DEPLOY_RUNBOOK.md` is done (≈3 min, same URL/token).
+## Gateway deployment state (VERIFIED 2026-09-19 ~08:45 IDT, token-free probe)
+Repo gateway: **0.9.0 / contract 4** (`56a0be3`) — live activity pipeline: ActivitySources → heartbeat/GitHub/Drive → ActivityLedger → effective `last_meaningful_progress` (evidence priority heartbeat › run report › GitHub › Drive › curated; Last Control Check never; automation only where `include_automation=TRUE`), validated `activity_heartbeat`, scan health fields.
+Deployed Web App: still **0.7.0 / contract 2** → the phone's time wall still follows the curated cell until the one redeploy in `GATEWAY_DEPLOY_RUNBOOK.md`. **No app update is needed for the fix** (0.7.0 reads `last_meaningful_progress`). Four of five GitHub sources are private → `GITHUB_READ_TOKEN` Script Property required for them (`health.activity_github_token_configured`).
+Optional newer app: `ControlTower-0.9.0-release` (run 35424223931, artifact 10578401736, SHA-256 `4304f483…998a0`, same signing cert) installs over 0.7.0 and adds live source labels + the idea incubator.
 
 ## Push state
 Client: FCM token obtained on the emulator with the tracked `google-services.json` and registered through the gateway (VERIFIED). Server: `FCM_SERVICE_ACCOUNT_JSON` is not set in Script Properties (no authenticated Firebase tooling on the build machine; not created here by design) → sending is NOT VERIFIED. Push gate stays not-GREEN until a physical device receives a push.
