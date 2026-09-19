@@ -1,4 +1,4 @@
-// UX-review fixture gateway. Emulates the Apps Script contract (v2) on http://localhost:8787/exec so the
+// UX-review fixture gateway. Emulates the Apps Script contract (v3) on http://localhost:8787/exec so the
 // app can be reviewed on an emulator without the real token. FIXTURE DATA ONLY — never portfolio truth.
 //
 //   node control-tower-android/tools/review-gateway.mjs
@@ -41,7 +41,27 @@ const projects = [
     objective: 'תקציר יומי מסונן', milestone: 'תקציר בוקר יציב',
     progress_evidence: '', next_action: 'להוסיף מקור חדשות אחד', blocker: '', needs_ariel: false, ariel_input: '', risk: '',
     last_meaningful_progress: '', last_meaningful_progress_raw: 'ongoing', last_control_check: iso(3 * H), expected_cadence: '', link: '' },
-].map((p) => ({ role: 'project', key: p.name.toLowerCase(), last_check: p.last_control_check, user_test_required: /user test/i.test(p.lifecycle), last_meaningful_progress_raw: '', last_control_check_raw: '', ...p }));
+].map((p) => {
+  const meaningful = p.last_meaningful_progress || '';
+  const isNews = p.id === 'P-003';
+  return {
+    role: 'project',
+    key: p.name.toLowerCase(),
+    last_check: p.last_control_check,
+    user_test_required: /user test/i.test(p.lifecycle),
+    last_meaningful_progress_raw: '',
+    last_control_check_raw: '',
+    ...p,
+    latest_activity_at: isNews ? iso(5 * 60_000) : meaningful,
+    latest_activity_type: isNews ? 'automation' : (meaningful ? 'progress' : ''),
+    latest_activity_source: isNews ? 'github_event' : (meaningful ? 'project_board' : ''),
+    latest_activity_summary: isNews ? 'refresh feed snapshot' : (p.progress_evidence || ''),
+    latest_meaningful_activity_at: isNews ? iso(2 * H) : meaningful,
+    latest_meaningful_activity_type: isNews ? 'progress' : (meaningful ? 'progress' : ''),
+    latest_meaningful_activity_source: isNews ? 'github_event' : (meaningful ? 'project_board' : ''),
+    latest_meaningful_activity_summary: isNews ? 'source-quality hardening' : (p.progress_evidence || ''),
+  };
+});
 
 const inbox = [
   { received_at: iso(20 * 60_000), source: 'share', status: 'REPORTED', evidence_level: 'REPORTED', report_text: 'EXTERNAL_PROJECT_REPORT_V1\nTom AI Learning: גרסה 1.2 נבנתה, ממתינה לבדיקה בטלפון.', project_hint: '', processed_at: '', notes: '' },
@@ -53,8 +73,8 @@ const activity = [
 ];
 
 const handlers = {
-  health: () => ({ spreadsheet_title: 'PROJECT_CONTROL_BOARD (fixture)', tabs: ['Projects', 'Connections', 'MobileInbox', 'MobileDevices', 'MobilePushState'], projects_rows: 6, mobile_tabs_ready: true, resolved_columns: {}, unresolved_columns: [], active_devices: 1, fcm_configured: true, scanner_trigger_installed: true, contract_version: 2, server_time: new Date().toISOString() }),
-  portfolio: () => ({ projects, snapshot_at: new Date().toISOString(), contract_version: 2 }),
+  health: () => ({ spreadsheet_title: 'PROJECT_CONTROL_BOARD (fixture)', tabs: ['Projects', 'Connections', 'MobileInbox', 'MobileDevices', 'MobilePushState', 'ActivitySources', 'ActivityLedger'], projects_rows: 6, mobile_tabs_ready: true, resolved_columns: {}, unresolved_columns: [], active_devices: 1, fcm_configured: true, scanner_trigger_installed: true, activity: { sources_enabled: 6, ledger_events: 12, latest_observed_activity: iso(5 * 60_000) }, contract_version: 3, server_time: new Date().toISOString() }),
+  portfolio: () => ({ projects, snapshot_at: new Date().toISOString(), contract_version: 3 }),
   inbox: () => ({ items: inbox }),
   submit_report: (b) => { inbox.unshift({ received_at: new Date().toISOString(), source: b.source || 'manual', status: 'REPORTED', evidence_level: 'REPORTED', report_text: b.report_text || '', project_hint: '', processed_at: '', notes: '' }); return { received_at: new Date().toISOString(), status: 'REPORTED', row: inbox.length + 1 }; },
   register_device: () => ({ registered: true, row: 2, active_devices: 1 }),
@@ -73,7 +93,7 @@ createServer((req, res) => {
     const h = handlers[action];
     const payload = req.method !== 'POST' ? { ok: false, error: 'post_only', status: 405 }
       : !h ? { ok: false, error: 'unknown_action', status: 400 }
-      : { ...h(body), ok: true, action, gateway_version: '0.6.0-fixture', contract_version: 2, status: 200 };
+      : { ...h(body), ok: true, action, gateway_version: '0.8.0-fixture', contract_version: 3, status: 200 };
     console.log(new Date().toISOString(), req.method, action ?? '-', payload.status);
     res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
     res.end(JSON.stringify(payload));
