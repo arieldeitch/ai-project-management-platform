@@ -206,34 +206,83 @@ function githubPrEvent_(source, pr) {
   };
 }
 
+function githubRepoEvent_(source, event) {
+  if (!event || !event.id || !event.created_at) return null;
+  var parsed = parseCellDate_(event.created_at);
+  if (!parsed.iso) return null;
+  var payload = event.payload || {};
+  var actor = event.actor && event.actor.login ? String(event.actor.login) : '';
+  var type = String(event.type || '');
+  var summary = '';
+  var evidenceUrl = 'https://github.com/' + source.locator;
+  var activityType = 'progress';
+  var metadata = { event_id: event.id, github_type: type, actor: actor };
+
+  if (type === 'PushEvent') {
+    var commits = Array.isArray(payload.commits) ? payload.commits : [];
+    var last = commits.length ? commits[commits.length - 1] : null;
+    var message = last && last.message ? String(last.message).split('\n')[0] : '';
+    var sha = last && last.sha ? last.sha : (payload.head || '');
+    var synthetic = {
+      author: { login: actor },
+      committer: { login: actor },
+      commit: { message: message }
+    };
+    activityType = isAutomationCommit_(synthetic) ? 'automation' : 'progress';
+    summary = message || ('Git push · ' + String(payload.ref || '').replace('refs/heads/', ''));
+    if (sha) evidenceUrl = 'https://github.com/' + source.locator + '/commit/' + sha;
+    metadata.ref = payload.ref || '';
+    metadata.sha = sha || '';
+  } else if (type === 'PullRequestEvent') {
+    var pr = payload.pull_request || {};
+    var action = String(payload.action || 'updated');
+    summary = 'PR #' + (pr.number || payload.number || '') + ' · ' + action + ': ' + str_(pr.title, 500);
+    evidenceUrl = pr.html_url || ('https://github.com/' + source.locator + '/pull/' + (pr.number || payload.number || ''));
+    metadata.number = pr.number || payload.number || '';
+    metadata.action = action;
+  } else if (type === 'PullRequestReviewEvent' || type === 'PullRequestReviewCommentEvent') {
+    var reviewPr = payload.pull_request || {};
+    summary = 'PR #' + (reviewPr.number || '') + ' · review: ' + str_(reviewPr.title, 500);
+    evidenceUrl = reviewPr.html_url || evidenceUrl;
+    activityType = 'checkpoint';
+    metadata.number = reviewPr.number || '';
+  } else {
+    return null;
+  }
+
+  return {
+    event_id: 'github_event:' + source.locator + ':' + event.id,
+    occurred_at: parsed.iso,
+    project_id: source.project_id,
+    project_name: source.project_name,
+    source_type: 'github_event',
+    source_locator: source.locator,
+    activity_type: activityType,
+    summary: summary,
+    evidence_url: evidenceUrl,
+    evidence_level: 'OBSERVED',
+    metadata_json: JSON.stringify(metadata)
+  };
+}
+
+/**
+ * Efficient repo observer: one Events API call per repository, every scanner run.
+ * This catches pushes on PR branches as well as PR/review events, avoiding a main-branch-only blind spot.
+ */
 function pollGithubSource_(source, seen) {
-  var base = 'https://api.github.com/repos/' + source.locator;
-  var branch = encodeURIComponent(source.branch || 'main');
-  var commitRes = githubJson_(base + '/commits?per_page=1&sha=' + branch);
-  var prRes = githubJson_(base + '/pulls?state=all&sort=updated&direction=desc&per_page=1');
+  var res = githubJson_('https://api.github.com/repos/' + source.locator + '/events?per_page=15');
+  if (!res.ok) return { inserted: 0, latest: '', errors: ['events:' + res.status] };
+  if (!Array.isArray(res.body)) return { inserted: 0, latest: '', errors: ['events:invalid_body'] };
   var inserted = 0;
   var latest = '';
-  var errors = [];
-
-  if (commitRes.ok && Array.isArray(commitRes.body) && commitRes.body.length) {
-    var ce = githubCommitEvent_(source, commitRes.body[0]);
-    if (ce) {
-      if (source.include_automation || ce.activity_type !== 'automation') {
-        if (appendActivityEvent_(ce, seen)) inserted++;
-      }
-      if (!latest || ce.occurred_at > latest) latest = ce.occurred_at;
-    }
-  } else if (!commitRes.ok) errors.push('commit:' + commitRes.status);
-
-  if (prRes.ok && Array.isArray(prRes.body) && prRes.body.length) {
-    var pe = githubPrEvent_(source, prRes.body[0]);
-    if (pe) {
-      if (appendActivityEvent_(pe, seen)) inserted++;
-      if (!latest || pe.occurred_at > latest) latest = pe.occurred_at;
-    }
-  } else if (!prRes.ok) errors.push('pr:' + prRes.status);
-
-  return { inserted: inserted, latest: latest, errors: errors };
+  for (var i = res.body.length - 1; i >= 0; i--) {
+    var e = githubRepoEvent_(source, res.body[i]);
+    if (!e) continue;
+    if (!latest || e.occurred_at > latest) latest = e.occurred_at;
+    if (!source.include_automation && e.activity_type === 'automation') continue;
+    if (appendActivityEvent_(e, seen)) inserted++;
+  }
+  return { inserted: inserted, latest: latest, errors: [] };
 }
 
 /**
