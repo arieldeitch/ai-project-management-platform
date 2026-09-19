@@ -513,7 +513,7 @@ public class MainActivity extends Activity {
 
     // ---------- time wall ----------
 
-    /** The per-project time wall: label, big absolute time, relative age, freshness chip, stale/unknown note. */
+    /** Live activity wall: observed activity is separate from meaningful-progress freshness. */
     private View timeWall(Project p, boolean large) {
         LinearLayout wall = new LinearLayout(this);
         wall.setOrientation(LinearLayout.VERTICAL);
@@ -523,24 +523,49 @@ public class MainActivity extends Activity {
         wall.setPadding(dp(12), dp(9), dp(12), dp(9));
 
         LinearLayout head = row();
-        head.addView(text("פעילות אחרונה בפרויקט", large ? 12 : 11, MUTED, true), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-        head.addView(chip(Hebrew.freshness(p.freshness.state), accent));
+        head.addView(text("פעילות אחרונה שנצפתה", large ? 12 : 11, MUTED, true),
+                new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        if (p.latestActivityMillis > 0) {
+            int activityColor = p.latestActivityIsAutomation() ? MUTED : BLUE;
+            head.addView(chip(Hebrew.activityType(p.latestActivityType), activityColor));
+        }
         wall.addView(head);
 
-        if (p.lastProgressMillis > 0) {
-            TextView abs = text(TimeText.absolute(p.lastProgressMillis), large ? 24 : 18, TEXT, true);
+        if (p.latestActivityMillis > 0) {
+            TextView abs = text(TimeText.absolute(p.latestActivityMillis), large ? 24 : 18, TEXT, true);
             abs.setTextDirection(View.TEXT_DIRECTION_LTR);
             abs.setGravity(Gravity.START);
             wall.addView(abs, full(4, 0));
-            wall.addView(text(TimeText.relative(p.lastProgressMillis, now()), large ? 15 : 13, accent, true), full(1, 0));
+            wall.addView(text(TimeText.relative(p.latestActivityMillis, now()) + " · "
+                    + Hebrew.activitySource(p.latestActivitySource), large ? 15 : 13,
+                    p.latestActivityIsAutomation() ? MUTED : BLUE, true), full(1, 0));
+            if (p.latestActivityIsAutomation()) {
+                wall.addView(text("אוטומציה תפעולית — לא מחליפה התקדמות משמעותית.", 12, MUTED, false), full(3, 0));
+            }
         } else {
-            wall.addView(text("אין חותמת פעילות עדכנית", large ? 18 : 15, TEXT, true), full(4, 0));
-            if (!p.lastProgressRaw.isEmpty()) wall.addView(text("בלוח רשום: " + shortText(p.lastProgressRaw, 60), 12, MUTED, false), full(2, 0));
+            wall.addView(text("לא נצפתה פעילות עדכנית", large ? 18 : 15, TEXT, true), full(4, 0));
         }
-        // Stale / aging / unknown-cadence explanations. The no-timestamp case is already the headline above.
+
+        LinearLayout meaningful = row();
+        meaningful.addView(text("התקדמות משמעותית", 11, MUTED, true),
+                new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        meaningful.addView(chip(Hebrew.freshness(p.freshness.state), accent));
+        wall.addView(meaningful, full(8, 0));
+
+        if (p.latestMeaningfulActivityMillis > 0) {
+            wall.addView(text(TimeText.wall(p.latestMeaningfulActivityMillis, now()) + " · "
+                    + Hebrew.activitySource(p.latestMeaningfulActivitySource), 12, TEXT, true), full(3, 0));
+        } else {
+            wall.addView(text("לא זוהתה התקדמות משמעותית עדכנית", 12, MUTED, false), full(3, 0));
+            if (!p.lastProgressRaw.isEmpty()) {
+                wall.addView(text("בלוח רשום: " + shortText(p.lastProgressRaw, 60), 12, MUTED, false), full(2, 0));
+            }
+        }
+
         String note = p.freshness.note();
         if (p.freshness.reason != Freshness.Reason.NO_TIMESTAMP && !note.isEmpty()) {
-            wall.addView(text(note, 12, p.freshness.state == Freshness.State.UNKNOWN ? MUTED : accent, false), full(3, 0));
+            wall.addView(text(note, 12,
+                    p.freshness.state == Freshness.State.UNKNOWN ? MUTED : accent, false), full(3, 0));
         }
         return wall;
     }
@@ -672,8 +697,10 @@ public class MainActivity extends Activity {
         addCount(strip, "ישן", p.stale, AMBER);
         summary.addView(strip, lp(ViewGroup.LayoutParams.MATCH_PARENT, dp(64), 0, 0));
         Project latest = p.latestActiveProject();
-        if (latest != null) summary.addView(text("הכי עדכני: " + latest.name + " · " + TimeText.wall(latest.lastProgressMillis, now()), 12, MUTED, false), full(8, 0));
-        if (p.unknownActivity > 0) summary.addView(text(p.unknownActivity == 1 ? "פרויקט אחד בלי חותמת פעילות בלוח" : p.unknownActivity + " פרויקטים בלי חותמת פעילות בלוח", 12, MUTED, false), full(3, 0));
+        if (latest != null) summary.addView(text("הכי עדכני: " + latest.name + " · " + TimeText.wall(latest.latestActivityMillis, now())
+                + " · " + Hebrew.activitySource(latest.latestActivitySource) + " · " + Hebrew.activityType(latest.latestActivityType),
+                12, MUTED, false), full(8, 0));
+        if (p.unknownActivity > 0) summary.addView(text(p.unknownActivity == 1 ? "פרויקט אחד בלי התקדמות משמעותית מזוהה" : p.unknownActivity + " פרויקטים בלי התקדמות משמעותית מזוהה", 12, MUTED, false), full(3, 0));
         if (p.unknownCadence > 0) summary.addView(text(p.unknownCadence == 1 ? "פרויקט אחד בלי קצב צפוי מוגדר" : p.unknownCadence + " פרויקטים בלי קצב צפוי מוגדר", 12, MUTED, false), full(3, 0));
         c.addView(summary, full(0, 14));
 
@@ -699,7 +726,7 @@ public class MainActivity extends Activity {
             c.addView(section("תשתית (לא פרויקט)"));
             for (Project x : p.infrastructure) addProjectCard(c, x, false);
         }
-        c.addView(text("מקור: לוח הבקרה ב-Google Drive", 11, MUTED, false), full(6, 0));
+        c.addView(text("מקור: לוח הבקרה + Activity Ledger", 11, MUTED, false), full(6, 0));
     }
 
     // ---------- פרויקטים ----------
@@ -817,7 +844,10 @@ public class MainActivity extends Activity {
         }
         addField(body, "מה המטרה", p.objective);
         addField(body, "מה המצב עכשיו", p.milestone.isEmpty() ? Hebrew.lifecycle(p.lifecycle) : p.milestone);
-        addExpandableField(body, "מה קרה לאחרונה", p.progressEvidence, 280);
+        addExpandableField(body, "מה נצפה לאחרונה", p.latestActivitySummary, 280);
+        if (!p.progressEvidence.isEmpty() && !p.progressEvidence.equals(p.latestActivitySummary)) {
+            addExpandableField(body, "עדכון מאומת בלוח", p.progressEvidence, 280);
+        }
         addField(body, "הפעולה הבאה", p.nextAction);
         addField(body, "מה חוסם", p.blocker);
         if (!p.needsAttention()) addField(body, "צריך את אריאל", "לא נדרשת פעולה כרגע");
@@ -1033,10 +1063,10 @@ public class MainActivity extends Activity {
                             .append(" · מכשירים רשומים: ").append(r.body.optInt("active_devices", 0))
                             .append(r.body.optBoolean("fcm_configured", false) ? " · התראות מוגדרות" : " · התראות לא מוגדרות בשער")
                             .append(r.body.optBoolean("scanner_trigger_installed", false) ? " · סורק פעיל" : " · סורק לא מותקן");
-                    if (contract < 2) sb.append(" · הגרסה בשער ישנה (ללא חותמות פעילות) — יש לפרוס את CombinedCode.gs המעודכן");
+                    if (contract < 3) sb.append(" · הגרסה בשער ישנה (ללא מעקב פעילות חי) — יש לפרוס את CombinedCode.gs המעודכן");
                     if (missing != null && missing.length() > 0) sb.append(" · עמודות שלא זוהו: ").append(TextUtils.join(", ", jsonStrings(missing)));
                     gatewayLine.setText(sb.toString());
-                    gatewayLine.setTextColor(contract < 2 ? AMBER : TEXT);
+                    gatewayLine.setTextColor(contract < 3 ? AMBER : TEXT);
                 } else {
                     gatewayLine.setText("שער לא זמין: " + r.describe());
                     gatewayLine.setTextColor(RED);
