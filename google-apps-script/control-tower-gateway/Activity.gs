@@ -37,21 +37,23 @@ function activityLedgerSheet_() {
   return ensureSheet_(ACTIVITY_LEDGER_SHEET, ACTIVITY_LEDGER_HEADERS);
 }
 
+var ACTIVITY_DEDUPE_WINDOW = 1200;
+var ACTIVITY_LATEST_WINDOW = 2500;
+
 function activityIdSet_() {
   var sheet = activityLedgerSheet_();
   var lastRow = sheet.getLastRow();
   var seen = {};
   if (lastRow < 2) return seen;
-  var values = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+  var count = Math.min(ACTIVITY_DEDUPE_WINDOW, lastRow - 1);
+  var start = lastRow - count + 1;
+  var values = sheet.getRange(start, 1, count, 1).getValues();
   values.forEach(function (r) { if (r[0]) seen[String(r[0])] = true; });
   return seen;
 }
 
-function appendActivityEvent_(event, seen) {
-  if (!event || !event.event_id || !event.project_id || !event.occurred_at) return false;
-  if (seen && seen[event.event_id]) return false;
-  var sheet = activityLedgerSheet_();
-  sheet.appendRow([
+function activityEventRow_(event) {
+  return [
     str_(event.event_id, 240),
     str_(event.occurred_at, 64),
     str_(event.observed_at || nowIso_(), 64),
@@ -64,9 +66,25 @@ function appendActivityEvent_(event, seen) {
     str_(event.evidence_url, 800),
     str_(event.evidence_level || 'OBSERVED', 40),
     str_(event.metadata_json, 1500)
-  ]);
-  if (seen) seen[event.event_id] = true;
-  return true;
+  ];
+}
+
+function appendActivityEvents_(events, seen) {
+  var rows = [];
+  (events || []).forEach(function (event) {
+    if (!event || !event.event_id || !event.project_id || !event.occurred_at) return;
+    if (seen && seen[event.event_id]) return;
+    rows.push(activityEventRow_(event));
+    if (seen) seen[event.event_id] = true;
+  });
+  if (!rows.length) return 0;
+  var sheet = activityLedgerSheet_();
+  sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, ACTIVITY_LEDGER_HEADERS.length).setValues(rows);
+  return rows.length;
+}
+
+function appendActivityEvent_(event, seen) {
+  return appendActivityEvents_([event], seen) === 1;
 }
 
 function normalizeHeartbeatTime_(value) {
@@ -273,15 +291,16 @@ function pollGithubSource_(source, seen) {
   var res = githubJson_('https://api.github.com/repos/' + source.locator + '/events?per_page=15');
   if (!res.ok) return { inserted: 0, latest: '', errors: ['events:' + res.status] };
   if (!Array.isArray(res.body)) return { inserted: 0, latest: '', errors: ['events:invalid_body'] };
-  var inserted = 0;
   var latest = '';
+  var pending = [];
   for (var i = res.body.length - 1; i >= 0; i--) {
     var e = githubRepoEvent_(source, res.body[i]);
     if (!e) continue;
     if (!latest || e.occurred_at > latest) latest = e.occurred_at;
     if (!source.include_automation && e.activity_type === 'automation') continue;
-    if (appendActivityEvent_(e, seen)) inserted++;
+    pending.push(e);
   }
+  var inserted = appendActivityEvents_(pending, seen);
   return { inserted: inserted, latest: latest, errors: [] };
 }
 
@@ -320,7 +339,9 @@ function latestActivityByProject_() {
   var lastRow = sheet.getLastRow();
   var out = {};
   if (lastRow < 2) return out;
-  var values = sheet.getRange(2, 1, lastRow - 1, ACTIVITY_LEDGER_HEADERS.length).getValues();
+  var count = Math.min(ACTIVITY_LATEST_WINDOW, lastRow - 1);
+  var start = lastRow - count + 1;
+  var values = sheet.getRange(start, 1, count, ACTIVITY_LEDGER_HEADERS.length).getValues();
   values.forEach(function (row) {
     var projectId = str_(row[3], 80);
     if (!projectId) return;
