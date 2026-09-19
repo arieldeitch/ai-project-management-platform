@@ -125,11 +125,13 @@ public final class Hebrew {
     public static String activitySource(String source) {
         switch (source == null ? "" : source.trim().toLowerCase(Locale.ROOT)) {
             case "github_commit":
-            case "github_pr": return "GitHub";
+            case "github_pr":
+            case "github_event": return "GitHub";
             case "agent_heartbeat": return "דיווח סוכן";
             case "project_board": return "לוח הבקרה";
             case "drive":
-            case "drive_doc": return "Google Drive";
+            case "drive_doc":
+            case "drive_file": return "Google Drive";
             default: return source == null || source.trim().isEmpty() ? "מקור לא ידוע" : source.trim();
         }
     }
