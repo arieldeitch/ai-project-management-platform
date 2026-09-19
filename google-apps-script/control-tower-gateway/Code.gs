@@ -13,19 +13,22 @@
  *   GATEWAY_TOKEN              required  — high-entropy shared secret (≥ 32 chars). Same value goes into the Android build.
  *   FCM_SERVICE_ACCOUNT_JSON   optional  — Firebase service-account JSON (whole file). Enables push.
  *   PROJECTS_COLUMN_MAP        optional  — JSON {field: "Exact Header"} overriding header auto-detection.
+ *   GITHUB_READ_TOKEN          optional  — raises GitHub API quota / enables intentionally configured private repos. Never required for public repos.
  */
 
-var GATEWAY_VERSION = '0.7.0';
+var GATEWAY_VERSION = '0.8.0';
 
 var ACTIONS = {
   health: function () { return healthReport_(); },
-  portfolio: function (p) { return { projects: readPortfolio_(), connections: p.include_connections ? readConnections_() : undefined, snapshot_at: nowIso_(), contract_version: GATEWAY_CONTRACT_VERSION }; },
+  portfolio: function (p) { return { projects: enrichPortfolioWithActivity_(readPortfolio_()), connections: p.include_connections ? readConnections_() : undefined, snapshot_at: nowIso_(), contract_version: GATEWAY_CONTRACT_VERSION }; },
   inbox: function (p) { return { items: listInbox_(clampInt_(p.limit, 1, 100, 30)) }; },
   submit_report: function (p) { return submitReport_(p); },
   register_device: function (p) { return registerDevice_(p); },
   unregister_device: function (p) { return unregisterDevice_(p); },
   test_push: function (p) { return testPush_(p); },
-  activity: function (p) { return { items: listPushEvents_(clampInt_(p.limit, 1, 100, 30)) }; }
+  activity: function (p) { return { items: listPushEvents_(clampInt_(p.limit, 1, 100, 30)) }; },
+  project_activity: function (p) { return { items: listProjectActivity_(clampInt_(p.limit, 1, 200, 50), str_(p.project_id, 80)) }; },
+  activity_heartbeat: function (p) { return recordActivityHeartbeat_(p); }
 };
 
 function doPost(e) {
@@ -127,12 +130,13 @@ function healthReport_() {
     spreadsheet_title: ss.getName(),
     tabs: tabs,
     projects_rows: Math.max(0, ss.getSheetByName(PROJECTS_SHEET) ? ss.getSheetByName(PROJECTS_SHEET).getLastRow() - 1 : 0),
-    mobile_tabs_ready: [INBOX_SHEET, DEVICES_SHEET, PUSH_STATE_SHEET].every(function (n) { return tabs.indexOf(n) >= 0; }),
+    mobile_tabs_ready: [INBOX_SHEET, DEVICES_SHEET, PUSH_STATE_SHEET, ACTIVITY_SOURCES_SHEET, ACTIVITY_LEDGER_SHEET].every(function (n) { return tabs.indexOf(n) >= 0; }),
     resolved_columns: resolved,
     unresolved_columns: missing,
     active_devices: countActiveDevices_(),
     fcm_configured: isFcmConfigured_(),
     scanner_trigger_installed: isScannerTriggerInstalled_(),
+    activity: activityHealth_(),
     contract_version: GATEWAY_CONTRACT_VERSION,
     server_time: nowIso_()
   };
