@@ -3,7 +3,7 @@
 **PROJECT_CONTROL_BOARD Sheet → this Web App → Android client. FCM = push transport only.**
 
 Files: `appsscript.json`, `Code.gs` (endpoint, auth, action allow-list), `Config.gs` (fixed IDs, tabs, header aliases),
-`Portfolio.gs` (read Projects/Connections), `Inbox.gs` (MobileInbox), `Devices.gs` (MobileDevices),
+`Portfolio.gs` (read Projects/Connections), `Inbox.gs` (MobileInbox), `Ideas.gs` (idea incubator), `Devices.gs` (MobileDevices),
 `Push.gs` (FCM v1 sender), `Scanner.gs` (high-signal trigger, push-state dedupe, editor smoke tests).
 
 ## Contract
@@ -21,6 +21,9 @@ Response is always JSON with `ok`, `status` (HTTP-like code carried in the body 
 | `unregister_device` | `token` | row removed |
 | `test_push` | — | `{sent, failed, fcm_configured}` — only to registered device rows |
 | `activity` | `limit?` | recent push events from MobilePushState |
+| `ideas` | `limit?` | active ideas, newest first, with maturity score |
+| `create_idea` | title + optional checklist fields | new canonical idea row |
+| `update_idea` | `idea_id` + changed fields | bounded update to one idea |
 
 Anything else → `unknown_action`. Wrong/missing token → `unauthorized` (after a 250 ms delay).
 
@@ -43,8 +46,9 @@ Tests: `node --test google-apps-script/control-tower-gateway/test/portfolio.test
 - `MobileInbox` — received_at, source, status, evidence_level, report_text, project_hint, device_id, app_version, processed_at, notes
 - `MobileDevices` — token, device_id, device_label, platform, app_version, registered_at, last_seen_at, active
 - `MobilePushState` — project_key, last_rag, last_needs_ariel, last_lifecycle, last_event, last_event_at, updated_at
+- `Ideas` — quick capture, need/functionality checklist, maturity inputs, next step and lifecycle stage
 
-They are transport state. `Projects` / `Connections` stay the only portfolio truth and are never written by the gateway.
+The three `Mobile*` tabs are transport state. `Ideas` is the canonical pre-project incubator. `Projects` / `Connections` stay the portfolio truth and are never written by the gateway. Ideas move deliberately through `INBOX → CLARIFY → SHAPE → VALIDATE → READY`; promotion never creates a project automatically.
 
 ## Column detection
 

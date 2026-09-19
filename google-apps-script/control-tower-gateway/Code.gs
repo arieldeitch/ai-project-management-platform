@@ -16,7 +16,7 @@
  *   GITHUB_READ_TOKEN          optional  — raises GitHub API quota / enables intentionally configured private repos. Never required for public repos.
  */
 
-var GATEWAY_VERSION = '0.8.0';
+var GATEWAY_VERSION = '0.9.0';
 
 var ACTIONS = {
   health: function () { return healthReport_(); },
@@ -29,6 +29,9 @@ var ACTIONS = {
   activity: function (p) { return { items: listPushEvents_(clampInt_(p.limit, 1, 100, 30)) }; },
   project_activity: function (p) { return { items: listProjectActivity_(clampInt_(p.limit, 1, 200, 50), str_(p.project_id, 80)) }; },
   activity_heartbeat: function (p) { return recordActivityHeartbeat_(p); }
+  ,ideas: function (p) { return { items: listIdeas_(clampInt_(p.limit, 1, 200, 100)) }; }
+  ,create_idea: function (p) { return createIdea_(p); }
+  ,update_idea: function (p) { return updateIdea_(p); }
 };
 
 function doPost(e) {
@@ -130,7 +133,7 @@ function healthReport_() {
     spreadsheet_title: ss.getName(),
     tabs: tabs,
     projects_rows: Math.max(0, ss.getSheetByName(PROJECTS_SHEET) ? ss.getSheetByName(PROJECTS_SHEET).getLastRow() - 1 : 0),
-    mobile_tabs_ready: [INBOX_SHEET, DEVICES_SHEET, PUSH_STATE_SHEET, ACTIVITY_SOURCES_SHEET, ACTIVITY_LEDGER_SHEET].every(function (n) { return tabs.indexOf(n) >= 0; }),
+    mobile_tabs_ready: [INBOX_SHEET, DEVICES_SHEET, PUSH_STATE_SHEET, ACTIVITY_SOURCES_SHEET, ACTIVITY_LEDGER_SHEET, IDEAS_SHEET].every(function (n) { return tabs.indexOf(n) >= 0; }),
     resolved_columns: resolved,
     unresolved_columns: missing,
     active_devices: countActiveDevices_(),

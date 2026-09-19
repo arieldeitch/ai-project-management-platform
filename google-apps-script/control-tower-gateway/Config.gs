@@ -13,15 +13,18 @@ var DEVICES_SHEET = 'MobileDevices';
 var PUSH_STATE_SHEET = 'MobilePushState';
 var ACTIVITY_SOURCES_SHEET = 'ActivitySources';
 var ACTIVITY_LEDGER_SHEET = 'ActivityLedger';
+var IDEAS_SHEET = 'Ideas';
 
 var INBOX_HEADERS = ['received_at', 'source', 'status', 'evidence_level', 'report_text', 'project_hint', 'device_id', 'app_version', 'processed_at', 'notes'];
 var DEVICES_HEADERS = ['token', 'device_id', 'device_label', 'platform', 'app_version', 'registered_at', 'last_seen_at', 'active'];
 var PUSH_STATE_HEADERS = ['project_key', 'last_rag', 'last_needs_ariel', 'last_lifecycle', 'last_event', 'last_event_at', 'updated_at'];
 var ACTIVITY_SOURCE_HEADERS = ['project_id', 'project_name', 'source_type', 'locator', 'branch', 'include_automation', 'enabled', 'last_poll_at', 'last_seen_at', 'notes'];
 var ACTIVITY_LEDGER_HEADERS = ['event_id', 'occurred_at', 'observed_at', 'project_id', 'project_name', 'source_type', 'source_locator', 'activity_type', 'summary', 'evidence_url', 'evidence_level', 'metadata_json'];
+var IDEA_HEADERS = ['idea_id', 'created_at', 'updated_at', 'title', 'stage', 'need', 'target_user', 'desired_outcome', 'core_functionality', 'usage_frequency', 'urgency', 'surface', 'automation_level', 'data_needed', 'success_metric', 'constraints', 'next_step', 'notes'];
 
 var MAX_BODY_BYTES = 64 * 1024;
 var MAX_REPORT_CHARS = 20000;
+var MAX_IDEA_TEXT = 4000;
 
 // Firebase project id is derived from the service-account JSON (project_id); never client-supplied.
 var FCM_CHANNEL_ID = 'control_tower_alerts';
@@ -94,4 +97,4 @@ function isFcmConfigured_() {
 var INFRASTRUCTURE_NAME_PATTERNS = [/control\s*tower/i, /מגדל\s*הפיקוח/];
 
 // Contract version reported by health/portfolio so clients can detect a stale deployment.
-var GATEWAY_CONTRACT_VERSION = 3;
+var GATEWAY_CONTRACT_VERSION = 4;

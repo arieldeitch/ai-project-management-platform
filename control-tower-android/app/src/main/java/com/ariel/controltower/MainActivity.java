@@ -56,7 +56,7 @@ import java.util.concurrent.Executors;
  * Presentation rules live in {@code com.ariel.controltower.model} and are unit-tested.
  */
 public class MainActivity extends Activity {
-    private static final int TAB_HOME = 0, TAB_PROJECTS = 1, TAB_DEPUTY = 2, TAB_ACTIVITY = 3;
+    private static final int TAB_HOME = 0, TAB_PROJECTS = 1, TAB_IDEAS = 2, TAB_DEPUTY = 3, TAB_ACTIVITY = 4;
     private static final String CACHE_PREFS = "control_tower_cache";
 
     private final ExecutorService io = Executors.newSingleThreadExecutor();
@@ -114,6 +114,7 @@ public class MainActivity extends Activity {
         switch (target) {
             case "now": activeTab = TAB_HOME; return true;
             case "projects": activeTab = TAB_PROJECTS; return true;
+            case "ideas": activeTab = TAB_IDEAS; return true;
             case "deputy": activeTab = TAB_DEPUTY; return true;
             case "activity": activeTab = TAB_ACTIVITY; return true;
             default: return false;
@@ -372,7 +373,7 @@ public class MainActivity extends Activity {
 
     private void buildNav() {
         nav.removeAllViews();
-        String[] labels = {"בית", "פרויקטים", "סגן", "פעילות"};
+        String[] labels = {"בית", "פרויקטים", "רעיונות", "סגן", "פעילות"};
         for (int i = 0; i < labels.length; i++) {
             final int index = i;
             boolean active = activeTab == i;
@@ -398,6 +399,7 @@ public class MainActivity extends Activity {
         contentHost.removeAllViews();
         if (index == TAB_HOME) showHome();
         else if (index == TAB_PROJECTS) showProjects();
+        else if (index == TAB_IDEAS) showIdeas();
         else if (index == TAB_DEPUTY) showDeputy();
         else showActivity();
     }
@@ -884,6 +886,162 @@ public class MainActivity extends Activity {
 
         scroll.addView(c);
         contentHost.addView(scroll);
+    }
+
+    // ---------- רעיונות ----------
+
+    private interface ChoiceSink { void set(String value); }
+
+    private void addChoiceTiles(LinearLayout parent, String title, String[] labels, String[] values, String selected, ChoiceSink sink) {
+        parent.addView(text(title, 13, BLUE, true), full(12, 5));
+        LinearLayout group = row();
+        for (int i = 0; i < labels.length; i++) {
+            final String value = values[i];
+            Button b = actionButton(labels[i], value.equals(selected));
+            b.setTextSize(12);
+            LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(0, dp(44), 1f);
+            p.setMarginEnd(dp(5));
+            group.addView(b, p);
+            b.setOnClickListener(v -> {
+                sink.set(value);
+                for (int j = 0; j < group.getChildCount(); j++) {
+                    Button x = (Button) group.getChildAt(j);
+                    boolean active = x == b;
+                    x.setTextColor(active ? BG : TEXT);
+                    x.setBackground(active ? box(BLUE, BLUE, 14) : box(SURFACE_2, BORDER, 14));
+                }
+            });
+        }
+        parent.addView(group, full(0, 2));
+    }
+
+    private void showIdeas() {
+        ScrollView s = screen("רעיונות", "כל הרעיונות במקום אחד — מלכידה מהירה ועד בשלות לפרויקט.", true);
+        contentHost.addView(s);
+        LinearLayout c = column(s);
+
+        LinearLayout form = card();
+        form.addView(text("רעיון חדש", 17, TEXT, true));
+        form.addView(text("הכותרת מספיקה לשמירה. הצ'ק־ליסט עוזר למקד ולהבשיל.", 12, MUTED, false), full(3, 8));
+        EditText title = input("שם קצר לרעיון *", false);
+        EditText need = input("איזה כאב או צורך הוא פותר?", true);
+        EditText outcome = input("מה ישתפר אם הרעיון יעבוד?", true);
+        EditText functionality = input("מה הפונקציונליות המרכזית?", true);
+        EditText success = input("איך נדע שהרעיון הצליח?", true);
+        EditText next = input("מה הצעד הקטן הבא?", true);
+        form.addView(title, lp(ViewGroup.LayoutParams.MATCH_PARENT, dp(54), 0, 8));
+        form.addView(need, lp(ViewGroup.LayoutParams.MATCH_PARENT, dp(78), 0, 8));
+        form.addView(outcome, lp(ViewGroup.LayoutParams.MATCH_PARENT, dp(78), 0, 8));
+        form.addView(functionality, lp(ViewGroup.LayoutParams.MATCH_PARENT, dp(78), 0, 8));
+
+        String[] frequency = {"OCCASIONAL"}, urgency = {"MEDIUM"}, surface = {"UNDECIDED"}, automation = {"UNDECIDED"};
+        addChoiceTiles(form, "תדירות שימוש", new String[]{"חד־פעמי", "לפעמים", "שבועי", "יומי"}, new String[]{"ONE_OFF", "OCCASIONAL", "WEEKLY", "DAILY"}, frequency[0], v -> frequency[0] = v);
+        addChoiceTiles(form, "דחיפות", new String[]{"נמוכה", "בינונית", "גבוהה"}, new String[]{"LOW", "MEDIUM", "HIGH"}, urgency[0], v -> urgency[0] = v);
+        addChoiceTiles(form, "איפה הוא חי", new String[]{"לא החלטתי", "מובייל", "ווב", "אוטומציה", "סוכן"}, new String[]{"UNDECIDED", "MOBILE", "WEB", "AUTOMATION", "AGENT"}, surface[0], v -> surface[0] = v);
+        addChoiceTiles(form, "רמת אוטומציה", new String[]{"לא החלטתי", "ידני", "מסייע", "אוטומטי"}, new String[]{"UNDECIDED", "MANUAL", "ASSISTED", "AUTOMATIC"}, automation[0], v -> automation[0] = v);
+        form.addView(success, lp(ViewGroup.LayoutParams.MATCH_PARENT, dp(78), 10, 8));
+        form.addView(next, lp(ViewGroup.LayoutParams.MATCH_PARENT, dp(78), 0, 10));
+        Button save = actionButton("שמור רעיון", true);
+        TextView saveStatus = text("", 12, MUTED, false);
+        form.addView(save, lp(ViewGroup.LayoutParams.MATCH_PARENT, dp(50), 0, 4));
+        form.addView(saveStatus);
+        c.addView(form, full(0, 14));
+
+        LinearLayout list = new LinearLayout(this);
+        list.setOrientation(LinearLayout.VERTICAL);
+        c.addView(section("מאגר הרעיונות"));
+        c.addView(list);
+        loadIdeas(list);
+
+        save.setOnClickListener(v -> {
+            String ideaTitle = title.getText().toString().trim();
+            if (ideaTitle.isEmpty()) { title.setError("צריך שם קצר לרעיון"); return; }
+            save.setEnabled(false);
+            saveStatus.setText("שומר…");
+            JSONObject p = new JSONObject();
+            try {
+                p.put("title", ideaTitle); p.put("need", need.getText().toString().trim());
+                p.put("desired_outcome", outcome.getText().toString().trim());
+                p.put("core_functionality", functionality.getText().toString().trim());
+                p.put("usage_frequency", frequency[0]); p.put("urgency", urgency[0]);
+                p.put("surface", surface[0]); p.put("automation_level", automation[0]);
+                p.put("success_metric", success.getText().toString().trim());
+                p.put("next_step", next.getText().toString().trim());
+            } catch (Exception ignored) {}
+            io.execute(() -> {
+                Gateway.Result r = Gateway.call(this, "create_idea", p);
+                runOnUiThread(() -> {
+                    save.setEnabled(true);
+                    if (r.ok()) {
+                        title.setText(""); need.setText(""); outcome.setText(""); functionality.setText(""); success.setText(""); next.setText("");
+                        saveStatus.setText("נשמר. הרעיון לא ילך לאיבוד."); saveStatus.setTextColor(GREEN);
+                        loadIdeas(list);
+                    } else { saveStatus.setText(r.describe()); saveStatus.setTextColor(RED); }
+                });
+            });
+        });
+    }
+
+    private void loadIdeas(LinearLayout holder) {
+        holder.removeAllViews();
+        holder.addView(loading(), lp(ViewGroup.LayoutParams.MATCH_PARENT, dp(70), 0, 0));
+        JSONObject p = new JSONObject();
+        try { p.put("limit", 100); } catch (Exception ignored) {}
+        fetchArray("ideas", p, "items", arr -> {
+            holder.removeAllViews();
+            if (arr.length() == 0) { holder.addView(text("עדיין אין רעיונות. אפשר להתחיל רק מכותרת.", 13, MUTED, false)); return; }
+            for (int i = 0; i < arr.length(); i++) {
+                JSONObject x = arr.optJSONObject(i); if (x == null) continue;
+                LinearLayout item = card();
+                LinearLayout top = row();
+                top.addView(text(x.optString("title"), 16, TEXT, true), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+                top.addView(chip(ideaStage(x.optString("stage")), BLUE), chipLp());
+                item.addView(top);
+                int maturity = x.optInt("maturity_score", 0);
+                item.addView(text("בשלות " + maturity + "% · " + ideaMeta(x), 12, MUTED, false), full(5, 0));
+                String need = x.optString("need");
+                if (!need.isEmpty()) item.addView(text(shortText(need, 180), 14, TEXT, false), full(7, 0));
+                String next = x.optString("next_step");
+                if (!next.isEmpty()) item.addView(text("הצעד הבא: " + shortText(next, 140), 13, BLUE, true), full(7, 0));
+                String nextStage = nextIdeaStage(x.optString("stage"));
+                if (!nextStage.isEmpty()) {
+                    Button advance = actionButton("קדם ל־" + ideaStage(nextStage), false);
+                    item.addView(advance, lp(ViewGroup.LayoutParams.MATCH_PARENT, dp(44), 10, 0));
+                    advance.setOnClickListener(v -> updateIdeaStage(x.optString("idea_id"), nextStage, holder));
+                }
+                holder.addView(item, full(0, 8));
+            }
+        }, msg -> { holder.removeAllViews(); holder.addView(text("לא ניתן לטעון רעיונות: " + msg, 13, RED, false)); });
+    }
+
+    private void updateIdeaStage(String id, String stage, LinearLayout holder) {
+        JSONObject p = new JSONObject();
+        try { p.put("idea_id", id); p.put("stage", stage); } catch (Exception ignored) {}
+        io.execute(() -> {
+            Gateway.Result r = Gateway.call(this, "update_idea", p);
+            runOnUiThread(() -> { if (r.ok()) loadIdeas(holder); else Toast.makeText(this, r.describe(), Toast.LENGTH_LONG).show(); });
+        });
+    }
+
+    private String nextIdeaStage(String s) {
+        if ("INBOX".equals(s)) return "CLARIFY"; if ("CLARIFY".equals(s)) return "SHAPE";
+        if ("SHAPE".equals(s)) return "VALIDATE"; if ("VALIDATE".equals(s)) return "READY";
+        return "";
+    }
+
+    private String ideaStage(String s) {
+        if ("INBOX".equals(s)) return "חדש"; if ("CLARIFY".equals(s)) return "מיקוד צורך";
+        if ("SHAPE".equals(s)) return "עיצוב פתרון"; if ("VALIDATE".equals(s)) return "בדיקת ערך";
+        if ("READY".equals(s)) return "מוכן לפרויקט"; if ("PARKED".equals(s)) return "בהמתנה";
+        if ("PROMOTED".equals(s)) return "הפך לפרויקט"; return s;
+    }
+
+    private String ideaMeta(JSONObject x) {
+        String surface = x.optString("surface", "UNDECIDED");
+        String urgency = x.optString("urgency", "MEDIUM");
+        String a = "HIGH".equals(urgency) ? "דחוף" : "LOW".equals(urgency) ? "לא דחוף" : "דחיפות בינונית";
+        String b = "MOBILE".equals(surface) ? "מובייל" : "WEB".equals(surface) ? "ווב" : "AUTOMATION".equals(surface) ? "אוטומציה" : "AGENT".equals(surface) ? "סוכן" : "טרם נבחר משטח";
+        return a + " · " + b;
     }
 
     // ---------- סגן ----------

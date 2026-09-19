@@ -6,7 +6,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
-export const ORDER = ['Config.gs', 'Portfolio.gs', 'Activity.gs', 'Inbox.gs', 'Devices.gs', 'Push.gs', 'Scanner.gs', 'Code.gs'];
+export const ORDER = ['Config.gs', 'Portfolio.gs', 'Activity.gs', 'Inbox.gs', 'Ideas.gs', 'Devices.gs', 'Push.gs', 'Scanner.gs', 'Code.gs'];
 
 export function combined() {
   const header = `/**
