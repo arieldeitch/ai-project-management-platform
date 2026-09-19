@@ -75,6 +75,7 @@ jobs:
           echo "code=$CODE" >> "$GITHUB_OUTPUT"
           echo "artifact=ControlTower-$NAME-debug" >> "$GITHUB_OUTPUT"
           echo "release=ControlTower-$NAME-release" >> "$GITHUB_OUTPUT"
+          echo "built_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
           echo "Building Control Tower $NAME ($CODE) @ ${GITHUB_SHA::12}"
 
       # Gateway token comes from a secret; absent -> the app asks for it once on-device. The URL is tracked.
@@ -131,6 +132,8 @@ jobs:
         working-directory: control-tower-android
         env:
           CT_GIT_SHA: ${{ github.sha }}
+          CT_GIT_REF: ${{ github.ref_name }}
+          CT_BUILD_TIME: ${{ steps.version.outputs.built_at }}
           CT_GATEWAY_URL: ${{ secrets.CT_GATEWAY_URL }}
           CT_GATEWAY_TOKEN: ${{ secrets.CT_GATEWAY_TOKEN }}
         run: gradle :app:assembleDebug --stacktrace
@@ -140,6 +143,8 @@ jobs:
         working-directory: control-tower-android
         env:
           CT_GIT_SHA: ${{ github.sha }}
+          CT_GIT_REF: ${{ github.ref_name }}
+          CT_BUILD_TIME: ${{ steps.version.outputs.built_at }}
           CT_GATEWAY_URL: ${{ secrets.CT_GATEWAY_URL }}
           CT_GATEWAY_TOKEN: ${{ secrets.CT_GATEWAY_TOKEN }}
           CT_RELEASE_KEYSTORE_PATH: ${{ steps.signing.outputs.path }}
@@ -165,6 +170,8 @@ jobs:
         working-directory: control-tower-android
         env:
           CT_GIT_SHA: ${{ github.sha }}
+          CT_GIT_REF: ${{ github.ref_name }}
+          CT_BUILD_TIME: ${{ steps.version.outputs.built_at }}
           CT_GATEWAY_URL: ${{ secrets.CT_GATEWAY_URL }}
           CT_GATEWAY_TOKEN: ${{ secrets.CT_GATEWAY_TOKEN }}
         run: gradle :app:testDebugUnitTest --stacktrace
@@ -174,6 +181,8 @@ jobs:
         continue-on-error: true
         env:
           CT_GIT_SHA: ${{ github.sha }}
+          CT_GIT_REF: ${{ github.ref_name }}
+          CT_BUILD_TIME: ${{ steps.version.outputs.built_at }}
           CT_GATEWAY_URL: ${{ secrets.CT_GATEWAY_URL }}
           CT_GATEWAY_TOKEN: ${{ secrets.CT_GATEWAY_TOKEN }}
         run: gradle :app:lintDebug

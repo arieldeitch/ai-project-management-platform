@@ -9,17 +9,19 @@ import android.graphics.Color;
 public final class Theme {
     private Theme() {}
 
-    public static final int BG = Color.parseColor("#171C24");
-    public static final int NAV = Color.parseColor("#202733");
-    public static final int SURFACE = Color.parseColor("#252D39");
-    public static final int SURFACE_2 = Color.parseColor("#2B3543");
-    public static final int BORDER = Color.parseColor("#3A4656");
-    public static final int TEXT = Color.parseColor("#F3F6FA");
-    public static final int MUTED = Color.parseColor("#B5BFCC");
-    public static final int BLUE = Color.parseColor("#7BA8E8");
-    public static final int GREEN = Color.parseColor("#55B986");
-    public static final int AMBER = Color.parseColor("#D7A64A");
-    public static final int RED = Color.parseColor("#E06E6E");
+    // Warm slate instead of the previous black/blue: lighter surfaces, desaturated accent, restrained status colours.
+    public static final int BG = Color.parseColor("#1D222A");
+    public static final int NAV = Color.parseColor("#252B34");
+    public static final int SURFACE = Color.parseColor("#293039");
+    public static final int SURFACE_2 = Color.parseColor("#323A45");
+    public static final int BORDER = Color.parseColor("#3F4955");
+    public static final int TEXT = Color.parseColor("#EEF2F6");
+    public static final int MUTED = Color.parseColor("#AAB4C0");
+    public static final int BLUE = Color.parseColor("#93B4D6");   // soft steel blue accent
+    public static final int TEAL = Color.parseColor("#7FC4B9");   // ideas / calm highlights
+    public static final int GREEN = Color.parseColor("#6DBF95");
+    public static final int AMBER = Color.parseColor("#D8B06A");
+    public static final int RED = Color.parseColor("#E08585");
 
     /** Translucent tint of a status colour for chips/backgrounds. */
     public static int tint(int color, int alpha) {

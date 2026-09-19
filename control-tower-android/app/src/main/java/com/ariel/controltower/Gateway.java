@@ -5,6 +5,8 @@ import android.content.SharedPreferences;
 import android.os.Build;
 import android.provider.Settings;
 
+import com.ariel.controltower.model.BuildIdentity;
+
 import org.json.JSONObject;
 
 import java.io.BufferedReader;
@@ -82,7 +84,7 @@ public final class Gateway {
         public final JSONObject body;
         public final String error;
 
-        Result(int httpCode, JSONObject body, String error) {
+        public Result(int httpCode, JSONObject body, String error) {
             this.httpCode = httpCode;
             this.body = body == null ? new JSONObject() : body;
             this.error = error;
@@ -125,6 +127,45 @@ public final class Gateway {
         } catch (Exception e) {
             return new Result(0, null, "לא ניתן להגיע לשער. בדוק חיבור לרשת.");
         }
+    }
+
+
+    /**
+     * Newest successful APK build of the public repository, read anonymously from the GitHub API
+     * (no token, no auth). Returns null on any failure — the UI then says "not available" rather than guessing.
+     */
+    public static BuildIdentity latestBuild(String repo, String branch) {
+        try {
+            String runs = getText("https://api.github.com/repos/" + repo + "/actions/workflows/control-tower-apk.yml/runs?branch=" + branch + "&status=success&per_page=1");
+            BuildIdentity partial = BuildIdentity.fromWorkflowRuns(runs, null);
+            if (partial == null) return null;
+            String gradle = "";
+            try {
+                gradle = getText("https://raw.githubusercontent.com/" + repo + "/" + partial.sha + "/control-tower-android/app/build.gradle");
+            } catch (Exception ignored) {}
+            return BuildIdentity.fromWorkflowRuns(runs, gradle);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private static String getText(String url) throws Exception {
+        HttpURLConnection c = open(url, "GET");
+        c.setInstanceFollowRedirects(true);
+        c.setRequestProperty("Accept", "application/vnd.github+json, text/plain, */*");
+        c.setRequestProperty("User-Agent", "ControlTower/" + appVersion());
+        int code = c.getResponseCode();
+        InputStream in = code >= 200 && code < 400 ? c.getInputStream() : c.getErrorStream();
+        StringBuilder sb = new StringBuilder();
+        if (in != null) {
+            try (BufferedReader br = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8))) {
+                String line;
+                while ((line = br.readLine()) != null) sb.append(line).append('\n');
+            }
+        }
+        c.disconnect();
+        if (code < 200 || code >= 300) throw new IllegalStateException("http " + code);
+        return sb.toString();
     }
 
     /**

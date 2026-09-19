@@ -44,6 +44,18 @@ public final class Project {
     /** Freshness is based on meaningful progress, never on repetitive automation. */
     public final Freshness freshness;
 
+    // Contract v5: compact purpose line, deterministic status, OS alignment (separate clock).
+    public final String shortDescription;
+    public final Status status;
+    public final String statusReason;
+    public final OsAlignment osAlignment;
+    public final long lastOsCheckMillis;   // -1 when never checked
+    public final String osVersionSeen;
+    public final String osChangeMarker;
+    public final String osEvidence;
+    public final String osSyncAction;
+    public final String osCurrentMarker;
+
     private Project(JSONObject o, long now) {
         id = o.optString("id", "");
         name = o.optString("name", "פרויקט");
@@ -94,6 +106,33 @@ public final class Project {
         latestMeaningfulActivityEvidenceUrl = o.optString("latest_meaningful_activity_evidence_url", lastProgressMillis > 0 ? link : "");
 
         freshness = Freshness.of(latestMeaningfulActivityMillis, expectedCadence, now);
+
+        shortDescription = o.optString("short_description", "").trim();
+        Status fromGateway = Status.parse(o.optString("status_bucket", ""));
+        status = fromGateway != null ? fromGateway : Status.derive(this);
+        String reason = o.optString("status_reason", "").trim();
+        statusReason = reason.isEmpty() ? Status.deriveReason(this, status) : reason;
+        osAlignment = OsAlignment.parse(o.optString("os_alignment", ""));
+        lastOsCheckMillis = TimeText.parse(o.optString("last_os_check", ""));
+        osVersionSeen = o.optString("os_version_seen", "").trim();
+        osChangeMarker = o.optString("os_change_marker", "").trim();
+        osEvidence = o.optString("os_evidence", "").trim();
+        osSyncAction = o.optString("os_sync_action", "").trim();
+        osCurrentMarker = o.optString("os_current_marker", "").trim();
+    }
+
+    /** Name plus the optional one-line purpose: "Momentum OS — אפליקציית ניהול בית". */
+    public String compactTitle() {
+        return shortDescription.isEmpty() ? name : name + " — " + shortDescription;
+    }
+
+    /** Evidence URL for the OS record, when the evidence text carries one. */
+    public String osEvidenceUrl() {
+        int i = osEvidence.indexOf("http");
+        if (i < 0) return "";
+        String rest = osEvidence.substring(i);
+        int end = rest.indexOf(' ');
+        return end > 0 ? rest.substring(0, end) : rest;
     }
 
     public static Project from(JSONObject o, long now) {

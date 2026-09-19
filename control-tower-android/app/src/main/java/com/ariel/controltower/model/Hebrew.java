@@ -110,6 +110,21 @@ public final class Hebrew {
         }
     }
 
+    /** Ideas incubator stage. */
+    public static String ideaStage(String s) {
+        switch (norm(s)) {
+            case "INBOX": return "חדש";
+            case "CLARIFY": return "מיקוד צורך";
+            case "SHAPE": return "עיצוב פתרון";
+            case "VALIDATE": return "בדיקת ערך";
+            case "READY": return "מוכן לפרויקט";
+            case "PARKED": return "בהמתנה";
+            case "PROMOTED": return "הפך לפרויקט";
+            case "ARCHIVED": return "בארכיון";
+            default: return s == null ? "" : s.trim();
+        }
+    }
+
     public static String activityType(String type) {
         switch (norm(type)) {
             case "PROGRESS": return "התקדמות";

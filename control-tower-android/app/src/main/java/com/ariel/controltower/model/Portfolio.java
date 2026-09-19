@@ -18,6 +18,8 @@ public final class Portfolio {
     public final boolean fromCache;
 
     public final int red, watch, green, needsAttention, stale, unknownActivity, unknownCadence;
+    public final int[] statusCounts = new int[Status.values().length];
+    public final int osAligned, osNeedsAction;
 
     private Portfolio(List<Project> projects, List<Project> infrastructure, long syncedAt, long serverSnapshotAt, int contractVersion, boolean fromCache) {
         this.projects = Collections.unmodifiableList(projects);
@@ -26,8 +28,10 @@ public final class Portfolio {
         this.serverSnapshotAt = serverSnapshotAt;
         this.contractVersion = contractVersion;
         this.fromCache = fromCache;
-        int r = 0, w = 0, g = 0, n = 0, s = 0, u = 0, uc = 0;
+        int r = 0, w = 0, g = 0, n = 0, s = 0, u = 0, uc = 0, oa = 0, on = 0;
         for (Project p : projects) {
+            statusCounts[p.status.ordinal()]++;
+            if (p.osAlignment == OsAlignment.CURRENT) oa++; else on++;
             if (p.isRed()) r++; else if (p.isGreen()) g++; else w++;
             if (p.needsAttention()) n++;
             if (p.isStale()) s++;
@@ -35,6 +39,7 @@ public final class Portfolio {
             if (p.freshness.reason == Freshness.Reason.NO_CADENCE) uc++;
         }
         red = r; watch = w; green = g; needsAttention = n; stale = s; unknownActivity = u; unknownCadence = uc;
+        osAligned = oa; osNeedsAction = on;
     }
 
     /** Build from a gateway `portfolio` response body. */
@@ -67,6 +72,19 @@ public final class Portfolio {
         if (tb <= 0) return -1;
         return Long.compare(tb, ta);
     };
+
+    public int count(Status s) { return statusCounts[s.ordinal()]; }
+
+    /** Home / Projects filter: by status, or the stale modifier, or everything (null, false). */
+    public List<Project> filter(Status status, boolean staleOnly) {
+        List<Project> out = new ArrayList<>();
+        for (Project p : projects) {
+            if (status != null && p.status != status) continue;
+            if (staleOnly && !p.isStale()) continue;
+            out.add(p);
+        }
+        return out;
+    }
 
     public List<Project> attention() {
         List<Project> out = new ArrayList<>();

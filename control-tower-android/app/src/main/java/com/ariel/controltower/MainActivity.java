@@ -10,9 +10,11 @@ import static com.ariel.controltower.Theme.NAV;
 import static com.ariel.controltower.Theme.RED;
 import static com.ariel.controltower.Theme.SURFACE;
 import static com.ariel.controltower.Theme.SURFACE_2;
+import static com.ariel.controltower.Theme.TEAL;
 import static com.ariel.controltower.Theme.TEXT;
 
 import android.app.Activity;
+import android.content.ClipData;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Color;
@@ -21,14 +23,13 @@ import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Bundle;
 import android.text.InputType;
-import android.text.TextUtils;
+import android.view.DragEvent;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.FrameLayout;
-import android.widget.HorizontalScrollView;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
@@ -36,15 +37,21 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.ariel.controltower.model.BuildIdentity;
+import com.ariel.controltower.model.DeputyDigest;
 import com.ariel.controltower.model.Freshness;
 import com.ariel.controltower.model.Hebrew;
+import com.ariel.controltower.model.IdeaBoard;
+import com.ariel.controltower.model.OsAlignment;
 import com.ariel.controltower.model.Portfolio;
 import com.ariel.controltower.model.Project;
+import com.ariel.controltower.model.Status;
 import com.ariel.controltower.model.TimeText;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -53,27 +60,38 @@ import java.util.concurrent.Executors;
  * Control Tower — private single-owner Android client.
  * Data: PROJECT_CONTROL_BOARD Sheet via the Apps Script gateway ({@link Gateway}).
  * Push: FCM, transport only ({@link PushNotifications}).
- * Presentation rules live in {@code com.ariel.controltower.model} and are unit-tested.
+ * Rule of the UI: compact first, detail only on explicit open. Every Ariel-facing string is Hebrew.
  */
 public class MainActivity extends Activity {
     private static final int TAB_HOME = 0, TAB_PROJECTS = 1, TAB_IDEAS = 2, TAB_DEPUTY = 3, TAB_ACTIVITY = 4;
     private static final String CACHE_PREFS = "control_tower_cache";
+    private static final long REFRESH_MIN_INTERVAL = 45_000L;
+    private static final String REPO = "arieldeitch/ai-project-management-platform";
 
     private final ExecutorService io = Executors.newSingleThreadExecutor();
     private FrameLayout contentHost;
     private LinearLayout nav;
     private int activeTab = TAB_HOME;
     private boolean detailOpen = false;
-    private Portfolio portfolio;          // last snapshot rendered (live or cached)
-    private static final long REFRESH_MIN_INTERVAL = 45_000L;
-    private boolean forceRefresh = false; // set by the explicit refresh button
+    private boolean forceRefresh = false;
+    private Portfolio portfolio;
+
+    // Home / Projects filter state (in-memory; obvious on screen; one tap to clear)
+    private Status filterStatus = null;
+    private boolean filterStale = false;
+    private boolean filterOs = false;
+    private boolean legendOpen = false;
+
+    // Ideas: optimistic local board + background sync
+    private IdeaBoard ideaBoard;
+    private boolean ideaSyncPending = false;
+    private String expandedIdeaId = null;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         getWindow().setStatusBarColor(BG);
         getWindow().setNavigationBarColor(NAV);
-        // 0.3.0 kept Supabase session tokens here; the Drive-first client has no login, so purge them.
         getSharedPreferences("control_tower_session", MODE_PRIVATE).edit().clear().apply();
         applyRoutingIntent(getIntent());
         if (Gateway.isConfigured(this)) showApp(); else showSetup(null);
@@ -94,22 +112,15 @@ public class MainActivity extends Activity {
 
     @Override
     public void onBackPressed() {
-        // Never a dead end: detail -> its list, secondary tab -> Home, Home -> leave the app.
-        if (contentHost != null && detailOpen) {
-            selectTab(activeTab);
-            return;
-        }
-        if (contentHost != null && activeTab != TAB_HOME) {
-            selectTab(TAB_HOME);
-            return;
-        }
+        if (contentHost != null && detailOpen) { selectTab(activeTab); return; }
+        if (contentHost != null && activeTab != TAB_HOME) { selectTab(TAB_HOME); return; }
         super.onBackPressed();
     }
 
     private boolean applyRoutingIntent(Intent intent) {
         if (intent == null) return false;
         String target = intent.getStringExtra(PushNotifications.EXTRA_TARGET);
-        if (target == null) target = intent.getStringExtra("target"); // FCM-displayed notifications pass raw data keys
+        if (target == null) target = intent.getStringExtra("target");
         if (target == null) return false;
         switch (target) {
             case "now": activeTab = TAB_HOME; return true;
@@ -129,9 +140,7 @@ public class MainActivity extends Activity {
 
     // ---------- view helpers ----------
 
-    private int dp(int n) {
-        return Math.round(n * getResources().getDisplayMetrics().density);
-    }
+    private int dp(int n) { return Math.round(n * getResources().getDisplayMetrics().density); }
 
     private GradientDrawable box(int color, int strokeColor, int radiusDp) {
         GradientDrawable d = new GradientDrawable();
@@ -149,7 +158,7 @@ public class MainActivity extends Activity {
         t.setGravity(Gravity.START);
         t.setTextDirection(View.TEXT_DIRECTION_ANY_RTL);
         t.setTextAlignment(View.TEXT_ALIGNMENT_VIEW_START);
-        t.setLineSpacing(0, 1.15f);
+        t.setLineSpacing(0, 1.12f);
         if (bold) t.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         return t;
     }
@@ -165,15 +174,20 @@ public class MainActivity extends Activity {
         return lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, top, bottom);
     }
 
+    private LinearLayout.LayoutParams grow() {
+        return new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+    }
+
     private Button actionButton(String label, boolean primary) {
         Button b = new Button(this);
         b.setText(label);
-        b.setTextSize(15);
+        b.setTextSize(14);
         b.setAllCaps(false);
         b.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         b.setTextColor(primary ? BG : TEXT);
-        b.setBackground(box(primary ? BLUE : SURFACE_2, primary ? BLUE : BORDER, 14));
-        b.setMinHeight(dp(46));
+        b.setBackground(box(primary ? BLUE : SURFACE_2, primary ? BLUE : BORDER, 12));
+        b.setMinHeight(dp(44));
+        b.setMinimumHeight(dp(44));
         return b;
     }
 
@@ -184,8 +198,8 @@ public class MainActivity extends Activity {
         b.setAllCaps(false);
         b.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         b.setTextColor(BLUE);
-        b.setBackground(box(Theme.tint(BLUE, 28), Theme.tint(BLUE, 90), 12));
-        b.setPadding(dp(14), 0, dp(14), 0);
+        b.setBackground(box(Theme.tint(BLUE, 24), Theme.tint(BLUE, 80), 12));
+        b.setPadding(dp(12), 0, dp(12), 0);
         b.setMinHeight(dp(44));
         b.setMinimumHeight(dp(44));
         return b;
@@ -196,9 +210,11 @@ public class MainActivity extends Activity {
         e.setHint(hint);
         e.setTextColor(TEXT);
         e.setHintTextColor(MUTED);
+        e.setTextSize(15);
         e.setBackground(box(SURFACE, BORDER, 12));
-        e.setPadding(dp(14), dp(multiline ? 14 : 0), dp(14), dp(multiline ? 14 : 0));
-        if (!multiline) e.setSingleLine(true);
+        e.setPadding(dp(14), dp(multiline ? 12 : 0), dp(14), dp(multiline ? 12 : 0));
+        e.setTextDirection(View.TEXT_DIRECTION_ANY_RTL);
+        if (!multiline) e.setSingleLine(true); else e.setGravity(Gravity.TOP | Gravity.START);
         return e;
     }
 
@@ -210,19 +226,24 @@ public class MainActivity extends Activity {
         return r;
     }
 
-    private LinearLayout card() {
+    private LinearLayout column() {
         LinearLayout c = new LinearLayout(this);
         c.setOrientation(LinearLayout.VERTICAL);
-        c.setPadding(dp(14), dp(13), dp(14), dp(13));
-        c.setBackground(box(SURFACE, BORDER, 14));
         c.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+        return c;
+    }
+
+    private LinearLayout card() {
+        LinearLayout c = column();
+        c.setPadding(dp(12), dp(10), dp(12), dp(10));
+        c.setBackground(box(SURFACE, BORDER, 12));
         return c;
     }
 
     private TextView chip(String label, int color) {
         TextView b = text(label, 11, color, true);
-        b.setBackground(box(Theme.tint(color, 38), Theme.tint(color, 140), 20));
-        b.setPadding(dp(9), dp(4), dp(9), dp(4));
+        b.setBackground(box(Theme.tint(color, 34), Theme.tint(color, 120), 20));
+        b.setPadding(dp(8), dp(3), dp(8), dp(3));
         return b;
     }
 
@@ -234,8 +255,8 @@ public class MainActivity extends Activity {
     }
 
     private TextView section(String value) {
-        TextView t = text(value, 16, TEXT, true);
-        t.setPadding(0, dp(10), 0, dp(8));
+        TextView t = text(value, 15, TEXT, true);
+        t.setPadding(0, dp(8), 0, dp(6));
         return t;
     }
 
@@ -243,7 +264,7 @@ public class MainActivity extends Activity {
         LinearLayout l = new LinearLayout(this);
         l.setGravity(Gravity.CENTER);
         ProgressBar p = new ProgressBar(this);
-        l.addView(p, new LinearLayout.LayoutParams(dp(38), dp(38)));
+        l.addView(p, new LinearLayout.LayoutParams(dp(34), dp(34)));
         return l;
     }
 
@@ -255,81 +276,109 @@ public class MainActivity extends Activity {
 
     private long now() { return System.currentTimeMillis(); }
 
-    // ---------- setup state (replaces the old login) ----------
+    private int statusColor(Status s) {
+        switch (s) {
+            case NEEDS_ARIEL: return RED;
+            case BLOCKED: return AMBER;
+            case AT_RISK: return RED;
+            case WATCH: return AMBER;
+            default: return GREEN;
+        }
+    }
+
+    private int osColor(OsAlignment a) {
+        switch (a) {
+            case CURRENT: return GREEN;
+            case VERSION_DRIFT: return AMBER;
+            case ACCESS_FAILED: return RED;
+            default: return MUTED;
+        }
+    }
+
+    private int freshnessColor(Freshness.State s) {
+        switch (s) {
+            case FRESH: return GREEN;
+            case AGING: return AMBER;
+            case STALE: return RED;
+            default: return MUTED;
+        }
+    }
+
+    /** "עוד פרטים ▾" toggle that reveals a block only on tap. */
+    private void collapsible(LinearLayout parent, String title, LinearLayout body, boolean startOpen) {
+        TextView toggle = text((startOpen ? "▾ " : "▸ ") + title, 13, BLUE, true);
+        toggle.setMinHeight(dp(44));
+        toggle.setGravity(Gravity.CENTER_VERTICAL | Gravity.START);
+        toggle.setContentDescription(title);
+        body.setVisibility(startOpen ? View.VISIBLE : View.GONE);
+        toggle.setOnClickListener(v -> {
+            boolean open = body.getVisibility() == View.VISIBLE;
+            body.setVisibility(open ? View.GONE : View.VISIBLE);
+            toggle.setText((open ? "▸ " : "▾ ") + title);
+        });
+        parent.addView(toggle, full(4, 0));
+        parent.addView(body, full(0, 4));
+    }
+
+    private void openUrl(String url) {
+        try {
+            startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
+        } catch (Exception e) {
+            Toast.makeText(this, "לא ניתן לפתוח את הקישור", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    // ---------- setup state ----------
 
     private void showSetup(String problem) {
         ScrollView scroll = new ScrollView(this);
         scroll.setFillViewport(true);
         scroll.setBackgroundColor(BG);
-        LinearLayout wrap = new LinearLayout(this);
-        wrap.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout wrap = column();
         wrap.setGravity(Gravity.CENTER_VERTICAL);
         wrap.setPadding(dp(24), dp(36), dp(24), dp(36));
-        wrap.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
 
         ImageView mark = new ImageView(this);
         mark.setImageResource(R.drawable.ic_brand_mark);
-        mark.setContentDescription("Control Tower");
-        LinearLayout.LayoutParams markLp = new LinearLayout.LayoutParams(dp(72), dp(72));
-        markLp.bottomMargin = dp(18);
+        mark.setContentDescription("מגדל הפיקוח");
+        LinearLayout.LayoutParams markLp = new LinearLayout.LayoutParams(dp(64), dp(64));
+        markLp.bottomMargin = dp(16);
         wrap.addView(mark, markLp);
+        wrap.addView(text("מגדל הפיקוח", 28, TEXT, true));
+        wrap.addView(text("חיבור חד־פעמי ללוח הבקרה", 15, MUTED, false), full(4, 18));
+        wrap.addView(text(Gateway.isBuildConfigured() ? "ההגדרה שנשמרה במכשיר אינה תקינה — הדבק שוב." : "הדבק פעם אחת את כתובת השער ואת הטוקן שקיבלת.", 14, MUTED, false), full(0, 16));
 
-        wrap.addView(text("מגדל הפיקוח", 30, TEXT, true));
-        wrap.addView(text("חיבור לשער הנתונים", 16, MUTED, false), full(4, 20));
-        String explain = Gateway.isBuildConfigured()
-                ? "הגרסה נבנתה עם שער, אבל ההגדרה שנשמרה במכשיר אינה תקינה."
-                : "הגרסה הזו נבנתה בלי טוקן. הדבק כאן פעם אחת את כתובת השער ואת הטוקן.";
-        wrap.addView(text(explain, 14, MUTED, false), full(0, 18));
-
-        EditText url = input("כתובת Web App של Apps Script", false);
+        EditText url = input("כתובת השער", false);
         url.setText(Gateway.url(this));
         url.setTextDirection(View.TEXT_DIRECTION_LTR);
         url.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
-        wrap.addView(url, lp(ViewGroup.LayoutParams.MATCH_PARENT, dp(54), 0, 12));
-
-        EditText token = input("טוקן השער (לפחות 32 תווים)", false);
+        wrap.addView(url, lp(ViewGroup.LayoutParams.MATCH_PARENT, dp(52), 0, 10));
+        EditText token = input("טוקן (לפחות 32 תווים)", false);
         token.setTextDirection(View.TEXT_DIRECTION_LTR);
         token.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
-        wrap.addView(token, lp(ViewGroup.LayoutParams.MATCH_PARENT, dp(54), 0, 16));
-
+        wrap.addView(token, lp(ViewGroup.LayoutParams.MATCH_PARENT, dp(52), 0, 14));
         TextView status = text(problem == null ? "" : problem, 13, problem == null ? MUTED : RED, false);
         Button connect = actionButton("בדוק והתחבר", true);
-        wrap.addView(connect, lp(ViewGroup.LayoutParams.MATCH_PARENT, dp(52), 0, 10));
-        wrap.addView(status, full(8, 0));
+        wrap.addView(connect, lp(ViewGroup.LayoutParams.MATCH_PARENT, dp(50), 0, 8));
+        wrap.addView(status, full(6, 0));
 
         connect.setOnClickListener(v -> {
             String u = url.getText().toString().trim();
             String t = token.getText().toString().trim();
-            if (!u.startsWith("https://script.google.com/")) {
-                status.setText("הכתובת צריכה להתחיל ב-https://script.google.com/");
-                status.setTextColor(RED);
-                return;
-            }
-            if (t.length() < 32) {
-                status.setText("הטוקן קצר מדי.");
-                status.setTextColor(RED);
-                return;
-            }
+            if (!u.startsWith("https://script.google.com/")) { status.setText("הכתובת צריכה להתחיל ב-https://script.google.com/"); status.setTextColor(RED); return; }
+            if (t.length() < 32) { status.setText("הטוקן קצר מדי."); status.setTextColor(RED); return; }
             connect.setEnabled(false);
-            status.setText("בודק מול השער…");
+            status.setText("בודק…");
             status.setTextColor(MUTED);
             Gateway.saveOverride(this, u, t);
             io.execute(() -> {
                 Gateway.Result r = Gateway.call(this, "health", new JSONObject());
                 runOnUiThread(() -> {
-                    if (r.ok()) {
-                        Toast.makeText(this, "מחובר ללוח " + r.body.optString("spreadsheet_title", "PROJECT_CONTROL_BOARD"), Toast.LENGTH_SHORT).show();
-                        showApp();
-                    } else {
-                        Gateway.saveOverride(this, "", "");
-                        connect.setEnabled(true);
-                        status.setText(r.describe());
-                        status.setTextColor(RED);
-                    }
+                    if (r.ok()) showApp();
+                    else { Gateway.saveOverride(this, "", ""); connect.setEnabled(true); status.setText(r.describe()); status.setTextColor(RED); }
                 });
             });
         });
-
         scroll.addView(wrap);
         setContentView(scroll);
         Insets.applySystemBars(scroll);
@@ -338,31 +387,25 @@ public class MainActivity extends Activity {
     // ---------- shell + navigation ----------
 
     private void showApp() {
-        LinearLayout root = new LinearLayout(this);
-        root.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout root = column();
         root.setBackgroundColor(BG);
-        root.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
-
         contentHost = new FrameLayout(this);
         root.addView(contentHost, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
-
         View divider = new View(this);
         divider.setBackgroundColor(BORDER);
         root.addView(divider, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(1)));
-
         nav = new LinearLayout(this);
         nav.setOrientation(LinearLayout.HORIZONTAL);
-        nav.setPadding(dp(8), dp(6), dp(8), dp(8));
+        nav.setPadding(dp(6), dp(6), dp(6), dp(8));
         nav.setGravity(Gravity.CENTER);
         nav.setBackgroundColor(NAV);
-        root.addView(nav, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(66)));
+        root.addView(nav, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(64)));
         setContentView(root);
-        // Status bar sits over the BG-coloured top padding; the nav bar extends under the gesture area.
         root.setOnApplyWindowInsetsListener((v, insets) -> {
             int[] bars = Insets.bars(insets);
             v.setPadding(bars[0], bars[1], bars[2], 0);
-            nav.setPadding(dp(8), dp(6), dp(8), dp(8) + bars[3]);
-            nav.getLayoutParams().height = dp(66) + bars[3];
+            nav.setPadding(dp(6), dp(6), dp(6), dp(8) + bars[3]);
+            nav.getLayoutParams().height = dp(64) + bars[3];
             nav.requestLayout();
             return insets;
         });
@@ -380,14 +423,14 @@ public class MainActivity extends Activity {
             Button b = new Button(this);
             b.setText(labels[i]);
             b.setAllCaps(false);
-            b.setTextSize(active ? 14 : 13);
+            b.setTextSize(13);
             b.setTypeface(Typeface.DEFAULT, active ? Typeface.BOLD : Typeface.NORMAL);
-            b.setTextColor(active ? BG : TEXT);
-            b.setBackground(active ? box(BLUE, BLUE, 14) : box(Color.TRANSPARENT, Color.TRANSPARENT, 14));
+            b.setTextColor(active ? TEXT : MUTED);
+            b.setBackground(active ? box(Theme.tint(BLUE, 60), Theme.tint(BLUE, 140), 12) : box(Color.TRANSPARENT, Color.TRANSPARENT, 12));
             b.setContentDescription(labels[i] + (active ? " (מסך נוכחי)" : ""));
             b.setOnClickListener(v -> selectTab(index));
             LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f);
-            p.setMargins(dp(3), 0, dp(3), 0);
+            p.setMargins(dp(2), 0, dp(2), 0);
             nav.addView(b, p);
         }
     }
@@ -404,39 +447,25 @@ public class MainActivity extends Activity {
         else showActivity();
     }
 
-    /** Screen scaffold: title row (with a small "בית" link on secondary tabs), then a column for content. */
-    private ScrollView screen(String title, String subtitle, boolean secondary) {
+    /** Screen scaffold: compact title row (+ optional action button) then a re-renderable content column. */
+    private ScrollView screen(String title, View action) {
         ScrollView scroll = new ScrollView(this);
         scroll.setFillViewport(true);
         scroll.setBackgroundColor(BG);
-        LinearLayout col = new LinearLayout(this);
-        col.setTag("screen-column");
-        col.setOrientation(LinearLayout.VERTICAL);
-        col.setPadding(dp(16), dp(16), dp(16), dp(28));
-        col.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
-
+        LinearLayout col = column();
+        col.setPadding(dp(14), dp(12), dp(14), dp(24));
         LinearLayout head = row();
-        TextView t = text(title, 26, TEXT, true);
-        head.addView(t, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-        if (secondary) {
-            Button home = linkButton("בית ‹");
-            home.setOnClickListener(v -> selectTab(TAB_HOME));
-            head.addView(home);
-        }
-        col.addView(head);
-        if (subtitle != null && !subtitle.isEmpty()) col.addView(text(subtitle, 13, MUTED, false), full(2, 12));
-        else col.addView(new View(this), lp(ViewGroup.LayoutParams.MATCH_PARENT, dp(8), 0, 0));
-        LinearLayout content = new LinearLayout(this);
+        head.addView(text(title, 22, TEXT, true), grow());
+        if (action != null) head.addView(action);
+        col.addView(head, full(0, 8));
+        LinearLayout content = column();
         content.setTag("screen-content");
-        content.setOrientation(LinearLayout.VERTICAL);
-        content.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
         col.addView(content, full(0, 0));
         scroll.addView(col);
         return scroll;
     }
 
-    /** The content container below the fixed header; safe to clear and re-render. */
-    private LinearLayout column(ScrollView scroll) {
+    private LinearLayout content(ScrollView scroll) {
         return (LinearLayout) scroll.findViewWithTag("screen-content");
     }
 
@@ -444,9 +473,7 @@ public class MainActivity extends Activity {
 
     private interface PortfolioCallback { void run(Portfolio p, String error); }
 
-    private SharedPreferences cache() {
-        return getSharedPreferences(CACHE_PREFS, MODE_PRIVATE);
-    }
+    private SharedPreferences cache() { return getSharedPreferences(CACHE_PREFS, MODE_PRIVATE); }
 
     private Portfolio cachedPortfolio() {
         String json = cache().getString("portfolio", null);
@@ -469,7 +496,7 @@ public class MainActivity extends Activity {
                 try {
                     JSONObject body = r.body;
                     body.put("synced_at", at);
-                    cache().edit().putString("portfolio", body.toString()).putLong("synced_at", at).apply();
+                    cache().edit().putString("portfolio", body.toString()).putLong("synced_at", at).putInt("contract", body.optInt("contract_version", 1)).apply();
                     Portfolio p = Portfolio.from(body, at, false);
                     runOnUiThread(() -> cb.run(p, null));
                 } catch (Exception e) {
@@ -482,297 +509,232 @@ public class MainActivity extends Activity {
         });
     }
 
-    // ---------- snapshot freshness line ----------
-
-    private int freshnessColor(Freshness.State s) {
-        switch (s) {
-            case FRESH: return GREEN;
-            case AGING: return AMBER;
-            case STALE: return RED;
-            default: return MUTED;
+    /** Shared by Home and Projects: render cache instantly, refresh in place unless the snapshot is fresh. */
+    private void loadInto(ScrollView s, LinearLayout c, int tab, Renderer render) {
+        Portfolio cached = cachedPortfolio();
+        if (cached != null) render.run(c, cached, null, true);
+        else c.addView(loading(), lp(ViewGroup.LayoutParams.MATCH_PARENT, dp(70), 10, 0));
+        if (cached != null && !forceRefresh && now() - cached.syncedAt < REFRESH_MIN_INTERVAL) {
+            c.removeAllViews();
+            render.run(c, cached, null, false);
+            return;
         }
+        forceRefresh = false;
+        loadPortfolio((p, err) -> {
+            if (contentHost == null || activeTab != tab || detailOpen) return;
+            int y = s.getScrollY();
+            c.removeAllViews();
+            if (p != null) render.run(c, p, null, false);
+            else if (cached != null) render.run(c, cached, err, false);
+            else renderLoadError(c, err);
+            if (y > 0) s.post(() -> s.scrollTo(0, y));
+        });
     }
 
-    /** "עודכן לאחרונה: 18/09/2026 15:12 · לפני 2 דקות" (+ cache warning). */
-    private View snapshotLine(Portfolio p, String refreshError) {
-        return snapshotLine(p, refreshError, true);
+    private interface Renderer { void run(LinearLayout c, Portfolio p, String refreshError, boolean refreshing); }
+
+    private void renderLoadError(LinearLayout c, String err) {
+        LinearLayout e = card();
+        e.setBackground(box(Theme.tint(RED, 26), Theme.tint(RED, 120), 12));
+        e.addView(text("לא ניתן לטעון את הפורטפוליו", 15, TEXT, true));
+        e.addView(text(err == null || err.isEmpty() ? "בדוק חיבור לרשת או את הגדרת השער." : err, 13, MUTED, false), full(4, 8));
+        Button retry = actionButton("נסה שוב", true);
+        retry.setOnClickListener(v -> { forceRefresh = true; selectTab(activeTab); });
+        e.addView(retry, lp(ViewGroup.LayoutParams.MATCH_PARENT, dp(44), 0, 0));
+        c.addView(e, full(6, 0));
     }
 
-    private View snapshotLine(Portfolio p, String refreshError, boolean warnIfCached) {
-        LinearLayout box = new LinearLayout(this);
-        box.setOrientation(LinearLayout.VERTICAL);
-        box.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+    /** One line: when the data on screen was fetched, plus a warning only when a refresh actually failed. */
+    private View snapshotLine(Portfolio p, String refreshError, boolean refreshing) {
+        LinearLayout box = column();
         long age = now() - p.syncedAt;
         int color = age < 15 * 60_000L ? GREEN : age < 2 * Freshness.HOUR ? AMBER : RED;
-        box.addView(text("עודכן לאחרונה: " + TimeText.wall(p.syncedAt, now()), 13, color, true));
-        // Only a real failed refresh earns the warning; a fresh cached snapshot is simply the data.
-        if (warnIfCached && refreshError != null && !refreshError.isEmpty()) {
-            String why = refreshError == null || refreshError.isEmpty() ? "" : " · " + refreshError;
-            box.addView(text("מוצג עותק שמור מהמכשיר — הרענון האחרון נכשל" + why, 12, AMBER, false), full(2, 0));
-        }
+        box.addView(text((refreshing ? "מרענן… · " : "") + "עודכן " + TimeText.relative(p.syncedAt, now()) + " · " + TimeText.absolute(p.syncedAt), 12, color, false));
+        if (refreshError != null && !refreshError.isEmpty()) box.addView(text("מוצג עותק שמור — הרענון נכשל: " + refreshError, 12, AMBER, false), full(2, 0));
         return box;
     }
 
-    // ---------- time wall ----------
+    // ---------- filters ----------
 
-    /** Live activity wall: observed activity is separate from meaningful-progress freshness. */
-    private View timeWall(Project p, boolean large) {
-        LinearLayout wall = new LinearLayout(this);
-        wall.setOrientation(LinearLayout.VERTICAL);
-        wall.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
-        int accent = freshnessColor(p.freshness.state);
-        wall.setBackground(box(SURFACE_2, Theme.tint(accent, 150), 12));
-        wall.setPadding(dp(12), dp(9), dp(12), dp(9));
+    private boolean filterActive() { return filterStatus != null || filterStale || filterOs; }
 
-        LinearLayout head = row();
-        head.addView(text("פעילות אחרונה שנצפתה", large ? 12 : 11, MUTED, true),
-                new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-        if (p.latestActivityMillis > 0) {
-            int activityColor = p.latestActivityIsAutomation() ? MUTED : BLUE;
-            head.addView(chip(Hebrew.activityType(p.latestActivityType), activityColor));
-        }
-        wall.addView(head);
-
-        if (p.latestActivityMillis > 0) {
-            TextView abs = text(TimeText.absolute(p.latestActivityMillis), large ? 24 : 18, TEXT, true);
-            abs.setTextDirection(View.TEXT_DIRECTION_LTR);
-            abs.setGravity(Gravity.START);
-            wall.addView(abs, full(4, 0));
-            wall.addView(text(TimeText.relative(p.latestActivityMillis, now()) + " · "
-                    + Hebrew.activitySource(p.latestActivitySource), large ? 15 : 13,
-                    p.latestActivityIsAutomation() ? MUTED : BLUE, true), full(1, 0));
-            if (p.latestActivityIsAutomation()) {
-                wall.addView(text("אוטומציה תפעולית — לא מחליפה התקדמות משמעותית.", 12, MUTED, false), full(3, 0));
-            }
-        } else {
-            wall.addView(text("לא נצפתה פעילות עדכנית", large ? 18 : 15, TEXT, true), full(4, 0));
-        }
-
-        LinearLayout meaningful = row();
-        meaningful.addView(text("התקדמות משמעותית", 11, MUTED, true),
-                new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-        meaningful.addView(chip(Hebrew.freshness(p.freshness.state), accent));
-        wall.addView(meaningful, full(8, 0));
-
-        if (p.latestMeaningfulActivityMillis > 0) {
-            wall.addView(text(TimeText.wall(p.latestMeaningfulActivityMillis, now()) + " · "
-                    + Hebrew.activitySource(p.latestMeaningfulActivitySource), 12, TEXT, true), full(3, 0));
-        } else {
-            wall.addView(text("לא זוהתה התקדמות משמעותית עדכנית", 12, MUTED, false), full(3, 0));
-            if (!p.lastProgressRaw.isEmpty()) {
-                wall.addView(text("בלוח רשום: " + shortText(p.lastProgressRaw, 60), 12, MUTED, false), full(2, 0));
-            }
-        }
-
-        String note = p.freshness.note();
-        if (p.freshness.reason != Freshness.Reason.NO_TIMESTAMP && !note.isEmpty()) {
-            wall.addView(text(note, 12,
-                    p.freshness.state == Freshness.State.UNKNOWN ? MUTED : accent, false), full(3, 0));
-        }
-        return wall;
+    private String filterLabel() {
+        if (filterStatus != null) return filterStatus.label;
+        if (filterStale) return "ישן";
+        if (filterOs) return "לא מיושר ל-OS";
+        return "";
     }
 
-    // ---------- project cards ----------
+    private List<Project> applyFilter(Portfolio p) {
+        List<Project> base = p.filter(filterStatus, filterStale);
+        if (!filterOs) return base;
+        List<Project> out = new ArrayList<>();
+        for (Project x : base) if (x.osAlignment != OsAlignment.CURRENT) out.add(x);
+        return out;
+    }
 
-    private void addProjectCard(LinearLayout parent, Project p, boolean attention) {
+    private TextView filterChip(String label, int count, int color, boolean active, Runnable onTap) {
+        // RIGHT-TO-LEFT MARK keeps the count on the Hebrew side even when the label ends in Latin ("OS").
+        TextView t = chip(label + String.valueOf((char) 0x200F) + " " + count, count > 0 ? color : MUTED);
+        t.setTextSize(12);
+        t.setMinHeight(dp(36));
+        t.setGravity(Gravity.CENTER);
+        t.setPadding(dp(10), dp(6), dp(10), dp(6));
+        if (active) t.setBackground(box(Theme.tint(color, 110), color, 20));
+        t.setContentDescription((active ? "מסנן פעיל: " : "סנן לפי ") + label);
+        t.setOnClickListener(v -> onTap.run());
+        return t;
+    }
+
+    /** Status counts as tappable filters + legend toggle. Tapping the active filter clears it. */
+    private void addFilterBar(LinearLayout c, Portfolio p, int tab) {
+        LinearLayout wrap = column();
+        LinearLayout line1 = row();
+        for (Status s : Status.values()) {
+            final Status st = s;
+            line1.addView(filterChip(s.label, p.count(s), statusColor(s), filterStatus == s, () -> {
+                filterStatus = filterStatus == st ? null : st; filterStale = false; filterOs = false; selectTab(tab);
+            }), chipLp());
+        }
+        wrap.addView(line1);
+        LinearLayout line2 = row();
+        line2.addView(filterChip("ישן", p.stale, AMBER, filterStale, () -> { filterStale = !filterStale; filterStatus = null; filterOs = false; selectTab(tab); }), chipLp());
+        line2.addView(filterChip("לא מיושר ל-OS", p.osNeedsAction, MUTED, filterOs, () -> { filterOs = !filterOs; filterStatus = null; filterStale = false; selectTab(tab); }), chipLp());
+        TextView legend = chip(legendOpen ? "✕ הסבר" : "ⓘ מה זה אומר", BLUE);
+        legend.setMinHeight(dp(36));
+        legend.setGravity(Gravity.CENTER);
+        legend.setPadding(dp(10), dp(6), dp(10), dp(6));
+        legend.setOnClickListener(v -> { legendOpen = !legendOpen; selectTab(tab); });
+        line2.addView(legend, chipLp());
+        wrap.addView(line2, full(2, 0));
+        if (filterActive()) {
+            LinearLayout f = row();
+            f.addView(text("מסונן: " + filterLabel(), 13, TEXT, true), grow());
+            Button clear = linkButton("נקה סינון ✕");
+            clear.setOnClickListener(v -> { filterStatus = null; filterStale = false; filterOs = false; selectTab(tab); });
+            f.addView(clear);
+            wrap.addView(f, full(4, 0));
+        }
+        if (legendOpen) {
+            LinearLayout lg = card();
+            lg.addView(text("מה כל סטטוס אומר", 13, TEXT, true));
+            for (Status s : Status.values()) lg.addView(text("• " + s.label + " — " + s.meaning + ". כלל: " + s.rule + ".", 12, MUTED, false), full(4, 0));
+            lg.addView(text("• ישן — ההתקדמות המשמעותית האחרונה ישנה מפי שניים מהקצב הצפוי של הפרויקט.", 12, MUTED, false), full(4, 0));
+            lg.addView(text("• לא מיושר ל-OS — אין ראיה שהפרויקט קרא את גרסת מערכת ההפעלה הנוכחית (לא נגזר מפעילות).", 12, MUTED, false), full(4, 0));
+            wrap.addView(lg, full(6, 0));
+        }
+        c.addView(wrap, full(0, 6));
+    }
+
+    // ---------- compact project row ----------
+
+    /** Two to three lines: name — purpose | status + why | activity time. Everything else is behind the tap. */
+    private void addProjectRow(LinearLayout parent, Project p, boolean emphasise) {
         LinearLayout c = card();
-        if (p.isRed()) c.setBackground(box(Theme.tint(RED, 26), Theme.tint(RED, 120), 14));
-        else if (attention) c.setBackground(box(SURFACE, Theme.tint(BLUE, 140), 14));
+        if (emphasise) c.setBackground(box(SURFACE, Theme.tint(statusColor(p.status), 140), 12));
 
         LinearLayout top = row();
-        top.addView(text(p.name, 17, TEXT, true), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-        top.addView(chip(Hebrew.ragBadge(p.rag), Theme.rag(p.rag)));
+        top.addView(text(p.compactTitle(), 15, TEXT, true), grow());
+        top.addView(chip(p.status.label, statusColor(p.status)));
         c.addView(top);
 
-        List<String> reasons = p.attentionReasons();
-        reasons.removeIf(r -> r.startsWith("אדום")); // the RAG chip already says it
-        if (attention && !reasons.isEmpty()) {
-            LinearLayout chips = row();
-            for (String r : reasons) chips.addView(chip(r, r.startsWith("צריך") ? RED : r.startsWith("מחכה") ? BLUE : AMBER), chipLp());
-            c.addView(chips, full(8, 0));
-        }
-
-        String status = p.statusSentence();
-        if (!status.isEmpty()) c.addView(text(shortText(status, 140), 13, TEXT, false), full(8, 0));
-
-        if (attention) {
+        c.addView(text(p.statusReason, 12, MUTED, false), full(4, 0));
+        if (p.status == Status.NEEDS_ARIEL || p.status == Status.BLOCKED) {
             String action = p.arielAction();
-            if (!action.isEmpty()) {
-                LinearLayout ask = row();
-                ask.addView(chip("מה צריך ממך", RED));
-                c.addView(ask, full(8, 0));
-                c.addView(text(shortText(action, 180), 14, TEXT, true), full(4, 0));
-            }
-        } else if (!p.nextAction.isEmpty()) {
-            c.addView(text("הבא: " + shortText(p.nextAction, 120), 13, MUTED, false), full(6, 0));
+            if (!action.isEmpty() && !p.statusReason.contains(action)) c.addView(text("הבא: " + shortText(action, 110), 12, TEXT, false), full(3, 0));
         }
 
-        c.addView(timeWall(p, false), full(10, 0));
+        LinearLayout when = row();
+        StringBuilder t = new StringBuilder();
+        if (p.latestActivityMillis > 0) t.append("פעילות ").append(TimeText.relative(p.latestActivityMillis, now())).append(" · ").append(TimeText.absolute(p.latestActivityMillis));
+        else t.append("לא נצפתה פעילות");
+        TextView whenText = text(t.toString(), 11, MUTED, false);
+        when.addView(whenText, grow());
+        if (p.freshness.state == Freshness.State.STALE || p.freshness.state == Freshness.State.AGING) when.addView(chip(Hebrew.freshness(p.freshness.state), freshnessColor(p.freshness.state)), chipLp());
+        if (p.osAlignment != OsAlignment.CURRENT) when.addView(chip(p.osAlignment.label, osColor(p.osAlignment)), chipLp());
+        c.addView(when, full(6, 0));
 
-        TextView open = text("לפרטים ›", 12, BLUE, true);
-        c.addView(open, full(8, 0));
         c.setOnClickListener(v -> showProjectDetail(p));
-        parent.addView(c, full(0, 10));
-    }
-
-    private void addCount(LinearLayout strip, String label, int count, int color) {
-        LinearLayout b = new LinearLayout(this);
-        b.setOrientation(LinearLayout.VERTICAL);
-        b.setGravity(Gravity.CENTER);
-        TextView n = text(String.valueOf(count), 22, count > 0 ? color : MUTED, true);
-        n.setGravity(Gravity.CENTER);
-        b.addView(n);
-        TextView l = text(label, 11, MUTED, true);
-        l.setGravity(Gravity.CENTER);
-        b.addView(l);
-        strip.addView(b, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f));
+        c.setContentDescription("פרויקט " + p.name + ", " + p.status.label + ". הקש לפרטים");
+        parent.addView(c, full(0, 6));
     }
 
     // ---------- בית ----------
 
     private void showHome() {
-        ScrollView s = screen("מגדל הפיקוח", null, false);
+        Button refresh = linkButton("רענון");
+        refresh.setContentDescription("רענון הנתונים מהלוח");
+        refresh.setOnClickListener(v -> { forceRefresh = true; selectTab(TAB_HOME); });
+        ScrollView s = screen("מגדל הפיקוח", refresh);
         contentHost.addView(s);
-        LinearLayout c = column(s);
-        Portfolio cached = cachedPortfolio();
-        if (cached != null) {
-            renderHome(c, cached, null, true);
-        } else {
-            c.addView(loading(), lp(ViewGroup.LayoutParams.MATCH_PARENT, dp(80), 10, 0));
-        }
-        if (cached != null && !forceRefresh && now() - cached.syncedAt < REFRESH_MIN_INTERVAL) {
-            // Fresh enough: render from cache without another gateway round-trip (no lifecycle churn).
-            c.removeAllViews();
-            renderHome(c, cached, null, false);
-            return;
-        }
-        forceRefresh = false;
-        loadPortfolio((p, err) -> {
-            if (contentHost == null || activeTab != TAB_HOME || detailOpen) return;
-            int y = s.getScrollY();
-            c.removeAllViews();
-            if (p != null) renderHome(c, p, null, false);
-            else if (cached != null) renderHome(c, cached, err, false);
-            else renderLoadError(c, err);
-            if (y > 0) s.post(() -> s.scrollTo(0, y));
-        });
-    }
-
-    private void renderLoadError(LinearLayout c, String err) {
-        LinearLayout e = card();
-        e.setBackground(box(Theme.tint(RED, 26), Theme.tint(RED, 120), 14));
-        e.addView(text("לא ניתן לטעון את הפורטפוליו", 16, TEXT, true));
-        e.addView(text(err == null || err.isEmpty() ? "בדוק חיבור לרשת או את הגדרת השער." : err, 13, MUTED, false), full(5, 10));
-        Button retry = actionButton("נסה שוב", true);
-        retry.setOnClickListener(v -> selectTab(activeTab));
-        e.addView(retry, lp(ViewGroup.LayoutParams.MATCH_PARENT, dp(46), 0, 0));
-        c.addView(e, full(8, 0));
+        loadInto(s, content(s), TAB_HOME, this::renderHome);
     }
 
     private void renderHome(LinearLayout c, Portfolio p, String refreshError, boolean refreshing) {
         portfolio = p;
+        c.addView(snapshotLine(p, refreshError, refreshing), full(0, 8));
+        String headline = p.projects.size() + " פרויקטים · " + (p.needsAttention == 0 ? "אין משהו שמחכה לך" : p.needsAttention == 1 ? "אחד מחכה לך" : p.needsAttention + " מחכים לך")
+                + (p.osAligned == p.projects.size() && !p.projects.isEmpty() ? " · כולם מיושרים ל-OS" : " · " + p.osNeedsAction + " ללא יישור OS");
+        c.addView(text(headline, 13, TEXT, true), full(0, 8));
+        addFilterBar(c, p, TAB_HOME);
 
-        LinearLayout head = row();
-        head.addView(snapshotLine(p, refreshError), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-        Button refresh = linkButton(refreshing ? "מרענן…" : "רענון ↻");
-        refresh.setEnabled(!refreshing);
-        refresh.setContentDescription("רענון הנתונים מהלוח");
-        refresh.setOnClickListener(v -> { forceRefresh = true; selectTab(TAB_HOME); });
-        head.addView(refresh);
-        c.addView(head, full(0, 10));
-
-        // תמונת מצב — counts first, so the situation is understood before any detail.
-        LinearLayout summary = card();
-        LinearLayout title = row();
-        title.addView(text(p.projects.size() + " פרויקטים בלוח", 18, TEXT, true), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-        summary.addView(title);
-        String headline = p.needsAttention == 0 ? "אין כרגע פרויקט שמחכה לך" : p.needsAttention == 1 ? "פרויקט אחד מחכה לך" : p.needsAttention + " פרויקטים מחכים לך";
-        summary.addView(text(headline, 14, p.needsAttention == 0 ? GREEN : RED, true), full(4, 10));
-        LinearLayout strip = new LinearLayout(this);
-        strip.setOrientation(LinearLayout.HORIZONTAL);
-        strip.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
-        strip.setBackground(box(SURFACE_2, BORDER, 12));
-        addCount(strip, "צריך אותך", p.needsAttention, RED);
-        addCount(strip, "אדום", p.red, RED);
-        addCount(strip, "במעקב", p.watch, AMBER);
-        addCount(strip, "תקין", p.green, GREEN);
-        addCount(strip, "ישן", p.stale, AMBER);
-        summary.addView(strip, lp(ViewGroup.LayoutParams.MATCH_PARENT, dp(64), 0, 0));
-        Project latest = p.latestActiveProject();
-        if (latest != null) summary.addView(text("הכי עדכני: " + latest.name + " · " + TimeText.wall(latest.latestActivityMillis, now())
-                + " · " + Hebrew.activitySource(latest.latestActivitySource) + " · " + Hebrew.activityType(latest.latestActivityType),
-                12, MUTED, false), full(8, 0));
-        if (p.unknownActivity > 0) summary.addView(text(p.unknownActivity == 1 ? "פרויקט אחד בלי התקדמות משמעותית מזוהה" : p.unknownActivity + " פרויקטים בלי התקדמות משמעותית מזוהה", 12, MUTED, false), full(3, 0));
-        if (p.unknownCadence > 0) summary.addView(text(p.unknownCadence == 1 ? "פרויקט אחד בלי קצב צפוי מוגדר" : p.unknownCadence + " פרויקטים בלי קצב צפוי מוגדר", 12, MUTED, false), full(3, 0));
-        c.addView(summary, full(0, 14));
-
-        // צריך אותי עכשיו
+        if (filterActive()) {
+            List<Project> list = applyFilter(p);
+            if (list.isEmpty()) c.addView(text("אין פרויקטים במסנן הזה.", 13, MUTED, false), full(6, 0));
+            for (Project x : list) addProjectRow(c, x, x.needsAttention());
+            return;
+        }
         List<Project> attention = p.attention();
-        c.addView(section("צריך אותי עכשיו" + (attention.isEmpty() ? "" : " (" + attention.size() + ")")));
-        if (attention.isEmpty()) {
-            LinearLayout ok = card();
-            ok.setBackground(box(Theme.tint(GREEN, 22), Theme.tint(GREEN, 110), 14));
-            ok.addView(text("✓ אין כרגע החלטה, חסם או בדיקה שמחכים לך", 14, GREEN, true));
-            c.addView(ok, full(0, 10));
+        if (!attention.isEmpty()) {
+            c.addView(section("צריך אותי עכשיו (" + attention.size() + ")"));
+            for (Project x : attention) addProjectRow(c, x, true);
         } else {
-            for (Project x : attention) addProjectCard(c, x, true);
+            LinearLayout ok = card();
+            ok.setBackground(box(Theme.tint(GREEN, 22), Theme.tint(GREEN, 100), 12));
+            ok.addView(text("✓ אין כרגע החלטה, חסם או בדיקה שמחכים לך", 13, GREEN, true));
+            c.addView(ok, full(2, 6));
         }
-
-        // הפרויקטים — everything else, urgency order
         List<Project> calm = p.calm();
-        c.addView(section("שאר הפרויקטים" + (calm.isEmpty() ? "" : " (" + calm.size() + ")")));
-        if (calm.isEmpty()) c.addView(text("כל הפרויקטים נמצאים למעלה.", 13, MUTED, false));
-        for (Project x : calm) addProjectCard(c, x, false);
-
-        if (!p.infrastructure.isEmpty()) {
-            c.addView(section("תשתית (לא פרויקט)"));
-            for (Project x : p.infrastructure) addProjectCard(c, x, false);
+        if (!calm.isEmpty()) {
+            c.addView(section("שאר הפרויקטים (" + calm.size() + ")"));
+            for (Project x : calm) addProjectRow(c, x, false);
         }
-        c.addView(text("מקור: לוח הבקרה + Activity Ledger", 11, MUTED, false), full(6, 0));
+        if (!p.infrastructure.isEmpty()) {
+            c.addView(section("תשתית"));
+            for (Project x : p.infrastructure) addProjectRow(c, x, false);
+        }
     }
 
     // ---------- פרויקטים ----------
 
     private void showProjects() {
-        ScrollView s = screen("פרויקטים", "לפי דחיפות: מה שמחכה לך ואדום למעלה, אחר כך לפי פעילות אחרונה.", true);
+        Button home = linkButton("בית ‹");
+        home.setOnClickListener(v -> selectTab(TAB_HOME));
+        ScrollView s = screen("פרויקטים", home);
         contentHost.addView(s);
-        LinearLayout c = column(s);
-        Portfolio cached = cachedPortfolio();
-        if (cached != null) renderProjects(c, cached, null);
-        else c.addView(loading(), lp(ViewGroup.LayoutParams.MATCH_PARENT, dp(80), 0, 0));
-        if (cached != null && !forceRefresh && now() - cached.syncedAt < REFRESH_MIN_INTERVAL) return;
-        forceRefresh = false;
-        loadPortfolio((p, err) -> {
-            if (contentHost == null || activeTab != TAB_PROJECTS || detailOpen) return;
-            int y = s.getScrollY();
-            c.removeAllViews();
-            if (p != null) renderProjects(c, p, null);
-            else if (cached != null) renderProjects(c, cached, err);
-            else renderLoadError(c, err);
-            if (y > 0) s.post(() -> s.scrollTo(0, y));
-        });
+        loadInto(s, content(s), TAB_PROJECTS, this::renderProjects);
     }
 
-    private void renderProjects(LinearLayout c, Portfolio p, String refreshError) {
+    private void renderProjects(LinearLayout c, Portfolio p, String refreshError, boolean refreshing) {
         portfolio = p;
-        c.addView(snapshotLine(p, refreshError), full(0, 10));
-        if (p.projects.isEmpty()) {
-            c.addView(text("לא נמצאו פרויקטים בלוח.", 13, MUTED, false));
-            return;
-        }
-        List<Project> attention = p.attention();
-        if (!attention.isEmpty()) {
-            c.addView(section("מחכה לך / דורש טיפול (" + attention.size() + ")"));
-            for (Project x : attention) addProjectCard(c, x, true);
-        }
-        List<Project> calm = p.calm();
-        if (!calm.isEmpty()) {
-            c.addView(section("במעקב ותקין (" + calm.size() + ")"));
-            for (Project x : calm) addProjectCard(c, x, false);
+        c.addView(snapshotLine(p, refreshError, refreshing), full(0, 8));
+        addFilterBar(c, p, TAB_PROJECTS);
+        if (p.projects.isEmpty()) { c.addView(text("לא נמצאו פרויקטים בלוח.", 13, MUTED, false)); return; }
+        if (filterActive()) {
+            List<Project> list = applyFilter(p);
+            if (list.isEmpty()) c.addView(text("אין פרויקטים במסנן הזה.", 13, MUTED, false), full(6, 0));
+            for (Project x : list) addProjectRow(c, x, false);
+        } else {
+            for (Status s : Status.values()) {
+                List<Project> group = p.filter(s, false);
+                if (group.isEmpty()) continue;
+                c.addView(section(s.label + " (" + group.size() + ")"));
+                for (Project x : group) addProjectRow(c, x, false);
+            }
         }
         if (!p.infrastructure.isEmpty()) {
-            c.addView(section("תשתית (לא פרויקט)"));
-            for (Project x : p.infrastructure) addProjectCard(c, x, false);
+            c.addView(section("תשתית"));
+            for (Project x : p.infrastructure) addProjectRow(c, x, false);
         }
     }
 
@@ -780,246 +742,350 @@ public class MainActivity extends Activity {
 
     private void addField(LinearLayout c, String label, String value) {
         if (value == null || value.trim().isEmpty() || "null".equals(value)) return;
-        c.addView(text(label, 12, BLUE, true), full(14, 0));
-        c.addView(text(value, 15, TEXT, false), full(3, 0));
+        c.addView(text(label, 11, BLUE, true), full(10, 0));
+        c.addView(text(value, 14, TEXT, false), full(2, 0));
     }
 
-    /** Long free text: show the first {@code limit} characters with an inline "הצג עוד" toggle. */
     private void addExpandableField(LinearLayout c, String label, String value, int limit) {
         if (value == null || value.trim().isEmpty() || "null".equals(value)) return;
-        String full = value.trim();
-        if (full.length() <= limit + 40) {
-            addField(c, label, full);
-            return;
-        }
-        c.addView(text(label, 12, BLUE, true), full(14, 0));
-        TextView body = text(shortText(full, limit), 15, TEXT, false);
-        c.addView(body, full(3, 0));
-        TextView more = text("הצג עוד", 13, BLUE, true);
+        String all = value.trim();
+        if (all.length() <= limit + 40) { addField(c, label, all); return; }
+        c.addView(text(label, 11, BLUE, true), full(10, 0));
+        TextView body = text(shortText(all, limit), 14, TEXT, false);
+        c.addView(body, full(2, 0));
+        TextView more = text("הצג עוד", 12, BLUE, true);
         more.setMinHeight(dp(36));
         more.setGravity(Gravity.CENTER_VERTICAL | Gravity.START);
-        more.setContentDescription("הצג את הטקסט המלא");
-        c.addView(more, full(2, 0));
+        c.addView(more, full(0, 0));
         more.setOnClickListener(v -> {
             boolean expanded = body.getText().length() > limit + 1;
-            body.setText(expanded ? shortText(full, limit) : full);
+            body.setText(expanded ? shortText(all, limit) : all);
             more.setText(expanded ? "הצג עוד" : "הצג פחות");
         });
     }
 
-    /** Full-screen detail inside the shell (nav stays visible; Back returns to the list). */
     private void showProjectDetail(Project p) {
         detailOpen = true;
         contentHost.removeAllViews();
         ScrollView scroll = new ScrollView(this);
         scroll.setFillViewport(true);
         scroll.setBackgroundColor(BG);
-        LinearLayout c = new LinearLayout(this);
-        c.setOrientation(LinearLayout.VERTICAL);
-        c.setPadding(dp(16), dp(14), dp(16), dp(28));
-        c.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+        LinearLayout c = column();
+        c.setPadding(dp(14), dp(12), dp(14), dp(24));
 
         LinearLayout head = row();
+        head.addView(text(p.name, 21, TEXT, true), grow());
         Button back = linkButton("‹ חזרה");
         back.setOnClickListener(v -> selectTab(activeTab));
         head.addView(back);
-        head.addView(new View(this), new LinearLayout.LayoutParams(0, 1, 1f));
-        c.addView(head, full(0, 10));
+        c.addView(head);
+        if (!p.shortDescription.isEmpty()) c.addView(text(p.shortDescription, 13, MUTED, false), full(2, 0));
 
-        c.addView(text(p.name, 26, TEXT, true));
         LinearLayout chips = row();
-        chips.addView(chip(Hebrew.ragBadge(p.rag), Theme.rag(p.rag)), chipLp());
-        for (String r : p.attentionReasons()) {
-            if (r.startsWith("אדום")) continue;
-            chips.addView(chip(r, r.startsWith("המידע") ? AMBER : r.startsWith("מחכה") ? BLUE : RED), chipLp());
-        }
-        if (!Hebrew.lifecycle(p.lifecycle).isEmpty() && !p.userTestRequired) chips.addView(chip(Hebrew.lifecycle(p.lifecycle), MUTED), chipLp());
-        c.addView(chips, full(8, 10));
+        chips.addView(chip(p.status.label, statusColor(p.status)), chipLp());
+        chips.addView(chip(p.osAlignment.label, osColor(p.osAlignment)), chipLp());
+        if (p.freshness.state != Freshness.State.FRESH) chips.addView(chip(Hebrew.freshness(p.freshness.state), freshnessColor(p.freshness.state)), chipLp());
+        c.addView(chips, full(8, 0));
+        String action = p.arielAction();
+        boolean reasonRepeatsAction = p.needsAttention() && !action.isEmpty() && p.statusReason.contains(action);
+        if (!reasonRepeatsAction) c.addView(text(p.statusReason, 13, TEXT, false), full(4, 8));
 
-        c.addView(timeWall(p, true), full(0, 12));
+        // Compact time wall: two clocks, never conflated.
+        LinearLayout wall = card();
+        wall.setBackground(box(SURFACE_2, Theme.tint(freshnessColor(p.freshness.state), 140), 12));
+        String act = p.latestActivityMillis > 0 ? TimeText.absolute(p.latestActivityMillis) + " · " + TimeText.relative(p.latestActivityMillis, now()) + " · " + Hebrew.activitySource(p.latestActivitySource) : "לא נצפתה פעילות";
+        wall.addView(text("פעילות אחרונה: " + act, 13, TEXT, true));
+        String prog = p.latestMeaningfulActivityMillis > 0 ? TimeText.absolute(p.latestMeaningfulActivityMillis) + " · " + TimeText.relative(p.latestMeaningfulActivityMillis, now()) : "לא זוהתה";
+        wall.addView(text("התקדמות משמעותית: " + prog, 12, MUTED, false), full(3, 0));
+        String note = p.freshness.note();
+        if (!note.isEmpty()) wall.addView(text(note, 12, p.freshness.state == Freshness.State.UNKNOWN ? MUTED : freshnessColor(p.freshness.state), false), full(3, 0));
+        c.addView(wall, full(0, 8));
 
-        LinearLayout body = card();
+        LinearLayout main = card();
         if (p.needsAttention()) {
-            body.addView(text("מה צריך ממך", 12, RED, true));
-            String action = p.arielAction();
-            body.addView(text(action.isEmpty() ? "נדרשת החלטה או פעולה שלך" : action, 16, TEXT, true), full(3, 0));
+            main.addView(text("מה צריך ממך", 11, RED, true));
+            main.addView(text(action.isEmpty() ? "נדרשת החלטה או פעולה שלך" : action, 15, TEXT, true), full(2, 0));
         }
-        addField(body, "מה המטרה", p.objective);
-        addField(body, "מה המצב עכשיו", p.milestone.isEmpty() ? Hebrew.lifecycle(p.lifecycle) : p.milestone);
-        addExpandableField(body, "מה נצפה לאחרונה", p.latestActivitySummary, 280);
-        if (!p.progressEvidence.isEmpty() && !p.progressEvidence.equals(p.latestActivitySummary)) {
-            addExpandableField(body, "עדכון מאומת בלוח", p.progressEvidence, 280);
-        }
-        addField(body, "הפעולה הבאה", p.nextAction);
-        addField(body, "מה חוסם", p.blocker);
-        if (!p.needsAttention()) addField(body, "צריך את אריאל", "לא נדרשת פעולה כרגע");
-        addField(body, "רמת ביטחון", Hebrew.confidence(p.confidence));
-        addField(body, "סיכון / סחיפה", p.risk);
-        c.addView(body, full(0, 12));
+        addField(main, "הפעולה הבאה", p.nextAction);
+        addField(main, "מה חוסם", p.blocker);
+        addField(main, "מה המצב עכשיו", p.milestone.isEmpty() ? Hebrew.lifecycle(p.lifecycle) : p.milestone);
+        c.addView(main, full(0, 6));
 
-        LinearLayout meta = card();
-        meta.setBackground(box(Color.TRANSPARENT, BORDER, 14));
-        meta.addView(text("נתוני בקרה", 12, MUTED, true));
-        String check = p.lastControlCheckMillis > 0 ? TimeText.wall(p.lastControlCheckMillis, now()) : (p.lastControlCheckRaw.isEmpty() ? "לא נרשמה" : p.lastControlCheckRaw);
-        meta.addView(text("בדיקת Control Tower אחרונה: " + check, 13, MUTED, false), full(6, 0));
-        String cadence = p.expectedCadence.isEmpty() ? "לא הוגדר בלוח"
-                : p.freshness.cadenceUnknown() ? "לא זוהה · בלוח רשום: " + p.expectedCadence
-                : p.freshness.cadenceLabel;
-        meta.addView(text("קצב צפוי: " + cadence, 13, MUTED, false), full(3, 0));
-        if (!p.id.isEmpty()) meta.addView(text("מזהה בלוח: " + p.id, 12, MUTED, false), full(3, 0));
-        c.addView(meta, full(0, 12));
+        LinearLayout more = card();
+        addField(more, "מה המטרה", p.objective);
+        addExpandableField(more, "מה נצפה לאחרונה", p.latestActivitySummary, 240);
+        if (!p.progressEvidence.isEmpty() && !p.progressEvidence.equals(p.latestActivitySummary)) addExpandableField(more, "עדכון מאומת בלוח", p.progressEvidence, 240);
+        addField(more, "רמת ביטחון", Hebrew.confidence(p.confidence));
+        addField(more, "סיכון / סחיפה", p.risk);
+        collapsible(c, "עוד פרטים", more, false);
+
+        LinearLayout os = card();
+        os.addView(text(p.osAlignment.label + " — " + p.osAlignment.meaning, 13, osColor(p.osAlignment), true));
+        os.addView(text("בדיקת OS אחרונה: " + (p.lastOsCheckMillis > 0 ? TimeText.wall(p.lastOsCheckMillis, now()) : "אף פעם"), 12, MUTED, false), full(4, 0));
+        if (!p.osChangeMarker.isEmpty() || !p.osCurrentMarker.isEmpty()) {
+            os.addView(text("גרסת OS שנראתה: " + (p.osChangeMarker.isEmpty() ? "—" : p.osChangeMarker) + (p.osCurrentMarker.isEmpty() ? "" : " · נוכחית: " + p.osCurrentMarker), 12, MUTED, false), full(2, 0));
+        }
+        if (!p.osSyncAction.isEmpty()) os.addView(text("מה נדרש: " + p.osSyncAction, 12, TEXT, false), full(4, 0));
+        String evUrl = p.osEvidenceUrl();
+        if (!evUrl.isEmpty()) {
+            Button ev = linkButton("פתח ראיית OS");
+            ev.setOnClickListener(v -> openUrl(evUrl));
+            os.addView(ev, lp(ViewGroup.LayoutParams.WRAP_CONTENT, dp(40), 6, 0));
+        } else if (!p.osEvidence.isEmpty()) os.addView(text("ראיה: " + shortText(p.osEvidence, 120), 11, MUTED, false), full(3, 0));
+        String check = p.lastControlCheckMillis > 0 ? TimeText.wall(p.lastControlCheckMillis, now()) : "לא נרשמה";
+        os.addView(text("בדיקת מגדל הפיקוח האחרונה: " + check, 12, MUTED, false), full(8, 0));
+        String cadence = p.expectedCadence.isEmpty() ? "לא הוגדר בלוח" : p.freshness.cadenceUnknown() ? "לא זוהה · בלוח רשום: " + p.expectedCadence : p.freshness.cadenceLabel;
+        os.addView(text("קצב צפוי: " + cadence, 12, MUTED, false), full(2, 0));
+        if (!p.id.isEmpty()) os.addView(text("מזהה בלוח: " + p.id, 11, MUTED, false), full(2, 0));
+        collapsible(c, "יישור למערכת ההפעלה ובקרה", os, p.osAlignment != OsAlignment.CURRENT);
 
         if (p.link.startsWith("http")) {
             Button open = actionButton("פתח את הקישור הראשי", false);
-            open.setOnClickListener(v -> {
-                try {
-                    startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(p.link)));
-                } catch (Exception e) {
-                    Toast.makeText(this, "לא ניתן לפתוח את הקישור", Toast.LENGTH_SHORT).show();
-                }
-            });
-            c.addView(open, lp(ViewGroup.LayoutParams.MATCH_PARENT, dp(48), 0, 8));
+            open.setOnClickListener(v -> openUrl(p.link));
+            c.addView(open, lp(ViewGroup.LayoutParams.MATCH_PARENT, dp(46), 8, 6));
         }
         Button backBottom = actionButton("חזרה לרשימה", true);
         backBottom.setOnClickListener(v -> selectTab(activeTab));
-        c.addView(backBottom, lp(ViewGroup.LayoutParams.MATCH_PARENT, dp(48), 4, 0));
-
+        c.addView(backBottom, lp(ViewGroup.LayoutParams.MATCH_PARENT, dp(46), 2, 0));
         scroll.addView(c);
         contentHost.addView(scroll);
     }
 
     // ---------- רעיונות ----------
 
-    private interface ChoiceSink { void set(String value); }
-
-    private void addChoiceTiles(LinearLayout parent, String title, String[] labels, String[] values, String selected, ChoiceSink sink) {
-        parent.addView(text(title, 13, BLUE, true), full(12, 5));
-        LinearLayout group = row();
-        for (int i = 0; i < labels.length; i++) {
-            final String value = values[i];
-            Button b = actionButton(labels[i], value.equals(selected));
-            b.setTextSize(12);
-            LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(0, dp(44), 1f);
-            p.setMarginEnd(dp(5));
-            group.addView(b, p);
-            b.setOnClickListener(v -> {
-                sink.set(value);
-                for (int j = 0; j < group.getChildCount(); j++) {
-                    Button x = (Button) group.getChildAt(j);
-                    boolean active = x == b;
-                    x.setTextColor(active ? BG : TEXT);
-                    x.setBackground(active ? box(BLUE, BLUE, 14) : box(SURFACE_2, BORDER, 14));
-                }
-            });
-        }
-        parent.addView(group, full(0, 2));
+    private IdeaBoard cachedIdeas() {
+        String json = cache().getString("ideas", null);
+        if (json == null) return null;
+        try { return IdeaBoard.from(new JSONArray(json)); } catch (Exception e) { return null; }
     }
 
     private void showIdeas() {
-        ScrollView s = screen("רעיונות", "כל הרעיונות במקום אחד — מלכידה מהירה ועד בשלות לפרויקט.", true);
+        Button add = linkButton("+ רעיון");
+        ScrollView s = screen("רעיונות", add);
         contentHost.addView(s);
-        LinearLayout c = column(s);
-
-        LinearLayout form = card();
-        form.addView(text("רעיון חדש", 17, TEXT, true));
-        form.addView(text("הכותרת מספיקה לשמירה. הצ'ק־ליסט עוזר למקד ולהבשיל.", 12, MUTED, false), full(3, 8));
-        EditText title = input("שם קצר לרעיון *", false);
-        EditText need = input("איזה כאב או צורך הוא פותר?", true);
-        EditText outcome = input("מה ישתפר אם הרעיון יעבוד?", true);
-        EditText functionality = input("מה הפונקציונליות המרכזית?", true);
-        EditText success = input("איך נדע שהרעיון הצליח?", true);
-        EditText next = input("מה הצעד הקטן הבא?", true);
-        form.addView(title, lp(ViewGroup.LayoutParams.MATCH_PARENT, dp(54), 0, 8));
-        form.addView(need, lp(ViewGroup.LayoutParams.MATCH_PARENT, dp(78), 0, 8));
-        form.addView(outcome, lp(ViewGroup.LayoutParams.MATCH_PARENT, dp(78), 0, 8));
-        form.addView(functionality, lp(ViewGroup.LayoutParams.MATCH_PARENT, dp(78), 0, 8));
-
-        String[] frequency = {"OCCASIONAL"}, urgency = {"MEDIUM"}, surface = {"UNDECIDED"}, automation = {"UNDECIDED"};
-        addChoiceTiles(form, "תדירות שימוש", new String[]{"חד־פעמי", "לפעמים", "שבועי", "יומי"}, new String[]{"ONE_OFF", "OCCASIONAL", "WEEKLY", "DAILY"}, frequency[0], v -> frequency[0] = v);
-        addChoiceTiles(form, "דחיפות", new String[]{"נמוכה", "בינונית", "גבוהה"}, new String[]{"LOW", "MEDIUM", "HIGH"}, urgency[0], v -> urgency[0] = v);
-        addChoiceTiles(form, "איפה הוא חי", new String[]{"לא החלטתי", "מובייל", "ווב", "אוטומציה", "סוכן"}, new String[]{"UNDECIDED", "MOBILE", "WEB", "AUTOMATION", "AGENT"}, surface[0], v -> surface[0] = v);
-        addChoiceTiles(form, "רמת אוטומציה", new String[]{"לא החלטתי", "ידני", "מסייע", "אוטומטי"}, new String[]{"UNDECIDED", "MANUAL", "ASSISTED", "AUTOMATIC"}, automation[0], v -> automation[0] = v);
-        form.addView(success, lp(ViewGroup.LayoutParams.MATCH_PARENT, dp(78), 10, 8));
-        form.addView(next, lp(ViewGroup.LayoutParams.MATCH_PARENT, dp(78), 0, 10));
-        Button save = actionButton("שמור רעיון", true);
-        TextView saveStatus = text("", 12, MUTED, false);
-        form.addView(save, lp(ViewGroup.LayoutParams.MATCH_PARENT, dp(50), 0, 4));
-        form.addView(saveStatus);
-        c.addView(form, full(0, 14));
-
-        LinearLayout list = new LinearLayout(this);
-        list.setOrientation(LinearLayout.VERTICAL);
-        c.addView(section("מאגר הרעיונות"));
+        LinearLayout c = content(s);
+        LinearLayout form = column();
+        form.setVisibility(View.GONE);
+        LinearLayout list = column();
+        c.addView(form, full(0, 6));
         c.addView(list);
-        loadIdeas(list);
+        add.setOnClickListener(v -> {
+            boolean open = form.getVisibility() == View.VISIBLE;
+            form.setVisibility(open ? View.GONE : View.VISIBLE);
+            add.setText(open ? "+ רעיון" : "✕ סגור");
+        });
+        buildIdeaForm(form, list);
 
+        IdeaBoard cached = cachedIdeas();
+        if (cached != null) { ideaBoard = cached; renderIdeas(list); }
+        else list.addView(loading(), lp(ViewGroup.LayoutParams.MATCH_PARENT, dp(70), 0, 0));
+        refreshIdeas(list, cached == null);
+    }
+
+    /** Background refresh: never blocks, never overwrites unsaved local reordering. */
+    private void refreshIdeas(LinearLayout list, boolean showErrors) {
+        JSONObject p = new JSONObject();
+        try { p.put("limit", 200); } catch (Exception ignored) {}
+        fetchArray("ideas", p, "items", arr -> {
+            if (activeTab != TAB_IDEAS) return;
+            cache().edit().putString("ideas", arr.toString()).apply();
+            if (ideaSyncPending) return; // local edits win until they are synced
+            ideaBoard = IdeaBoard.from(arr);
+            renderIdeas(list);
+        }, msg -> {
+            if (showErrors && activeTab == TAB_IDEAS) { list.removeAllViews(); list.addView(text("לא ניתן לטעון רעיונות: " + msg, 13, RED, false)); }
+        });
+    }
+
+    private void buildIdeaForm(LinearLayout form, LinearLayout list) {
+        LinearLayout card = card();
+        EditText title = input("שם קצר לרעיון", false);
+        card.addView(title, lp(ViewGroup.LayoutParams.MATCH_PARENT, dp(48), 0, 6));
+        EditText need = input("מה זה פותר? (אופציונלי)", true);
+        card.addView(need, lp(ViewGroup.LayoutParams.MATCH_PARENT, dp(64), 0, 6));
+        final String[] bucket = {"LATER"};
+        LinearLayout buckets = row();
+        for (int i = 0; i < IdeaBoard.BUCKETS.length; i++) {
+            final String b = IdeaBoard.BUCKETS[i];
+            TextView ch = chip(IdeaBoard.BUCKET_LABELS[i], TEAL);
+            ch.setMinHeight(dp(36)); ch.setGravity(Gravity.CENTER); ch.setPadding(dp(12), dp(6), dp(12), dp(6));
+            if (b.equals(bucket[0])) ch.setBackground(box(Theme.tint(TEAL, 110), TEAL, 20));
+            ch.setOnClickListener(v -> {
+                bucket[0] = b;
+                for (int j = 0; j < buckets.getChildCount(); j++) {
+                    TextView x = (TextView) buckets.getChildAt(j);
+                    boolean active = x == ch;
+                    x.setBackground(active ? box(Theme.tint(TEAL, 110), TEAL, 20) : box(Theme.tint(TEAL, 34), Theme.tint(TEAL, 120), 20));
+                }
+            });
+            buckets.addView(ch, chipLp());
+        }
+        card.addView(buckets, full(0, 6));
+        Button save = actionButton("שמור", true);
+        TextView status = text("", 12, MUTED, false);
+        card.addView(save, lp(ViewGroup.LayoutParams.MATCH_PARENT, dp(44), 0, 2));
+        card.addView(status);
+        form.addView(card);
         save.setOnClickListener(v -> {
-            String ideaTitle = title.getText().toString().trim();
-            if (ideaTitle.isEmpty()) { title.setError("צריך שם קצר לרעיון"); return; }
+            String t = title.getText().toString().trim();
+            if (t.isEmpty()) { title.setError("צריך שם קצר"); return; }
             save.setEnabled(false);
-            saveStatus.setText("שומר…");
+            status.setText("שומר…");
             JSONObject p = new JSONObject();
-            try {
-                p.put("title", ideaTitle); p.put("need", need.getText().toString().trim());
-                p.put("desired_outcome", outcome.getText().toString().trim());
-                p.put("core_functionality", functionality.getText().toString().trim());
-                p.put("usage_frequency", frequency[0]); p.put("urgency", urgency[0]);
-                p.put("surface", surface[0]); p.put("automation_level", automation[0]);
-                p.put("success_metric", success.getText().toString().trim());
-                p.put("next_step", next.getText().toString().trim());
-            } catch (Exception ignored) {}
+            try { p.put("title", t); p.put("need", need.getText().toString().trim()); p.put("planning_bucket", bucket[0]); } catch (Exception ignored) {}
             io.execute(() -> {
                 Gateway.Result r = Gateway.call(this, "create_idea", p);
                 runOnUiThread(() -> {
                     save.setEnabled(true);
-                    if (r.ok()) {
-                        title.setText(""); need.setText(""); outcome.setText(""); functionality.setText(""); success.setText(""); next.setText("");
-                        saveStatus.setText("נשמר. הרעיון לא ילך לאיבוד."); saveStatus.setTextColor(GREEN);
-                        loadIdeas(list);
-                    } else { saveStatus.setText(r.describe()); saveStatus.setTextColor(RED); }
+                    if (r.ok()) { title.setText(""); need.setText(""); status.setText("נשמר"); status.setTextColor(GREEN); refreshIdeas(list, false); }
+                    else { status.setText(r.describe()); status.setTextColor(RED); }
                 });
             });
         });
     }
 
-    private void loadIdeas(LinearLayout holder) {
-        holder.removeAllViews();
-        holder.addView(loading(), lp(ViewGroup.LayoutParams.MATCH_PARENT, dp(70), 0, 0));
-        JSONObject p = new JSONObject();
-        try { p.put("limit", 100); } catch (Exception ignored) {}
-        fetchArray("ideas", p, "items", arr -> {
-            holder.removeAllViews();
-            if (arr.length() == 0) { holder.addView(text("עדיין אין רעיונות. אפשר להתחיל רק מכותרת.", 13, MUTED, false)); return; }
-            for (int i = 0; i < arr.length(); i++) {
-                JSONObject x = arr.optJSONObject(i); if (x == null) continue;
-                LinearLayout item = card();
-                LinearLayout top = row();
-                top.addView(text(x.optString("title"), 16, TEXT, true), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-                top.addView(chip(ideaStage(x.optString("stage")), BLUE), chipLp());
-                item.addView(top);
-                int maturity = x.optInt("maturity_score", 0);
-                item.addView(text("בשלות " + maturity + "% · " + ideaMeta(x), 12, MUTED, false), full(5, 0));
-                String need = x.optString("need");
-                if (!need.isEmpty()) item.addView(text(shortText(need, 180), 14, TEXT, false), full(7, 0));
-                String next = x.optString("next_step");
-                if (!next.isEmpty()) item.addView(text("הצעד הבא: " + shortText(next, 140), 13, BLUE, true), full(7, 0));
-                String nextStage = nextIdeaStage(x.optString("stage"));
-                if (!nextStage.isEmpty()) {
-                    Button advance = actionButton("קדם ל־" + ideaStage(nextStage), false);
-                    item.addView(advance, lp(ViewGroup.LayoutParams.MATCH_PARENT, dp(44), 10, 0));
-                    advance.setOnClickListener(v -> updateIdeaStage(x.optString("idea_id"), nextStage, holder));
-                }
-                holder.addView(item, full(0, 8));
+    private void renderIdeas(LinearLayout list) {
+        list.removeAllViews();
+        if (ideaBoard == null || ideaBoard.size() == 0) { list.addView(text("עדיין אין רעיונות. הקש על + רעיון.", 13, MUTED, false)); return; }
+        list.addView(text("החזק וגרור כדי לסדר · הקש כדי לפתוח", 11, MUTED, false), full(0, 4));
+        for (int b = 0; b < IdeaBoard.BUCKETS.length; b++) {
+            final String bucket = IdeaBoard.BUCKETS[b];
+            List<IdeaBoard.Idea> items = ideaBoard.inBucket(bucket);
+            TextView head = section(IdeaBoard.BUCKET_LABELS[b] + " (" + items.size() + ")");
+            head.setBackground(box(Color.TRANSPARENT, Color.TRANSPARENT, 8));
+            head.setOnDragListener(dropListener(bucket, null, list, head));
+            list.addView(head);
+            if (items.isEmpty()) {
+                TextView empty = text("— ריק —", 12, MUTED, false);
+                empty.setMinHeight(dp(40));
+                empty.setGravity(Gravity.CENTER_VERTICAL | Gravity.START);
+                empty.setOnDragListener(dropListener(bucket, null, list, empty));
+                list.addView(empty);
             }
-        }, msg -> { holder.removeAllViews(); holder.addView(text("לא ניתן לטעון רעיונות: " + msg, 13, RED, false)); });
+            for (IdeaBoard.Idea idea : items) list.addView(ideaRow(idea, list), full(0, 6));
+        }
     }
 
-    private void updateIdeaStage(String id, String stage, LinearLayout holder) {
+    private View ideaRow(IdeaBoard.Idea idea, LinearLayout list) {
+        LinearLayout c = card();
+        c.setBackground(box(SURFACE, Theme.tint(TEAL, 70), 12));
+        LinearLayout top = row();
+        TextView handle = text("≡", 18, MUTED, false);
+        handle.setPadding(0, 0, dp(8), 0);
+        handle.setContentDescription("גרור לשינוי סדר");
+        top.addView(handle);
+        top.addView(text(idea.title, 15, TEXT, true), grow());
+        top.addView(chip(Hebrew.ideaStage(idea.stage), TEAL));
+        c.addView(top);
+
+        boolean expanded = idea.id.equals(expandedIdeaId);
+        if (expanded) {
+            if (!idea.need.isEmpty()) c.addView(text(shortText(idea.need, 300), 13, TEXT, false), full(6, 0));
+            if (!idea.nextStep.isEmpty()) c.addView(text("הצעד הבא: " + shortText(idea.nextStep, 160), 12, BLUE, true), full(4, 0));
+            c.addView(text("בשלות " + idea.maturity + "% · " + ("HIGH".equals(idea.urgency) ? "דחוף" : "LOW".equals(idea.urgency) ? "לא דחוף" : "דחיפות בינונית"), 11, MUTED, false), full(4, 0));
+            LinearLayout actions = row();
+            for (int i = 0; i < IdeaBoard.BUCKETS.length; i++) {
+                final String b = IdeaBoard.BUCKETS[i];
+                if (b.equals(idea.bucket)) continue;
+                Button mv = actionButton("→ " + IdeaBoard.BUCKET_LABELS[i], false);
+                mv.setTextSize(12);
+                mv.setOnClickListener(v -> moveIdea(idea.id, b, Integer.MAX_VALUE, list));
+                LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(40));
+                p.setMarginEnd(dp(6));
+                actions.addView(mv, p);
+            }
+            Button up = actionButton("▲", false); up.setTextSize(12); up.setContentDescription("הזז למעלה");
+            Button down = actionButton("▼", false); down.setTextSize(12); down.setContentDescription("הזז למטה");
+            up.setOnClickListener(v -> nudgeIdea(idea.id, -1, list));
+            down.setOnClickListener(v -> nudgeIdea(idea.id, +1, list));
+            LinearLayout.LayoutParams sq = new LinearLayout.LayoutParams(dp(44), dp(40));
+            sq.setMarginEnd(dp(6));
+            actions.addView(up, sq);
+            actions.addView(down, new LinearLayout.LayoutParams(dp(44), dp(40)));
+            c.addView(actions, full(8, 0));
+            String nextStage = nextIdeaStage(idea.stage);
+            if (!nextStage.isEmpty()) {
+                Button adv = actionButton("קדם ל־" + Hebrew.ideaStage(nextStage), false);
+                adv.setTextSize(12);
+                adv.setOnClickListener(v -> updateIdeaField(idea.id, "stage", nextStage, list));
+                c.addView(adv, lp(ViewGroup.LayoutParams.MATCH_PARENT, dp(40), 6, 0));
+            }
+        }
+        c.setOnClickListener(v -> { expandedIdeaId = expanded ? null : idea.id; renderIdeas(list); });
+        c.setOnLongClickListener(v -> {
+            ClipData data = ClipData.newPlainText("idea", idea.id);
+            v.startDragAndDrop(data, new View.DragShadowBuilder(v), idea.id, 0);
+            return true;
+        });
+        c.setOnDragListener(dropListener(idea.bucket, idea.id, list, c));
+        return c;
+    }
+
+    /** Drop on a row = insert before it; drop on a bucket header = append to that bucket. */
+    private View.OnDragListener dropListener(String bucket, String beforeId, LinearLayout list, View target) {
+        return (v, event) -> {
+            switch (event.getAction()) {
+                case DragEvent.ACTION_DRAG_STARTED: return event.getClipDescription() != null;
+                case DragEvent.ACTION_DRAG_ENTERED: target.setAlpha(0.6f); return true;
+                case DragEvent.ACTION_DRAG_EXITED: case DragEvent.ACTION_DRAG_ENDED: target.setAlpha(1f); return true;
+                case DragEvent.ACTION_DROP: {
+                    target.setAlpha(1f);
+                    Object local = event.getLocalState();
+                    String id = local instanceof String ? (String) local : (event.getClipData() != null && event.getClipData().getItemCount() > 0 ? String.valueOf(event.getClipData().getItemAt(0).getText()) : "");
+                    if (id.isEmpty() || id.equals(beforeId)) return true;
+                    int position = Integer.MAX_VALUE;
+                    if (beforeId != null) {
+                        List<IdeaBoard.Idea> items = ideaBoard.inBucket(bucket);
+                        for (int i = 0; i < items.size(); i++) if (items.get(i).id.equals(beforeId)) { position = i; break; }
+                        IdeaBoard.Idea moving = ideaBoard.find(id);
+                        if (moving != null && moving.bucket.equals(bucket)) {
+                            int from = -1;
+                            for (int i = 0; i < items.size(); i++) if (items.get(i).id.equals(id)) from = i;
+                            if (from >= 0 && from < position) position--;
+                        }
+                    }
+                    moveIdea(id, bucket, position, list);
+                    return true;
+                }
+                default: return true;
+            }
+        };
+    }
+
+    private void moveIdea(String id, String bucket, int position, LinearLayout list) {
+        if (ideaBoard == null || !ideaBoard.move(id, bucket, position)) return;
+        renderIdeas(list);            // optimistic: the screen changes now
+        syncIdeaOrder(list);          // background: the sheet follows
+    }
+
+    private void nudgeIdea(String id, int delta, LinearLayout list) {
+        if (ideaBoard == null || !ideaBoard.nudge(id, delta)) return;
+        renderIdeas(list);
+        syncIdeaOrder(list);
+    }
+
+    private void syncIdeaOrder(LinearLayout list) {
+        ideaSyncPending = true;
         JSONObject p = new JSONObject();
-        try { p.put("idea_id", id); p.put("stage", stage); } catch (Exception ignored) {}
+        try { p.put("items", ideaBoard.reorderPayload()); } catch (Exception ignored) {}
+        io.execute(() -> {
+            Gateway.Result r = Gateway.call(this, "reorder_ideas", p);
+            runOnUiThread(() -> {
+                ideaSyncPending = false;
+                if (!r.ok()) Toast.makeText(this, "הסדר לא נשמר בלוח: " + r.describe(), Toast.LENGTH_LONG).show();
+                refreshIdeas(list, false); // re-read the sheet so cache + screen reflect what was actually saved
+            });
+        });
+    }
+
+    private void updateIdeaField(String id, String field, String value, LinearLayout list) {
+        IdeaBoard.Idea idea = ideaBoard == null ? null : ideaBoard.find(id);
+        if (idea != null && "stage".equals(field)) { idea.stage = value; renderIdeas(list); }
+        JSONObject p = new JSONObject();
+        try { p.put("idea_id", id); p.put(field, value); } catch (Exception ignored) {}
         io.execute(() -> {
             Gateway.Result r = Gateway.call(this, "update_idea", p);
-            runOnUiThread(() -> { if (r.ok()) loadIdeas(holder); else Toast.makeText(this, r.describe(), Toast.LENGTH_LONG).show(); });
+            runOnUiThread(() -> { if (!r.ok()) Toast.makeText(this, r.describe(), Toast.LENGTH_LONG).show(); refreshIdeas(list, false); });
         });
     }
 
@@ -1029,56 +1095,40 @@ public class MainActivity extends Activity {
         return "";
     }
 
-    private String ideaStage(String s) {
-        if ("INBOX".equals(s)) return "חדש"; if ("CLARIFY".equals(s)) return "מיקוד צורך";
-        if ("SHAPE".equals(s)) return "עיצוב פתרון"; if ("VALIDATE".equals(s)) return "בדיקת ערך";
-        if ("READY".equals(s)) return "מוכן לפרויקט"; if ("PARKED".equals(s)) return "בהמתנה";
-        if ("PROMOTED".equals(s)) return "הפך לפרויקט"; return s;
-    }
-
-    private String ideaMeta(JSONObject x) {
-        String surface = x.optString("surface", "UNDECIDED");
-        String urgency = x.optString("urgency", "MEDIUM");
-        String a = "HIGH".equals(urgency) ? "דחוף" : "LOW".equals(urgency) ? "לא דחוף" : "דחיפות בינונית";
-        String b = "MOBILE".equals(surface) ? "מובייל" : "WEB".equals(surface) ? "ווב" : "AUTOMATION".equals(surface) ? "אוטומציה" : "AGENT".equals(surface) ? "סוכן" : "טרם נבחר משטח";
-        return a + " · " + b;
-    }
-
     // ---------- סגן ----------
 
     private void showDeputy() {
-        ScrollView s = screen("סגן", "כתוב מה לנהל, לבדוק או לקדם. הפקודה נרשמת בלוח כדיווח, ומאומתת רק עם ראיה.", true);
+        Button compose = linkButton("+ פקודה");
+        ScrollView s = screen("סגן", compose);
         contentHost.addView(s);
-        LinearLayout c = column(s);
+        LinearLayout c = content(s);
+        LinearLayout form = column();
+        form.setVisibility(View.GONE);
+        c.addView(form, full(0, 6));
+        LinearLayout list = column();
+        c.addView(list);
+        compose.setOnClickListener(v -> {
+            boolean open = form.getVisibility() == View.VISIBLE;
+            form.setVisibility(open ? View.GONE : View.VISIBLE);
+            compose.setText(open ? "+ פקודה" : "✕ סגור");
+        });
 
-        EditText command = input("מה אתה רוצה שאנהל, אבדוק או אקדם?", true);
-        command.setTextSize(16);
-        command.setGravity(Gravity.TOP | Gravity.START);
-        command.setTextDirection(View.TEXT_DIRECTION_ANY_RTL);
-        command.setMinHeight(dp(120));
-        command.setBackground(box(SURFACE, Theme.tint(BLUE, 140), 12));
-        c.addView(command, full(4, 10));
-
-        HorizontalScrollView hsv = new HorizontalScrollView(this);
-        hsv.setHorizontalScrollBarEnabled(false);
-        LinearLayout chips = new LinearLayout(this);
-        chips.setOrientation(LinearLayout.HORIZONTAL);
-        String[] quick = {"בדוק מה תקוע", "מה דורש החלטה שלי?", "רענן סטטוס", "תן לי 3 עדיפויות"};
-        for (String q : quick) {
-            Button chip = actionButton(q, false);
-            chip.setTextSize(12);
-            LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(44));
-            p.setMarginEnd(dp(8));
-            chips.addView(chip, p);
-            chip.setOnClickListener(v -> command.setText(q));
+        LinearLayout card = card();
+        EditText command = input("מה לנהל, לבדוק או לקדם?", true);
+        card.addView(command, lp(ViewGroup.LayoutParams.MATCH_PARENT, dp(84), 0, 6));
+        LinearLayout quick = row();
+        for (String q : new String[]{"בדוק מה תקוע", "מה דורש החלטה שלי?", "תן לי 3 עדיפויות"}) {
+            TextView ch = chip(q, BLUE);
+            ch.setMinHeight(dp(36)); ch.setGravity(Gravity.CENTER); ch.setPadding(dp(10), dp(6), dp(10), dp(6));
+            ch.setOnClickListener(v -> command.setText(q));
+            quick.addView(ch, chipLp());
         }
-        hsv.addView(chips);
-        c.addView(hsv, lp(ViewGroup.LayoutParams.MATCH_PARENT, dp(50), 0, 8));
-
+        card.addView(quick, full(0, 6));
         Button send = actionButton("שלח לסגן", true);
-        c.addView(send, lp(ViewGroup.LayoutParams.MATCH_PARENT, dp(52), 0, 14));
         TextView result = text("", 12, MUTED, false);
-        c.addView(result);
+        card.addView(send, lp(ViewGroup.LayoutParams.MATCH_PARENT, dp(44), 0, 2));
+        card.addView(result);
+        form.addView(card);
         send.setOnClickListener(v -> {
             String q = command.getText().toString().trim();
             if (q.isEmpty()) return;
@@ -1088,143 +1138,140 @@ public class MainActivity extends Activity {
             io.execute(() -> {
                 Gateway.Result r;
                 try {
-                    JSONObject params = new JSONObject()
-                            .put("report_text", q)
-                            .put("source", "deputy_command")
-                            .put("device_id", Gateway.deviceId(this));
-                    r = Gateway.call(this, "submit_report", params);
+                    r = Gateway.call(this, "submit_report", new JSONObject().put("report_text", q).put("source", "deputy_command").put("device_id", Gateway.deviceId(this)));
                 } catch (Exception e) {
                     r = new Gateway.Result(0, null, "השליחה נכשלה.");
                 }
                 Gateway.Result done = r;
                 runOnUiThread(() -> {
                     send.setEnabled(true);
-                    if (done.ok()) {
-                        command.setText("");
-                        result.setText("הפקודה נרשמה בלוח וממתינה לאימות.");
-                        result.setTextColor(GREEN);
-                        loadInbox(c);
-                    } else {
-                        result.setText("השליחה נכשלה: " + done.describe());
-                        result.setTextColor(RED);
-                    }
+                    if (done.ok()) { command.setText(""); result.setText("נרשם. הסגן יטפל וידווח."); result.setTextColor(GREEN); loadDeputy(list); }
+                    else { result.setText("השליחה נכשלה: " + done.describe()); result.setTextColor(RED); }
                 });
             });
         });
-
-        c.addView(section("היסטוריית פקודות ודיווחים"));
-        loadInbox(c);
+        loadDeputy(list);
     }
 
-    private void loadInbox(LinearLayout c) {
-        View old = c.findViewWithTag("commands-list");
-        if (old != null) c.removeView(old);
-        LinearLayout holder = new LinearLayout(this);
-        holder.setTag("commands-list");
-        holder.setOrientation(LinearLayout.VERTICAL);
-        c.addView(holder);
-        ProgressBar p = new ProgressBar(this);
-        holder.addView(p, new LinearLayout.LayoutParams(dp(38), dp(38)));
+    private void loadDeputy(LinearLayout list) {
+        list.removeAllViews();
+        list.addView(loading(), lp(ViewGroup.LayoutParams.MATCH_PARENT, dp(60), 0, 0));
         JSONObject params = new JSONObject();
-        try { params.put("limit", 30); } catch (Exception ignored) {}
+        try { params.put("limit", 100); } catch (Exception ignored) {}
         fetchArray("inbox", params, "items", arr -> {
-            holder.removeAllViews();
-            if (arr.length() == 0) {
-                holder.addView(text("עדיין אין פקודות או דיווחים.", 13, MUTED, false));
-                return;
-            }
-            for (int i = 0; i < arr.length(); i++) {
-                JSONObject o = arr.optJSONObject(i);
-                if (o == null) continue;
-                LinearLayout item = card();
-                LinearLayout top = row();
-                top.addView(chip(Hebrew.inboxStatus(o.optString("status")), inboxColor(o.optString("status"))), chipLp());
-                top.addView(chip(Hebrew.inboxSource(o.optString("source")), MUTED), chipLp());
-                item.addView(top);
-                String report = o.optString("report_text", "");
-                boolean external = report.startsWith("EXTERNAL_PROJECT_REPORT_V1");
-                if (external) report = report.substring("EXTERNAL_PROJECT_REPORT_V1".length()).trim();
-                if (external) top.addView(chip("דוח חיצוני", AMBER), chipLp());
-                item.addView(text(shortText(report, 220), 14, TEXT, true), full(8, 0));
-                String notes = o.optString("notes", "");
-                if (!notes.isEmpty()) item.addView(text(notes, 13, MUTED, false), full(6, 0));
-                long at = TimeText.parse(o.optString("received_at", ""));
-                item.addView(text(at > 0 ? TimeText.wall(at, now()) : o.optString("received_at", ""), 11, MUTED, false), full(6, 0));
-                holder.addView(item, full(0, 8));
-            }
-        }, msg -> {
-            holder.removeAllViews();
-            holder.addView(text("לא ניתן לטעון את ההיסטוריה: " + msg, 13, RED, false));
-        });
+            list.removeAllViews();
+            List<String> names = new ArrayList<>();
+            Portfolio p = portfolio != null ? portfolio : cachedPortfolio();
+            if (p != null) for (Project x : p.projects) names.add(x.name);
+            List<DeputyDigest.Item> items = DeputyDigest.from(arr, names, now());
+            if (items.isEmpty()) { list.addView(text("אין כרגע משהו שמחכה לטיפול.", 13, MUTED, false)); return; }
+            int open = 0;
+            for (DeputyDigest.Item it : items) if (it.isOpen()) open++;
+            list.addView(text(open == 0 ? "הכל טופל" : open == 1 ? "פריט אחד פתוח" : open + " פריטים פתוחים", 13, TEXT, true), full(0, 6));
+            for (DeputyDigest.Item it : items) list.addView(deputyRow(it), full(0, 6));
+        }, msg -> { list.removeAllViews(); list.addView(text("לא ניתן לטעון: " + msg, 13, RED, false)); });
     }
 
-    private int inboxColor(String s) {
-        String n = s == null ? "" : s.trim().toUpperCase();
-        if (n.equals("VERIFIED") || n.equals("DONE") || n.equals("COMPLETED")) return GREEN;
-        if (n.equals("REJECTED") || n.equals("FAILED")) return RED;
-        if (n.equals("NEEDS_DECISION") || n.equals("BLOCKED")) return AMBER;
-        return BLUE;
+    private View deputyRow(DeputyDigest.Item it) {
+        LinearLayout c = card();
+        int color = it.kind == DeputyDigest.Kind.TECH_FAILURE || it.kind == DeputyDigest.Kind.SYNC_FAILURE ? RED
+                : it.kind == DeputyDigest.Kind.USER_TEST || it.kind == DeputyDigest.Kind.DECISION || it.kind == DeputyDigest.Kind.DEPLOY_BLOCKED ? AMBER : BLUE;
+        if (!it.isOpen()) c.setAlpha(0.7f);
+        LinearLayout top = row();
+        top.addView(text(it.problem, 14, TEXT, true), grow());
+        top.addView(chip(DeputyDigest.kindLabel(it.kind), color), chipLp());
+        if (it.count > 1) top.addView(chip("×" + it.count, MUTED), chipLp());
+        c.addView(top);
+        if (!it.impact.isEmpty()) c.addView(text("למה זה חשוב: " + it.impact, 12, MUTED, false), full(4, 0));
+        LinearLayout next = row();
+        next.addView(text("הבא: " + it.nextAction, 12, TEXT, false), grow());
+        if (!it.owner.isEmpty()) next.addView(chip(it.owner, MUTED), chipLp());
+        c.addView(next, full(4, 0));
+        c.addView(text((it.isOpen() ? "פתוח" : "טופל") + " · " + (it.lastSeenMillis > 0 ? TimeText.relative(it.lastSeenMillis, now()) : ""), 11, MUTED, false), full(4, 0));
+        LinearLayout ev = column();
+        for (String e : it.evidence) ev.addView(text(shortText(e, 400), 11, MUTED, false), full(4, 0));
+        collapsible(c, "ראיות (" + it.evidence.size() + ")", ev, false);
+        return c;
     }
 
     // ---------- פעילות ----------
 
     private void showActivity() {
-        ScrollView s = screen("פעילות", "התראות שנשלחו, מצב החיבור ואבחון.", true);
+        Button home = linkButton("בית ‹");
+        home.setOnClickListener(v -> selectTab(TAB_HOME));
+        ScrollView s = screen("פעילות", home);
         contentHost.addView(s);
-        LinearLayout c = column(s);
+        LinearLayout c = content(s);
 
         Portfolio cached = cachedPortfolio();
-        if (cached != null) c.addView(snapshotLine(cached, null, false), full(0, 10));
+        if (cached != null) c.addView(snapshotLine(cached, null, false), full(0, 8));
+
+        // גרסה: installed vs newest — two different facts, labelled as such.
+        LinearLayout ver = card();
+        ver.addView(text("גרסה", 12, BLUE, true));
+        BuildIdentity installed = new BuildIdentity(BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE, BuildConfig.GIT_SHA, BuildConfig.GIT_REF, TimeText.parse(BuildConfig.BUILD_TIME));
+        boolean localBuild = BuildConfig.GIT_REF.isEmpty() || "local".equals(BuildConfig.GIT_REF) || "local".equals(BuildConfig.GIT_SHA);
+        ver.addView(text("מותקן במכשיר", 11, MUTED, true), full(6, 0));
+        ver.addView(text(installed.line(now()) + (localBuild ? " · בנייה מקומית (לא מ-CI)" : " · " + BuildConfig.GIT_REF), 12, TEXT, false), full(2, 0));
+        ver.addView(text("הכי חדש שנבנה ב-GitHub", 11, MUTED, true), full(8, 0));
+        TextView latestLine = text("בודק…", 12, MUTED, false);
+        ver.addView(latestLine, full(2, 0));
+        c.addView(ver, full(0, 8));
+        io.execute(() -> {
+            BuildIdentity latest = Gateway.latestBuild(REPO, "control-tower-apk-build");
+            runOnUiThread(() -> {
+                if (latest == null) { latestLine.setText("לא זמין כרגע (אין גישה ל-GitHub)"); return; }
+                String verdict;
+                int color;
+                if (latest.isNewerThan(installed)) { verdict = "יש גרסה חדשה יותר להתקנה"; color = AMBER; }
+                else if (installed.isNewerThan(latest)) { verdict = "המכשיר מריץ גרסה שעדיין לא נבנתה ב-GitHub"; color = MUTED; }
+                else { verdict = "זו הגרסה המותקנת"; color = GREEN; }
+                latestLine.setText(latest.line(now()) + " · " + verdict);
+                latestLine.setTextColor(color);
+            });
+        });
 
         LinearLayout system = card();
-        system.addView(text("מצב מערכת", 13, BLUE, true));
-        TextView gatewayLine = text("שער: בודק…", 13, TEXT, true);
-        system.addView(gatewayLine, full(7, 0));
+        system.addView(text("חיבור והתראות", 12, BLUE, true));
+        TextView gatewayLine = text("שער: בודק…", 12, TEXT, false);
+        system.addView(gatewayLine, full(4, 0));
         TextView pushStatus = text(PushNotifications.statusLine(this), 12, MUTED, false);
-        system.addView(pushStatus, full(6, 0));
-        system.addView(text("גרסה " + BuildConfig.VERSION_NAME + " (" + BuildConfig.VERSION_CODE + ") · " + BuildConfig.GIT_SHA
-                        + (Gateway.isBuildConfigured() ? " · שער מהבנייה" : " · שער מהמכשיר"), 11, MUTED, false), full(4, 0));
-
-        Button testPush = actionButton("שלח התראת בדיקה", false);
-        system.addView(testPush, lp(ViewGroup.LayoutParams.MATCH_PARENT, dp(46), 12, 0));
+        system.addView(pushStatus, full(3, 0));
+        LinearLayout buttons = row();
+        Button testPush = actionButton("התראת בדיקה", false);
+        testPush.setTextSize(12);
         testPush.setOnClickListener(v -> {
             testPush.setEnabled(false);
             pushStatus.setText("שולח התראת בדיקה…");
-            PushNotifications.requestTestPush(this, msg -> runOnUiThread(() -> {
-                testPush.setEnabled(true);
-                pushStatus.setText(msg);
-            }));
+            PushNotifications.requestTestPush(this, msg -> runOnUiThread(() -> { testPush.setEnabled(true); pushStatus.setText(msg); }));
         });
-        Button disconnect = actionButton("נתק מכשיר והגדר מחדש", false);
-        system.addView(disconnect, lp(ViewGroup.LayoutParams.MATCH_PARENT, dp(46), 8, 0));
+        Button disconnect = actionButton("נתק והגדר מחדש", false);
+        disconnect.setTextSize(12);
         disconnect.setOnClickListener(v -> PushNotifications.unregister(this, () -> {
             Gateway.saveOverride(this, "", "");
             cache().edit().clear().apply();
-            if (Gateway.isBuildConfigured()) {
-                Toast.makeText(this, "המכשיר נותק. השער מהבנייה נשאר פעיל.", Toast.LENGTH_LONG).show();
-                selectTab(TAB_ACTIVITY);
-            } else {
-                showSetup(null);
-            }
+            if (Gateway.isBuildConfigured()) { Toast.makeText(this, "המכשיר נותק.", Toast.LENGTH_LONG).show(); selectTab(TAB_ACTIVITY); }
+            else showSetup(null);
         }));
-        c.addView(system, full(0, 14));
+        LinearLayout.LayoutParams bl = new LinearLayout.LayoutParams(0, dp(40), 1f);
+        bl.setMarginEnd(dp(6));
+        buttons.addView(testPush, bl);
+        buttons.addView(disconnect, new LinearLayout.LayoutParams(0, dp(40), 1f));
+        system.addView(buttons, full(8, 0));
+        c.addView(system, full(0, 8));
 
         io.execute(() -> {
             Gateway.Result r = Gateway.call(this, "health", new JSONObject());
             runOnUiThread(() -> {
                 if (r.ok()) {
-                    JSONArray missing = r.body.optJSONArray("unresolved_columns");
                     int contract = r.body.optInt("contract_version", 1);
-                    StringBuilder sb = new StringBuilder("שער מחובר · ")
-                            .append(r.body.optString("spreadsheet_title", "לוח הבקרה"))
-                            .append(" · ").append(r.body.optInt("projects_rows", 0)).append(" שורות")
-                            .append(" · מכשירים רשומים: ").append(r.body.optInt("active_devices", 0))
-                            .append(r.body.optBoolean("fcm_configured", false) ? " · התראות מוגדרות" : " · התראות לא מוגדרות בשער")
-                            .append(r.body.optBoolean("scanner_trigger_installed", false) ? " · סורק פעיל" : " · סורק לא מותקן");
-                    if (contract < 3) sb.append(" · הגרסה בשער ישנה (ללא מעקב פעילות חי) — יש לפרוס את CombinedCode.gs המעודכן");
-                    if (missing != null && missing.length() > 0) sb.append(" · עמודות שלא זוהו: ").append(TextUtils.join(", ", jsonStrings(missing)));
+                    StringBuilder sb = new StringBuilder("שער מחובר · ").append(r.body.optInt("projects_rows", 0)).append(" פרויקטים בלוח");
+                    sb.append(r.body.optBoolean("fcm_configured", false) ? " · התראות מוגדרות" : " · התראות לא מוגדרות בשער");
+                    if (contract < 5) sb.append(" · הגרסה שפרוסה בשער ישנה — יישור OS ומיון רעיונות יעבדו אחרי פריסה מחדש");
+                    JSONObject osH = r.body.optJSONObject("os");
+                    if (osH != null && !osH.optBoolean("os_current_marker_configured", false)) sb.append(" · סמן גרסת ה-OS הנוכחי לא הוגדר בשער");
                     gatewayLine.setText(sb.toString());
-                    gatewayLine.setTextColor(contract < 3 ? AMBER : TEXT);
+                    gatewayLine.setTextColor(contract < 5 ? AMBER : TEXT);
                 } else {
                     gatewayLine.setText("שער לא זמין: " + r.describe());
                     gatewayLine.setTextColor(RED);
@@ -1234,47 +1281,33 @@ public class MainActivity extends Activity {
 
         c.addView(section("התראות שנשלחו"));
         View load = loading();
-        c.addView(load, lp(ViewGroup.LayoutParams.MATCH_PARENT, dp(80), 0, 0));
+        c.addView(load, lp(ViewGroup.LayoutParams.MATCH_PARENT, dp(60), 0, 0));
         JSONObject params = new JSONObject();
         try { params.put("limit", 30); } catch (Exception ignored) {}
         fetchArray("activity", params, "items", arr -> {
             c.removeView(load);
-            if (arr.length() == 0) {
-                c.addView(text("עדיין לא נשלחו התראות אוטומטיות.", 13, MUTED, false));
-                return;
-            }
+            if (arr.length() == 0) { c.addView(text("עדיין לא נשלחו התראות אוטומטיות.", 13, MUTED, false)); return; }
             for (int i = 0; i < arr.length(); i++) {
                 JSONObject o = arr.optJSONObject(i);
                 if (o == null) continue;
                 LinearLayout item = card();
                 LinearLayout top = row();
-                top.addView(text(projectDisplayName(cached, o.optString("project_key", "")), 15, TEXT, true), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+                top.addView(text(projectDisplayName(cached, o.optString("project_key", "")), 14, TEXT, true), grow());
                 top.addView(chip(Hebrew.pushEvent(o.optString("event")), BLUE));
                 item.addView(top);
-                item.addView(text(Hebrew.ragBadge(o.optString("rag", "")) + " · " + Hebrew.lifecycle(o.optString("lifecycle", "")), 12, MUTED, false), full(6, 0));
                 long at = TimeText.parse(o.optString("occurred_at", ""));
-                item.addView(text(at > 0 ? TimeText.wall(at, now()) : o.optString("occurred_at", ""), 11, MUTED, false), full(6, 0));
-                c.addView(item, full(0, 8));
+                item.addView(text(Hebrew.ragBadge(o.optString("rag", "")) + " · " + (at > 0 ? TimeText.wall(at, now()) : ""), 11, MUTED, false), full(4, 0));
+                c.addView(item, full(0, 6));
             }
-        }, msg -> {
-            c.removeView(load);
-            c.addView(text("לא ניתן לטעון את ההתראות: " + msg, 13, RED, false));
-        });
+        }, msg -> { c.removeView(load); c.addView(text("לא ניתן לטעון את ההתראות: " + msg, 13, RED, false)); });
     }
 
-    /** MobilePushState stores a lower-cased key; show the real project name when the snapshot knows it. */
     private String projectDisplayName(Portfolio p, String key) {
         if (p != null) {
             for (Project x : p.projects) if (x.name.equalsIgnoreCase(key)) return x.name;
             for (Project x : p.infrastructure) if (x.name.equalsIgnoreCase(key)) return x.name;
         }
         return key.isEmpty() ? "פרויקט" : key;
-    }
-
-    private String[] jsonStrings(JSONArray a) {
-        String[] out = new String[a.length()];
-        for (int i = 0; i < a.length(); i++) out[i] = a.optString(i, "");
-        return out;
     }
 
     // ---------- plumbing ----------
