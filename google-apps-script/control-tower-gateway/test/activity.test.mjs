@@ -12,6 +12,11 @@ const src = ['Config.gs', 'Portfolio.gs', 'Activity.gs']
 function context() {
   const ctx = {
     console,
+    str_: (value, maxLen) => {
+      if (value === null || value === undefined) return '';
+      const s = String(value);
+      return maxLen && s.length > maxLen ? s.slice(0, maxLen) : s;
+    },
     PropertiesService: { getScriptProperties: () => ({ getProperty: () => null }) },
     Utilities: {
       Charset: { UTF_8: 'utf8' },
