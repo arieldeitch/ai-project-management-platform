@@ -61,7 +61,7 @@ public final class Portfolio {
     public static final Comparator<Project> URGENCY = (a, b) -> {
         int byScore = Integer.compare(b.urgencyScore(), a.urgencyScore());
         if (byScore != 0) return byScore;
-        long ta = a.lastProgressMillis, tb = b.lastProgressMillis;
+        long ta = a.latestMeaningfulActivityMillis, tb = b.latestMeaningfulActivityMillis;
         if (ta <= 0 && tb <= 0) return a.name.compareTo(b.name);
         if (ta <= 0) return 1;
         if (tb <= 0) return -1;
@@ -83,13 +83,13 @@ public final class Portfolio {
     /** Most recent project activity across the portfolio, -1 if none has a timestamp. */
     public long latestActivity() {
         Project p = latestActiveProject();
-        return p == null ? -1 : p.lastProgressMillis;
+        return p == null ? -1 : p.latestActivityMillis;
     }
 
     /** The project with the most recent activity timestamp, or null when none has one. */
     public Project latestActiveProject() {
         Project best = null;
-        for (Project p : projects) if (p.lastProgressMillis > 0 && (best == null || p.lastProgressMillis > best.lastProgressMillis)) best = p;
+        for (Project p : projects) if (p.latestActivityMillis > 0 && (best == null || p.latestActivityMillis > best.latestActivityMillis)) best = p;
         return best;
     }
 }
