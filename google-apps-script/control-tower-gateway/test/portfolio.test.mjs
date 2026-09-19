@@ -124,7 +124,7 @@ test('health exposes the contract version and unresolved columns', () => {
   ctx.isScannerTriggerInstalled_ = () => false;
   ctx.activityHealth_ = () => ({ sources_enabled: 0, ledger_events: 0, latest_observed_activity: '' });
   const h = ctx.healthReport_();
-  assert.equal(h.contract_version, 3);
+  assert.equal(h.contract_version, 4);
   assert.equal(JSON.stringify(h.unresolved_columns), '[]');
   assert.equal(h.resolved_columns.last_meaningful_progress, 'Last Meaningful Progress');
 });
@@ -193,8 +193,8 @@ test('every reply carries contract/gateway version so a deployment can be verifi
   ctx.ContentService = { createTextOutput: (t) => { captured = t; return { setMimeType: () => ({}) }; }, MimeType: { JSON: 'json' } };
   ctx.reply_(401, { ok: false, error: 'unauthorized' });
   const body = JSON.parse(captured);
-  assert.equal(body.contract_version, 3);
-  assert.equal(body.gateway_version, '0.8.0');
+  assert.equal(body.contract_version, 4);
+  assert.equal(body.gateway_version, '0.9.0');
   assert.equal(body.error, 'unauthorized');
 });
 
