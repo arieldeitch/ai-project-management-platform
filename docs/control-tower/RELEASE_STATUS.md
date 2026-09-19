@@ -1,9 +1,37 @@
 # Control Tower Android — release status
 
-**Current candidate:** 0.7.0 (versionCode 8) · branch `control-tower-apk-build` · code commit `e382166`
-**Artifact of record:** GitHub Actions run 35356798804 → **`ControlTower-0.7.0-release`** (`ControlTower-0.7.0-release.apk`, 2,068,741 bytes, SHA-256 `ca8d6238…fb51f1`, signed with the persistent key, cert SHA-256 `00151c98…7c7950`). A debug artifact (`ControlTower-0.7.0-debug`) is also produced for review only.
-**Engineering gate:** 🟢 GREEN — build, signed release verified (v2+v3), 15/15 Android unit tests, 12/12 gateway tests, lint 0 errors, secret scan clean, CombinedCode in sync.
+**Current candidate:** 0.10.0 (versionCode 11) · branch `control-tower-apk-build` · code commit `b46d8d2`
+**Artifact of record:** GitHub Actions run 35435862836 → **`ControlTower-0.10.0-release`** (artifact 10581904689, `ControlTower-0.10.0-release.apk`, 1,942,274 bytes, SHA-256 `c94f0120e7579bfd0a317da92395d0de0367b41b7f54ff17a1d1e02463349fbe`, signed with the persistent key, cert SHA-256 `00151c98…7c7950` — verified locally with apksigner on the downloaded artifact). Installs **over** 0.7.0 / 0.9.0 with data kept. A debug artifact (`ControlTower-0.10.0-debug`, 10582189566) is for review only.
+**Engineering gate:** 🟢 GREEN — build, signed release verified, 39/39 Android unit tests (21 new), 40/40 gateway tests, lint 0 errors, secret scan clean, CombinedCode in sync, emulator review + one remediation pass (screenshots `docs/claude-runs/screenshots/2026-09-19_control-tower-0.10/`).
 **Product gate:** 🟡 AMBER — 🧪 מחכה לאריאל — USER TEST REQUIRED (physical-device acceptance pending).
+
+## What 0.10.0 adds over 0.9.0
+- **Home is compact and filterable.** Status chips (צריך אותך / חסום / דורש טיפול / במעקב / תקין) are real filters with counts, one-tap clear and a ⓘ legend that states each status's meaning and rule; "ישן" and "לא מיושר ל-OS" are extra filters. Rows: name — short description · status + why · activity time · OS chip.
+- **Status is deterministic** (gateway `status_bucket` + Hebrew `status_reason`; the same rule runs on the client for older gateways).
+- **OS alignment is a first-class fact:** CURRENT / VERSION_DRIFT / NEVER_SEEN / ACCESS_FAILED / UNKNOWN from the board's OS columns, evidence link, sync action; never derived from commits or checks. Five clocks stay separate.
+- **Ideas:** three planning buckets (עכשיו / הבא / בהמשך) backed by the sheet's `planning_bucket` / `manual_order`; drag & drop (long-press) and ▲▼; optimistic local reorder with background `reorder_ideas`; collapsed add form; calmer palette.
+- **סגן (Deputy):** repeated technical events are merged per functional problem and phrased as problem → why it matters → next → owner; raw evidence only under "ראיות".
+- **פעילות:** installed build vs newest CI build (version, versionCode, short commit, branch, build time) — three honest outcomes (newer available / same / device ahead of CI).
+
+## Gateway deployment state (VERIFIED 2026-09-19 ~12:55 IDT, token-free probe)
+Repo gateway: **0.10.0 / contract 5** (`033a000`) — OS alignment columns + receipts (`os_receipt`), status taxonomy, short description, ideas `planning_bucket`/`manual_order` + `reorder_ideas`, header-name column resolution for Ideas.
+Deployed Web App: **0.9.0 / contract 4** (Ariel deployed 0.9.0 since the last report). Until the one redeploy in `GATEWAY_DEPLOY_RUNBOOK.md`: the app works, but OS shows "לא ידוע" everywhere, status reasons are computed locally, idea buckets are all "בהמשך" and reorder shows "הסדר לא נשמר בלוח". Also set Script Property `OS_CURRENT_CHANGE_MARKER` (runbook).
+
+## Push state
+Unchanged from 0.7.0 (client registration VERIFIED on the emulator; server sending NOT VERIFIED — `FCM_SERVICE_ACCOUNT_JSON` not set).
+
+## Minimum remaining Ariel action
+1. Redeploy the gateway once (runbook, 3 min) and add `OS_CURRENT_CHANGE_MARKER`.
+2. Install `ControlTower-0.10.0-release.apk` over the current build (no uninstall), use it for a day and say what is unclear.
+
+## Evidence trail
+- Run report: `docs/claude-runs/2026-09-19_control-tower-ux-os-chief-alignment_REPORT.md` (this release); previous: `…_control-tower-live-activity-pipeline_REPORT.md` (0.9.0), `…_8h-hardening_REPORT.md` (0.7.0)
+- Emulator screenshots: `docs/claude-runs/screenshots/2026-09-19_control-tower-0.10/`
+- OS alignment protocol: `docs/control-tower/OS_ALIGNMENT_RECEIPT_PROTOCOL.md`
+
+---
+
+## Previous: 0.7.0 / 0.9.0 (kept for history)
 
 ## Architecture (unchanged)
 PROJECT_CONTROL_BOARD Sheet → Apps Script gateway (contract v2) → Android · FCM = push transport only · no Supabase.

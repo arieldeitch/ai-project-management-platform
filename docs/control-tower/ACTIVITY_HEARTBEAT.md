@@ -52,3 +52,9 @@ enough: the new `modifiedTime` is recorded as `drive_file:<fileId>:<modifiedTime
 `project_activity` (`{ "action": "project_activity", "project_id": "P-006", "limit": 20 }`) lists the ledger for one project.
 `portfolio` rows carry `activity_origin` (heartbeat | run_report | github | drive | automation | curated_board | none),
 `selected_activity_*`, and `curated_last_meaningful_progress` next to the effective `last_meaningful_progress`.
+
+## OS Access Receipt is a different clock (0.10.0)
+
+A heartbeat records *activity*. It never touches the OS columns. Reading the canonical OS is reported separately with
+`scripts/control-tower/os-receipt.mjs` (`action: os_receipt`) and lands in `Last OS Check` / `OS Alignment` only.
+Protocol and states: `docs/control-tower/OS_ALIGNMENT_RECEIPT_PROTOCOL.md`.

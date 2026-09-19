@@ -8,9 +8,11 @@ credentials exist on the build machine, and none should be created for this). Ev
 ```
 node google-apps-script/control-tower-gateway/verify-deployment.mjs
 ```
-- prints `contract_version=4` → the live activity pipeline (0.9.0) is deployed — nothing to do.
-- prints `contract_version=2` or `3` → the deployed gateway still derives the time wall from the curated cell only
-  (timestamps lag real GitHub/Drive work). Do the 3-minute step below.
+- prints `contract_version=5` → gateway 0.10.0 (OS alignment, status taxonomy, ideas planning) is deployed — nothing to do.
+- prints `contract_version=4` (VERIFIED deployed on 2026-09-19 ~12:55 IDT) → the live activity pipeline works, but the
+  app's OS-alignment block, status reasons, short descriptions and idea buckets stay empty/UNKNOWN and drag & drop
+  reorder is rejected with "unknown_action". Do the 3-minute step below.
+- prints `contract_version=2` or `3` → also the time wall still follows the curated cell. Same step.
 
 ## The step (≈ 3 minutes, same URL, same token)
 
@@ -21,9 +23,18 @@ node google-apps-script/control-tower-gateway/verify-deployment.mjs
    nothing is defined twice.
 3. **Deploy → Manage deployments → ✎ (edit) → Version: New version → Deploy.** Do **not** create a new deployment;
    editing the existing one keeps the URL the app already carries.
-4. Run the verifier again — it must print `contract_version=4` and exit 0.
+4. Run the verifier again — it must print `contract_version=5` and exit 0.
 
 Nothing else changes: `GATEWAY_TOKEN`, `FCM_SERVICE_ACCOUNT_JSON`, `GITHUB_READ_TOKEN` and the scanner trigger survive redeployment.
+
+## Once per OS change: the canonical OS marker (0.10.0)
+
+The gateway decides CURRENT / VERSION_DRIFT by comparing a project's receipt with **Script Properties**
+`OS_CURRENT_CHANGE_MARKER` (e.g. `OS-2026-09-17`, the change marker of the current canonical OS) and optionally
+`OS_CURRENT_VERSION` (e.g. `1.1`). Apps Script → Project Settings → Script properties → add both. Until they exist every
+receipt resolves to UNKNOWN (truthful) and `health.os.os_current_marker_configured` is `false`. Update the marker whenever
+the OS changes; nothing else needs redeploying. Projects record receipts with `scripts/control-tower/os-receipt.mjs`
+(protocol: `docs/control-tower/OS_ALIGNMENT_RECEIPT_PROTOCOL.md`).
 
 ## Only if `health` says `activity_github_token_configured: false`
 
@@ -36,4 +47,4 @@ Developer settings → Fine-grained tokens → "Control Tower read" → reposito
 ## What CI guarantees before you paste
 
 `CombinedCode.gs` is regenerated from the modular sources and checked in CI (`build-combined.mjs --check`); the mapping
-contract has Node tests (`test/portfolio.test.mjs`, `test/activity.test.mjs`). If CI is green, the file you paste is the file that was tested.
+contract has Node tests (`test/portfolio.test.mjs`, `test/activity.test.mjs`, `test/os.test.mjs`, `test/ideas.test.mjs` — 40 in 0.10.0). If CI is green, the file you paste is the file that was tested.
