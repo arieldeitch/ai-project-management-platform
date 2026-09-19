@@ -61,6 +61,35 @@ test('GitHub commit event carries actual commit time and evidence URL', () => {
   assert.equal(e.evidence_level, 'OBSERVED');
 });
 
+test('one GitHub Events item captures PR-branch pushes and classifies automation', () => {
+  const ctx = context();
+  const source = { project_id: 'P-001', project_name: 'Ariel Life OS', locator: 'arieldeitch/ariel-habit-ai', branch: 'main' };
+  const push = ctx.githubRepoEvent_(source, {
+    id: 'evt-1',
+    type: 'PushEvent',
+    created_at: '2026-09-19T04:30:00Z',
+    actor: { login: 'arieldeitch' },
+    payload: {
+      ref: 'refs/heads/feat/quiet-exit',
+      head: 'abc123',
+      commits: [{ sha: 'abc123', message: 'feat: quiet exit polish' }]
+    }
+  });
+  assert.equal(push.occurred_at, '2026-09-19T04:30:00.000Z');
+  assert.equal(push.activity_type, 'progress');
+  assert.match(push.summary, /quiet exit/);
+  assert.match(push.evidence_url, /abc123/);
+
+  const bot = ctx.githubRepoEvent_(source, {
+    id: 'evt-2',
+    type: 'PushEvent',
+    created_at: '2026-09-19T04:31:00Z',
+    actor: { login: 'github-actions[bot]' },
+    payload: { ref: 'refs/heads/main', head: 'def456', commits: [{ sha: 'def456', message: 'refresh feed snapshot' }] }
+  });
+  assert.equal(bot.activity_type, 'automation');
+});
+
 test('latest observed activity may be automation while latest meaningful stays progress', () => {
   const ctx = context();
   ctx.latestActivityByProject_ = () => ({
