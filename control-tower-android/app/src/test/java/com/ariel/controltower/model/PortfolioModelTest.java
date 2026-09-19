@@ -40,7 +40,7 @@ public class PortfolioModelTest {
                 .put(row("P-005", "Nutrition App", "Active", "RED", true, "2026-08-20T05:00:00Z", "2x/week"))
                 .put(row("P-006", "Chief of Staff", "Active", "GREEN", false, T_1423, "weekly"))
                 .put(row("X-1", "AI Control Tower", "Active", "GREEN", false, T_1423, "").put("role", "infrastructure"));
-        return new JSONObject().put("projects", arr).put("snapshot_at", "2026-09-18T12:14:00Z").put("contract_version", 2);
+        return new JSONObject().put("projects", arr).put("snapshot_at", "2026-09-18T12:14:00Z").put("contract_version", 3);
     }
 
     // ---------- Hebrew status mapping ----------
@@ -209,7 +209,7 @@ public class PortfolioModelTest {
         assertEquals(1, p.stale);
         assertEquals(1, p.unknownActivity);
         assertEquals(0, p.unknownCadence);
-        assertEquals(2, p.contractVersion);
+        assertEquals(3, p.contractVersion);
         assertTrue(p.serverSnapshotAt > 0);
     }
 
@@ -253,6 +253,52 @@ public class PortfolioModelTest {
         assertEquals(-1, x.lastProgressMillis);
         assertEquals(Freshness.State.UNKNOWN, x.freshness.state);
         assertEquals("18/09/2026 15:00", TimeText.absolutePlain(x.lastControlCheckMillis));
+    }
+
+    @Test public void liveObservedAutomationDoesNotResetMeaningfulFreshness() throws Exception {
+        JSONObject news = row("P-003", "Personal News Radar", "Active", "GREEN", false,
+                "2026-09-18T08:00:00Z", "daily")
+                .put("latest_activity_at", "2026-09-18T12:55:00Z")
+                .put("latest_activity_type", "automation")
+                .put("latest_activity_source", "github_commit")
+                .put("latest_activity_summary", "refresh feed snapshot")
+                .put("latest_meaningful_activity_at", "2026-09-18T08:00:00Z")
+                .put("latest_meaningful_activity_type", "progress")
+                .put("latest_meaningful_activity_source", "github_pr")
+                .put("latest_meaningful_activity_summary", "M3 hardening");
+        Portfolio p = Portfolio.from(new JSONObject()
+                .put("projects", new JSONArray().put(news))
+                .put("contract_version", 3)
+                .put("snapshot_at", "2026-09-18T12:56:00Z"), NOW, false);
+        Project x = p.projects.get(0);
+        assertEquals("18/09/2026 15:55", TimeText.absolutePlain(x.latestActivityMillis));
+        assertEquals("automation", x.latestActivityType);
+        assertTrue(x.latestActivityIsAutomation());
+        assertEquals("GitHub", Hebrew.activitySource(x.latestActivitySource));
+        assertEquals("אוטומציה", Hebrew.activityType(x.latestActivityType));
+        assertEquals("18/09/2026 11:00", TimeText.absolutePlain(x.latestMeaningfulActivityMillis));
+        assertEquals(Freshness.State.FRESH, x.freshness.state);
+        assertEquals(x.latestActivityMillis, p.latestActivity());
+        assertEquals("Personal News Radar", p.latestActiveProject().name);
+    }
+
+    @Test public void v2PortfolioFallsBackToBoardProgressForActivityFields() throws Exception {
+        JSONObject x = row("P-002", "Household OS", "Active", "YELLOW", false, T_1423, "daily");
+        Portfolio p = Portfolio.from(new JSONObject().put("projects", new JSONArray().put(x)).put("contract_version", 2), NOW, false);
+        Project project = p.projects.get(0);
+        assertEquals(project.lastProgressMillis, project.latestActivityMillis);
+        assertEquals(project.lastProgressMillis, project.latestMeaningfulActivityMillis);
+        assertEquals("project_board", project.latestActivitySource);
+        assertEquals("progress", project.latestActivityType);
+    }
+
+    @Test public void activityLabelsAreHebrew() {
+        assertEquals("התקדמות", Hebrew.activityType("progress"));
+        assertEquals("נקודת ביניים", Hebrew.activityType("checkpoint"));
+        assertEquals("אוטומציה", Hebrew.activityType("automation"));
+        assertEquals("דיווח סוכן", Hebrew.activitySource("agent_heartbeat"));
+        assertEquals("GitHub", Hebrew.activitySource("github_pr"));
+        assertEquals("לוח הבקרה", Hebrew.activitySource("project_board"));
     }
 
     @Test public void arielActionPrefersHisInputThenBlockerThenNext() throws Exception {
