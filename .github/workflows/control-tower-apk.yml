@@ -7,6 +7,7 @@ on:
     paths:
       - 'control-tower-android/**'
       - '.github/workflows/control-tower-apk.yml'
+      - 'google-apps-script/**'
   workflow_dispatch:
 
 permissions:
@@ -60,7 +61,7 @@ jobs:
 
       - name: Gateway tests (mapping contract + CombinedCode sync)
         run: |
-          node --test google-apps-script/control-tower-gateway/test/portfolio.test.mjs
+          node --test google-apps-script/control-tower-gateway/test/portfolio.test.mjs google-apps-script/control-tower-gateway/test/activity.test.mjs
           node google-apps-script/control-tower-gateway/build-combined.mjs --check
 
       - name: Read app version from build.gradle

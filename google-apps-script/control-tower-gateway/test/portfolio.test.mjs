@@ -122,11 +122,14 @@ test('health exposes the contract version and unresolved columns', () => {
   ctx.countActiveDevices_ = () => 0;
   ctx.isFcmConfigured_ = () => false;
   ctx.isScannerTriggerInstalled_ = () => false;
-  ctx.activityHealth_ = () => ({ sources_enabled: 0, ledger_events: 0, latest_observed_activity: '' });
+  ctx.activityHealth_ = () => ({ sources_enabled: 0, ledger_events: 0, latest_observed_activity: '', activity_sources_enabled: 6, activity_last_scan_at: '2026-09-19T05:00:00.000Z', activity_scan_status: 'ok', activity_source_failures: [], activity_ledger_latest_at: '2026-09-19T04:27:36.000Z' });
   const h = ctx.healthReport_();
   assert.equal(h.contract_version, 4);
   assert.equal(JSON.stringify(h.unresolved_columns), '[]');
   assert.equal(h.resolved_columns.last_meaningful_progress, 'Last Meaningful Progress');
+  assert.equal(h.activity_scan_status, 'ok');
+  assert.equal(h.activity_sources_enabled, 6);
+  assert.equal(h.activity_ledger_latest_at, '2026-09-19T04:27:36.000Z');
 });
 
 test('CombinedCode.gs is generated from the current modular sources', async () => {

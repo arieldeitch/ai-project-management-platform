@@ -13,7 +13,8 @@
  *   GATEWAY_TOKEN              required  — high-entropy shared secret (≥ 32 chars). Same value goes into the Android build.
  *   FCM_SERVICE_ACCOUNT_JSON   optional  — Firebase service-account JSON (whole file). Enables push.
  *   PROJECTS_COLUMN_MAP        optional  — JSON {field: "Exact Header"} overriding header auto-detection.
- *   GITHUB_READ_TOKEN          optional  — raises GitHub API quota / enables intentionally configured private repos. Never required for public repos.
+ *   GITHUB_READ_TOKEN          required for PRIVATE repositories in ActivitySources (read-only, fine-grained: Contents/Metadata read);
+ *                              optional for public repos (raises the anonymous 60/h quota). Never printed or returned.
  */
 
 var GATEWAY_VERSION = '0.9.0';
@@ -129,7 +130,7 @@ function healthReport_() {
   Object.keys(mapping).forEach(function (field) {
     if (mapping[field] >= 0) resolved[field] = headerRow_()[mapping[field]]; else missing.push(field);
   });
-  return {
+  var report = {
     spreadsheet_title: ss.getName(),
     tabs: tabs,
     projects_rows: Math.max(0, ss.getSheetByName(PROJECTS_SHEET) ? ss.getSheetByName(PROJECTS_SHEET).getLastRow() - 1 : 0),
@@ -143,4 +144,7 @@ function healthReport_() {
     contract_version: GATEWAY_CONTRACT_VERSION,
     server_time: nowIso_()
   };
+  // Flatten the task-mandated activity health fields for quick reading.
+  ['activity_sources_enabled', 'activity_last_scan_at', 'activity_scan_status', 'activity_source_failures', 'activity_ledger_latest_at', 'activity_github_token_configured'].forEach(function (k) { report[k] = report.activity[k]; });
+  return report;
 }

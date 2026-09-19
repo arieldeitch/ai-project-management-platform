@@ -1,6 +1,6 @@
 // Verifies which gateway contract is DEPLOYED, without any token.
 //   node google-apps-script/control-tower-gateway/verify-deployment.mjs [web-app-url]
-// The URL defaults to the one compiled into the Android client. Exit 0 when contract_version >= 2.
+// The URL defaults to the one compiled into the Android client. Exit 0 when contract_version >= 4 (live activity pipeline).
 import { readFileSync } from 'node:fs';
 
 const fromGradle = readFileSync(new URL('../../control-tower-android/app/build.gradle', import.meta.url), 'utf8')
@@ -15,4 +15,4 @@ try { body = JSON.parse(text); } catch { console.error('gateway returned non-JSO
 const contract = body.contract_version ?? 1;
 console.log(`deployed gateway: error=${body.error ?? '-'} gateway_version=${body.gateway_version ?? '(pre-0.7)'} contract_version=${contract}`);
 if (body.error !== 'unauthorized') { console.error('unexpected reply; expected unauthorized without a token'); process.exit(4); }
-process.exit(contract >= 2 ? 0 : 1);
+process.exit(contract >= 4 ? 0 : 1);

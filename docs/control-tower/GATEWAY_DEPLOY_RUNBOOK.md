@@ -8,9 +8,9 @@ credentials exist on the build machine, and none should be created for this). Ev
 ```
 node google-apps-script/control-tower-gateway/verify-deployment.mjs
 ```
-- exit 0 → deployed gateway is contract v2 or newer — nothing to do.
-- exit 1 → the deployed gateway is still v1 (pre-0.7): the app shows "אין חותמת פעילות עדכנית" on every project and the
-  Activity tab says the gateway is old. Do the 3-minute step below.
+- prints `contract_version=4` → the live activity pipeline (0.9.0) is deployed — nothing to do.
+- prints `contract_version=2` or `3` → the deployed gateway still derives the time wall from the curated cell only
+  (timestamps lag real GitHub/Drive work). Do the 3-minute step below.
 
 ## The step (≈ 3 minutes, same URL, same token)
 
@@ -21,11 +21,19 @@ node google-apps-script/control-tower-gateway/verify-deployment.mjs
    nothing is defined twice.
 3. **Deploy → Manage deployments → ✎ (edit) → Version: New version → Deploy.** Do **not** create a new deployment;
    editing the existing one keeps the URL the app already carries.
-4. Run the verifier again — it must print `contract_version=2` and exit 0.
+4. Run the verifier again — it must print `contract_version=4` and exit 0.
 
-Nothing else changes: `GATEWAY_TOKEN`, `FCM_SERVICE_ACCOUNT_JSON` and the scanner trigger survive redeployment.
+Nothing else changes: `GATEWAY_TOKEN`, `FCM_SERVICE_ACCOUNT_JSON`, `GITHUB_READ_TOKEN` and the scanner trigger survive redeployment.
+
+## Only if `health` says `activity_github_token_configured: false`
+
+Four of the five GitHub sources (ariel-habit-ai, child-s-day, personal-news-radar, chief-of-staff) are **private**; GitHub
+answers 404 to the anonymous poller, so those projects fall back to the curated cell. One-time: GitHub → Settings →
+Developer settings → Fine-grained tokens → "Control Tower read" → repository access: those four repos → permissions
+**Metadata: read, Contents: read** (nothing else) → copy → Apps Script → Project Settings → Script properties →
+`GITHUB_READ_TOKEN` = *(paste)*. Never put the value in the sheet, a doc, chat or Git. The next 15-minute scan picks it up.
 
 ## What CI guarantees before you paste
 
 `CombinedCode.gs` is regenerated from the modular sources and checked in CI (`build-combined.mjs --check`); the mapping
-contract has Node tests (`test/portfolio.test.mjs`). If CI is green, the file you paste is the file that was tested.
+contract has Node tests (`test/portfolio.test.mjs`, `test/activity.test.mjs`). If CI is green, the file you paste is the file that was tested.
