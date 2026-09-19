@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const src = ['Config.gs', 'Portfolio.gs', 'Activity.gs', 'Code.gs'].map((f) => readFileSync(join(here, '..', f), 'utf8')).join('\n');
+const src = ['Config.gs', 'Portfolio.gs', 'Os.gs', 'Activity.gs', 'Code.gs'].map((f) => readFileSync(join(here, '..', f), 'utf8')).join('\n');
 
 /** In-memory sheet good enough for getRange/getValues/setValues/setValue/getLastRow. */
 function memSheet(headers, rows) {
@@ -277,10 +277,10 @@ test('activity_heartbeat validates, records, and dedupes by client_event_id or c
   assert.equal(p.last_meaningful_progress, '2026-09-19T05:07:00.000Z');
 });
 
-test('gateway exposes activity_heartbeat and project_activity actions and reports contract 4', () => {
+test('gateway exposes activity_heartbeat and project_activity actions and reports contract 5', () => {
   const ctx = context();
   assert.ok(typeof ctx.ACTIONS.activity_heartbeat === 'function');
   assert.ok(typeof ctx.ACTIONS.project_activity === 'function');
-  assert.equal(ctx.GATEWAY_CONTRACT_VERSION, 4);
-  assert.equal(ctx.GATEWAY_VERSION, '0.9.0');
+  assert.equal(ctx.GATEWAY_CONTRACT_VERSION, 5);
+  assert.equal(ctx.GATEWAY_VERSION, '0.10.0');
 });

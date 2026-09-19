@@ -176,8 +176,49 @@ function mapProjectRow_(row, map, rowNumber) {
     link: get('link', 500),
     objective: get('objective'),
     risk: get('risk'),
-    user_test_required: isUserTestState_(lifecycle)
+    user_test_required: isUserTestState_(lifecycle),
+    // v5: optional one-line purpose for compact displays
+    short_description: get('short_description', 160),
+    // v5: OS alignment record (curated by receipts, never by activity). Raw cells; evaluated in Os.gs.
+    os_alignment: normalizeOsAlignment_(get('os_alignment', 40)),
+    last_os_check: (map.last_os_check >= 0 ? parseCellDate_(row[map.last_os_check]) : { iso: '', raw: '' }).iso,
+    os_version_seen: get('os_version_seen', 80),
+    os_change_marker: get('os_change_marker', 120),
+    os_evidence: get('os_evidence', 600),
+    os_sync_action: get('os_sync_action', 300),
+    board_row: rowNumber
   };
+}
+
+function normalizeOsAlignment_(value) {
+  var v = String(value || '').trim().toUpperCase().replace(/[s-]+/g, '_');
+  return OS_ALIGNMENT_STATES.indexOf(v) >= 0 ? v : (v ? 'UNKNOWN' : '');
+}
+
+/**
+ * Deterministic status taxonomy (shared with the clients; tested on both sides). One bucket per project,
+ * first rule wins: NEEDS_ARIEL › BLOCKED › AT_RISK › WATCH › OK. Freshness (stale) is a client-side modifier.
+ * status_reason is the Hebrew "why" shown next to the status.
+ */
+function statusBucket_(p) {
+  if (p.needs_ariel || p.user_test_required) {
+    return { bucket: 'NEEDS_ARIEL', reason: p.user_test_required ? 'מחכה לבדיקה שלך בטלפון' : (p.ariel_input ? 'צריך אותך: ' + str_(p.ariel_input, 120) : 'צריך החלטה או פעולה שלך') };
+  }
+  var lc = String(p.lifecycle || '').toLowerCase();
+  if (p.blocker || lc === 'blocked' || lc === 'חסום') {
+    return { bucket: 'BLOCKED', reason: p.blocker ? 'חסום: ' + str_(p.blocker, 120) : 'מסומן כחסום בלוח' };
+  }
+  if (p.rag === 'RED') return { bucket: 'AT_RISK', reason: p.risk ? 'אדום בלוח: ' + str_(p.risk, 120) : 'אדום בלוח — דורש טיפול' };
+  if (p.rag === 'YELLOW') return { bucket: 'WATCH', reason: p.risk ? 'צהוב בלוח: ' + str_(p.risk, 120) : 'צהוב בלוח — במעקב' };
+  if (p.rag === 'GREEN') return { bucket: 'OK', reason: 'ירוק בלוח — אין חסם ואין החלטה פתוחה' };
+  return { bucket: 'WATCH', reason: 'לא הוגדר רמזור בלוח' };
+}
+
+function applyStatusBucket_(p) {
+  var s = statusBucket_(p);
+  p.status_bucket = s.bucket;
+  p.status_reason = s.reason;
+  return p;
 }
 
 function readPortfolio_() {
@@ -192,7 +233,7 @@ function readPortfolio_() {
   var projects = [];
   rows.forEach(function (row, i) {
     var p = mapProjectRow_(row, map, i + 2);
-    if (p) projects.push(p);
+    if (p) projects.push(applyStatusBucket_(evaluateOsAlignment_(p)));
   });
   // Most recent project activity first (falls back to control check); rows without a date sink to the bottom.
   projects.sort(function (a, b) {

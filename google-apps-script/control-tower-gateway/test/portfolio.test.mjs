@@ -10,12 +10,12 @@ import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const src = ['Config.gs', 'Portfolio.gs', 'Code.gs'].map((f) => readFileSync(join(here, '..', f), 'utf8')).join('\n');
+const src = ['Config.gs', 'Portfolio.gs', 'Os.gs', 'Code.gs'].map((f) => readFileSync(join(here, '..', f), 'utf8')).join('\n');
 
 // Header row of the live PROJECT_CONTROL_BOARD as documented for this run (names only; values are test fixtures).
 const HEADERS = ['ID', 'Project', 'Lifecycle', 'RAG', 'Confidence', 'Objective', 'Current Milestone', 'Progress Evidence',
   'Next Action', 'Blocker / Dependency', 'Needs Ariel', 'Ariel Input', 'Risk / Drift', 'Last Meaningful Progress',
-  'Last Control Check', 'Expected Cadence', 'Primary Link'];
+  'Last Control Check', 'Expected Cadence', 'Primary Link', 'Short Description', 'OS Alignment', 'Last OS Check', 'OS Version Seen', 'OS Change Marker', 'OS Evidence', 'OS Sync Action'];
 
 function makeContext(rows, overrideMap) {
   const sheet = {
@@ -124,7 +124,7 @@ test('health exposes the contract version and unresolved columns', () => {
   ctx.isScannerTriggerInstalled_ = () => false;
   ctx.activityHealth_ = () => ({ sources_enabled: 0, ledger_events: 0, latest_observed_activity: '', activity_sources_enabled: 6, activity_last_scan_at: '2026-09-19T05:00:00.000Z', activity_scan_status: 'ok', activity_source_failures: [], activity_ledger_latest_at: '2026-09-19T04:27:36.000Z' });
   const h = ctx.healthReport_();
-  assert.equal(h.contract_version, 4);
+  assert.equal(h.contract_version, 5);
   assert.equal(JSON.stringify(h.unresolved_columns), '[]');
   assert.equal(h.resolved_columns.last_meaningful_progress, 'Last Meaningful Progress');
   assert.equal(h.activity_scan_status, 'ok');
@@ -196,8 +196,8 @@ test('every reply carries contract/gateway version so a deployment can be verifi
   ctx.ContentService = { createTextOutput: (t) => { captured = t; return { setMimeType: () => ({}) }; }, MimeType: { JSON: 'json' } };
   ctx.reply_(401, { ok: false, error: 'unauthorized' });
   const body = JSON.parse(captured);
-  assert.equal(body.contract_version, 4);
-  assert.equal(body.gateway_version, '0.9.0');
+  assert.equal(body.contract_version, 5);
+  assert.equal(body.gateway_version, '0.10.0');
   assert.equal(body.error, 'unauthorized');
 });
 

@@ -20,7 +20,8 @@ var DEVICES_HEADERS = ['token', 'device_id', 'device_label', 'platform', 'app_ve
 var PUSH_STATE_HEADERS = ['project_key', 'last_rag', 'last_needs_ariel', 'last_lifecycle', 'last_event', 'last_event_at', 'updated_at'];
 var ACTIVITY_SOURCE_HEADERS = ['project_id', 'project_name', 'source_type', 'locator', 'branch', 'include_automation', 'enabled', 'last_poll_at', 'last_seen_at', 'notes'];
 var ACTIVITY_LEDGER_HEADERS = ['event_id', 'occurred_at', 'observed_at', 'project_id', 'project_name', 'source_type', 'source_locator', 'activity_type', 'summary', 'evidence_url', 'evidence_level', 'metadata_json'];
-var IDEA_HEADERS = ['idea_id', 'created_at', 'updated_at', 'title', 'stage', 'need', 'target_user', 'desired_outcome', 'core_functionality', 'usage_frequency', 'urgency', 'surface', 'automation_level', 'data_needed', 'success_metric', 'constraints', 'next_step', 'notes'];
+var IDEA_HEADERS = ['idea_id', 'created_at', 'updated_at', 'title', 'stage', 'need', 'target_user', 'desired_outcome', 'core_functionality', 'usage_frequency', 'urgency', 'surface', 'automation_level', 'data_needed', 'success_metric', 'constraints', 'next_step', 'notes', 'planning_bucket', 'manual_order'];
+var IDEA_BUCKETS = ['NOW', 'NEXT', 'LATER'];
 
 var MAX_BODY_BYTES = 64 * 1024;
 var MAX_REPORT_CHARS = 20000;
@@ -53,6 +54,14 @@ var PROJECT_FIELD_ALIASES = {
   last_control_check: ['last control check', 'last check', 'control check', 'last ct check', 'בדיקת שליטה אחרונה', 'בדיקה אחרונה'],
   expected_cadence: ['expected cadence', 'cadence', 'expected rhythm', 'rhythm', 'קצב צפוי', 'קצב'],
   progress_evidence: ['progress evidence', 'latest evidence', 'evidence summary', 'ראיות'],
+  short_description: ['short description', 'description', 'purpose', 'one liner', 'תיאור קצר', 'תיאור'],
+  // OS alignment (evidence-backed; never inferred from activity). Written only by os_receipt / evaluation.
+  os_alignment: ['os alignment', 'os status', 'יישור os'],
+  last_os_check: ['last os check', 'os check', 'בדיקת os אחרונה'],
+  os_version_seen: ['os version seen', 'os version', 'גרסת os'],
+  os_change_marker: ['os change marker', 'os marker', 'change marker', 'סמן שינוי os'],
+  os_evidence: ['os evidence', 'ראיית os'],
+  os_sync_action: ['os sync action', 'os action', 'פעולת סנכרון os'],
   link:         ['primary link', 'link', 'url', 'drive link', 'קישור'],
   objective:    ['objective', 'goal', 'יעד', 'מטרה'],
   risk:         ['risk', 'risk drift', 'risk / drift', 'drift', 'סיכון']
@@ -97,4 +106,10 @@ function isFcmConfigured_() {
 var INFRASTRUCTURE_NAME_PATTERNS = [/control\s*tower/i, /מגדל\s*הפיקוח/];
 
 // Contract version reported by health/portfolio so clients can detect a stale deployment.
-var GATEWAY_CONTRACT_VERSION = 4;
+var GATEWAY_CONTRACT_VERSION = 5;
+
+// OS alignment states (canonical OS lives in Drive; Control Tower only records evidence-backed alignment).
+var OS_ALIGNMENT_STATES = ['CURRENT', 'VERSION_DRIFT', 'NEVER_SEEN', 'ACCESS_FAILED', 'UNKNOWN'];
+// Script Properties OS_CURRENT_CHANGE_MARKER / OS_CURRENT_VERSION hold the canonical marker published by the OS owner.
+var OS_MARKER_PROPERTY = 'OS_CURRENT_CHANGE_MARKER';
+var OS_VERSION_PROPERTY = 'OS_CURRENT_VERSION';

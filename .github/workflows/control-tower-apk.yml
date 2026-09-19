@@ -61,7 +61,7 @@ jobs:
 
       - name: Gateway tests (mapping contract + CombinedCode sync)
         run: |
-          node --test google-apps-script/control-tower-gateway/test/portfolio.test.mjs google-apps-script/control-tower-gateway/test/activity.test.mjs
+          node --test google-apps-script/control-tower-gateway/test/portfolio.test.mjs google-apps-script/control-tower-gateway/test/activity.test.mjs google-apps-script/control-tower-gateway/test/ideas.test.mjs google-apps-script/control-tower-gateway/test/os.test.mjs
           node google-apps-script/control-tower-gateway/build-combined.mjs --check
 
       - name: Read app version from build.gradle

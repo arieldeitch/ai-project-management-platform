@@ -30,7 +30,8 @@ var DEVICES_HEADERS = ['token', 'device_id', 'device_label', 'platform', 'app_ve
 var PUSH_STATE_HEADERS = ['project_key', 'last_rag', 'last_needs_ariel', 'last_lifecycle', 'last_event', 'last_event_at', 'updated_at'];
 var ACTIVITY_SOURCE_HEADERS = ['project_id', 'project_name', 'source_type', 'locator', 'branch', 'include_automation', 'enabled', 'last_poll_at', 'last_seen_at', 'notes'];
 var ACTIVITY_LEDGER_HEADERS = ['event_id', 'occurred_at', 'observed_at', 'project_id', 'project_name', 'source_type', 'source_locator', 'activity_type', 'summary', 'evidence_url', 'evidence_level', 'metadata_json'];
-var IDEA_HEADERS = ['idea_id', 'created_at', 'updated_at', 'title', 'stage', 'need', 'target_user', 'desired_outcome', 'core_functionality', 'usage_frequency', 'urgency', 'surface', 'automation_level', 'data_needed', 'success_metric', 'constraints', 'next_step', 'notes'];
+var IDEA_HEADERS = ['idea_id', 'created_at', 'updated_at', 'title', 'stage', 'need', 'target_user', 'desired_outcome', 'core_functionality', 'usage_frequency', 'urgency', 'surface', 'automation_level', 'data_needed', 'success_metric', 'constraints', 'next_step', 'notes', 'planning_bucket', 'manual_order'];
+var IDEA_BUCKETS = ['NOW', 'NEXT', 'LATER'];
 
 var MAX_BODY_BYTES = 64 * 1024;
 var MAX_REPORT_CHARS = 20000;
@@ -63,6 +64,14 @@ var PROJECT_FIELD_ALIASES = {
   last_control_check: ['last control check', 'last check', 'control check', 'last ct check', 'בדיקת שליטה אחרונה', 'בדיקה אחרונה'],
   expected_cadence: ['expected cadence', 'cadence', 'expected rhythm', 'rhythm', 'קצב צפוי', 'קצב'],
   progress_evidence: ['progress evidence', 'latest evidence', 'evidence summary', 'ראיות'],
+  short_description: ['short description', 'description', 'purpose', 'one liner', 'תיאור קצר', 'תיאור'],
+  // OS alignment (evidence-backed; never inferred from activity). Written only by os_receipt / evaluation.
+  os_alignment: ['os alignment', 'os status', 'יישור os'],
+  last_os_check: ['last os check', 'os check', 'בדיקת os אחרונה'],
+  os_version_seen: ['os version seen', 'os version', 'גרסת os'],
+  os_change_marker: ['os change marker', 'os marker', 'change marker', 'סמן שינוי os'],
+  os_evidence: ['os evidence', 'ראיית os'],
+  os_sync_action: ['os sync action', 'os action', 'פעולת סנכרון os'],
   link:         ['primary link', 'link', 'url', 'drive link', 'קישור'],
   objective:    ['objective', 'goal', 'יעד', 'מטרה'],
   risk:         ['risk', 'risk drift', 'risk / drift', 'drift', 'סיכון']
@@ -107,7 +116,13 @@ function isFcmConfigured_() {
 var INFRASTRUCTURE_NAME_PATTERNS = [/control\s*tower/i, /מגדל\s*הפיקוח/];
 
 // Contract version reported by health/portfolio so clients can detect a stale deployment.
-var GATEWAY_CONTRACT_VERSION = 4;
+var GATEWAY_CONTRACT_VERSION = 5;
+
+// OS alignment states (canonical OS lives in Drive; Control Tower only records evidence-backed alignment).
+var OS_ALIGNMENT_STATES = ['CURRENT', 'VERSION_DRIFT', 'NEVER_SEEN', 'ACCESS_FAILED', 'UNKNOWN'];
+// Script Properties OS_CURRENT_CHANGE_MARKER / OS_CURRENT_VERSION hold the canonical marker published by the OS owner.
+var OS_MARKER_PROPERTY = 'OS_CURRENT_CHANGE_MARKER';
+var OS_VERSION_PROPERTY = 'OS_CURRENT_VERSION';
 
 
 /* ===== Portfolio.gs ===== */
@@ -290,8 +305,49 @@ function mapProjectRow_(row, map, rowNumber) {
     link: get('link', 500),
     objective: get('objective'),
     risk: get('risk'),
-    user_test_required: isUserTestState_(lifecycle)
+    user_test_required: isUserTestState_(lifecycle),
+    // v5: optional one-line purpose for compact displays
+    short_description: get('short_description', 160),
+    // v5: OS alignment record (curated by receipts, never by activity). Raw cells; evaluated in Os.gs.
+    os_alignment: normalizeOsAlignment_(get('os_alignment', 40)),
+    last_os_check: (map.last_os_check >= 0 ? parseCellDate_(row[map.last_os_check]) : { iso: '', raw: '' }).iso,
+    os_version_seen: get('os_version_seen', 80),
+    os_change_marker: get('os_change_marker', 120),
+    os_evidence: get('os_evidence', 600),
+    os_sync_action: get('os_sync_action', 300),
+    board_row: rowNumber
   };
+}
+
+function normalizeOsAlignment_(value) {
+  var v = String(value || '').trim().toUpperCase().replace(/[s-]+/g, '_');
+  return OS_ALIGNMENT_STATES.indexOf(v) >= 0 ? v : (v ? 'UNKNOWN' : '');
+}
+
+/**
+ * Deterministic status taxonomy (shared with the clients; tested on both sides). One bucket per project,
+ * first rule wins: NEEDS_ARIEL › BLOCKED › AT_RISK › WATCH › OK. Freshness (stale) is a client-side modifier.
+ * status_reason is the Hebrew "why" shown next to the status.
+ */
+function statusBucket_(p) {
+  if (p.needs_ariel || p.user_test_required) {
+    return { bucket: 'NEEDS_ARIEL', reason: p.user_test_required ? 'מחכה לבדיקה שלך בטלפון' : (p.ariel_input ? 'צריך אותך: ' + str_(p.ariel_input, 120) : 'צריך החלטה או פעולה שלך') };
+  }
+  var lc = String(p.lifecycle || '').toLowerCase();
+  if (p.blocker || lc === 'blocked' || lc === 'חסום') {
+    return { bucket: 'BLOCKED', reason: p.blocker ? 'חסום: ' + str_(p.blocker, 120) : 'מסומן כחסום בלוח' };
+  }
+  if (p.rag === 'RED') return { bucket: 'AT_RISK', reason: p.risk ? 'אדום בלוח: ' + str_(p.risk, 120) : 'אדום בלוח — דורש טיפול' };
+  if (p.rag === 'YELLOW') return { bucket: 'WATCH', reason: p.risk ? 'צהוב בלוח: ' + str_(p.risk, 120) : 'צהוב בלוח — במעקב' };
+  if (p.rag === 'GREEN') return { bucket: 'OK', reason: 'ירוק בלוח — אין חסם ואין החלטה פתוחה' };
+  return { bucket: 'WATCH', reason: 'לא הוגדר רמזור בלוח' };
+}
+
+function applyStatusBucket_(p) {
+  var s = statusBucket_(p);
+  p.status_bucket = s.bucket;
+  p.status_reason = s.reason;
+  return p;
 }
 
 function readPortfolio_() {
@@ -306,7 +362,7 @@ function readPortfolio_() {
   var projects = [];
   rows.forEach(function (row, i) {
     var p = mapProjectRow_(row, map, i + 2);
-    if (p) projects.push(p);
+    if (p) projects.push(applyStatusBucket_(evaluateOsAlignment_(p)));
   });
   // Most recent project activity first (falls back to control check); rows without a date sink to the bottom.
   projects.sort(function (a, b) {
@@ -343,6 +399,128 @@ function readConnections_() {
     });
   }
   return out;
+}
+
+
+/* ===== Os.gs ===== */
+
+/**
+ * OS alignment — is each managed project provably aligned with the canonical Ariel AI Operating System?
+ *
+ * The OS itself lives in Drive (OS Brain owns the rules). Control Tower only records EVIDENCE:
+ *   * a project run posts an OS Access Receipt (action os_receipt) after it read the OS, identified the
+ *     version / change marker and applied the rules;
+ *   * the receipt is written into the project's OS columns on PROJECT_CONTROL_BOARD
+ *     (Last OS Check, OS Version Seen, OS Change Marker, OS Evidence, OS Sync Action, OS Alignment);
+ *   * the verdict is re-evaluated on every read against the canonical marker published in Script Properties
+ *     (OS_CURRENT_CHANGE_MARKER, optional OS_CURRENT_VERSION), so an OS update flips everyone to VERSION_DRIFT
+ *     until each project re-checks.
+ *
+ * Never inferred from commits, GitHub activity or a Control Tower check. Separate clock: last_os_check.
+ */
+
+function canonicalOsMarker_() {
+  try {
+    var props = PropertiesService.getScriptProperties();
+    return { marker: str_(props.getProperty(OS_MARKER_PROPERTY), 120).trim(), version: str_(props.getProperty(OS_VERSION_PROPERTY), 80).trim() };
+  } catch (e) {
+    return { marker: '', version: '' };
+  }
+}
+
+/**
+ * Pure verdict from stored evidence + canonical marker. Explicit ACCESS_FAILED/NEVER_SEEN cells are kept.
+ *   no check ever                     → NEVER_SEEN (or the explicit cell value when present)
+ *   check + marker, canonical known   → CURRENT when equal, VERSION_DRIFT otherwise
+ *   check + marker, canonical unknown → UNKNOWN (evidence exists, verdict cannot be computed yet)
+ *   check without marker              → UNKNOWN
+ */
+function osVerdict_(p, canonical) {
+  var stored = normalizeOsAlignment_(p.os_alignment);
+  if (stored === 'ACCESS_FAILED') return { state: 'ACCESS_FAILED', action: p.os_sync_action || 'הפרויקט לא הצליח לגשת למערכת ההפעלה — לבדוק הרשאות/קישור ולהריץ בדיקת OS מחדש' };
+  var checked = !!p.last_os_check;
+  if (!checked) {
+    // No evidence at all: an explicit UNKNOWN cell (Ariel's deliberate value) is respected; blank or
+    // NEVER_SEEN → NEVER_SEEN; CURRENT/VERSION_DRIFT without a check is an unsupported claim → UNKNOWN.
+    var state = stored === 'UNKNOWN' || stored === 'CURRENT' || stored === 'VERSION_DRIFT' ? 'UNKNOWN' : 'NEVER_SEEN';
+    return { state: state, action: p.os_sync_action || 'עדיין אין ראיה שהפרויקט קרא את מערכת ההפעלה — נדרשת ריצה אחת עם בדיקת OS וקבלה (receipt)' };
+  }
+  var seen = str_(p.os_change_marker, 120).trim();
+  if (!seen) return { state: 'UNKNOWN', action: p.os_sync_action || 'נרשמה בדיקת OS בלי סמן גרסה — להריץ שוב עם סמן השינוי של ה-OS' };
+  if (!canonical.marker) return { state: 'UNKNOWN', action: 'הפרויקט דיווח על סמן ' + seen + ' — כדי לאמת יש להגדיר את סמן ה-OS הנוכחי ב-Control Tower' };
+  if (seen === canonical.marker) return { state: 'CURRENT', action: '' };
+  return { state: 'VERSION_DRIFT', action: 'הפרויקט ראה גרסת OS ' + seen + ' אבל הנוכחית היא ' + canonical.marker + ' — נדרשת ריצת סנכרון בפרויקט' };
+}
+
+/** Enrich a portfolio row in place (read-time evaluation; never writes to the board). */
+function evaluateOsAlignment_(p) {
+  var canonical = canonicalOsMarker_();
+  var v = osVerdict_(p, canonical);
+  p.os_alignment = v.state;
+  if (!p.os_sync_action || v.state === 'CURRENT' || v.state === 'VERSION_DRIFT') p.os_sync_action = v.action;
+  p.os_current_marker = canonical.marker;
+  p.os_current_version = canonical.version;
+  return p;
+}
+
+/**
+ * OS Access Receipt intake (authenticated caller). Writes the project's OS columns; nothing else on the row.
+ * Payload: project_id (required), checked_at?, os_version_seen?, os_change_marker (required unless access_failed),
+ *          evidence_url | evidence_ref (required unless access_failed), applied? (default true), access_failed?, notes?
+ */
+function recordOsReceipt_(p) {
+  var projectId = str_(p.project_id, 80).trim();
+  if (!projectId) throw new Error('project_id is required');
+  var projects = readPortfolio_();
+  var target = null;
+  projects.forEach(function (x) { if (x.id === projectId) target = x; });
+  if (!target) throw new Error('unknown project_id');
+  var map = resolveProjectColumns_();
+  ['last_os_check', 'os_alignment'].forEach(function (f) {
+    if (map[f] < 0) throw new Error('board column missing for ' + f + ' (add it to Projects or set PROJECTS_COLUMN_MAP)');
+  });
+
+  var accessFailed = truthy_(p.access_failed);
+  var checkedAt = p.checked_at ? parseCellDate_(p.checked_at).iso : nowIso_();
+  if (!checkedAt) throw new Error('checked_at is not a supported timestamp');
+  if (Date.parse(checkedAt) > Date.now() + 5 * 60 * 1000) throw new Error('checked_at is in the future');
+  var marker = str_(p.os_change_marker, 120).trim();
+  var version = str_(p.os_version_seen, 80).trim();
+  var evidence = str_(p.evidence_url || p.evidence_ref, 600).trim();
+  if (!accessFailed) {
+    if (!marker) throw new Error('os_change_marker is required');
+    if (!evidence) throw new Error('evidence_url or evidence_ref is required');
+    if (/^https?:\/\//i.test(evidence) === false && evidence.length < 8) throw new Error('evidence_ref too short');
+  }
+  var applied = p.applied === undefined ? true : truthy_(p.applied);
+  var notes = str_(p.notes, 200).trim();
+
+  var updated = {
+    last_os_check: checkedAt,
+    os_version_seen: version,
+    os_change_marker: marker,
+    os_evidence: (accessFailed ? 'ACCESS_FAILED' : (applied ? 'receipt' : 'receipt (rules not yet applied)')) + ' · ' + evidence + (notes ? ' · ' + notes : ''),
+    os_alignment: accessFailed ? 'ACCESS_FAILED' : 'UNKNOWN',
+    os_sync_action: ''
+  };
+  var verdict = osVerdict_({ os_alignment: updated.os_alignment, last_os_check: updated.last_os_check, os_change_marker: marker, os_sync_action: '' }, canonicalOsMarker_());
+  updated.os_alignment = verdict.state;
+  updated.os_sync_action = verdict.action;
+
+  var sheet = openBoard_().getSheetByName(PROJECTS_SHEET);
+  Object.keys(updated).forEach(function (field) {
+    if (map[field] >= 0) sheet.getRange(target.board_row, map[field] + 1).setValue(updated[field]);
+  });
+  return { project_id: projectId, os_alignment: updated.os_alignment, last_os_check: checkedAt, os_change_marker: marker, os_sync_action: updated.os_sync_action };
+}
+
+/** Portfolio-wide OS alignment summary for health / Chief of Staff. */
+function osAlignmentSummary_(projects) {
+  var counts = {};
+  OS_ALIGNMENT_STATES.forEach(function (s) { counts[s] = 0; });
+  (projects || []).forEach(function (p) { if (p.role !== 'infrastructure') counts[p.os_alignment || 'UNKNOWN'] = (counts[p.os_alignment || 'UNKNOWN'] || 0) + 1; });
+  var canonical = canonicalOsMarker_();
+  return { counts: counts, os_current_marker_configured: !!canonical.marker, os_current_marker: canonical.marker, os_current_version: canonical.version };
 }
 
 
@@ -1083,6 +1261,11 @@ function listInbox_(limit) {
 /**
  * Ideas is the canonical idea incubator for Control Tower.
  * An idea stays here until it is promoted deliberately; it never becomes a project by accident.
+ *
+ * Columns are resolved BY HEADER NAME (Ariel adds columns to the sheet; positions are not assumed).
+ * Missing headers from IDEA_HEADERS are appended to the header row once.
+ * Manual planning: planning_bucket ∈ NOW | NEXT | LATER and manual_order (integer, ascending) are the
+ * only ordering truth; listIdeas_ returns items sorted by bucket, then manual_order, then updated_at.
  */
 var IDEA_STAGES = ['INBOX', 'CLARIFY', 'SHAPE', 'VALIDATE', 'READY', 'PARKED', 'PROMOTED', 'ARCHIVED'];
 var IDEA_ENUMS = {
@@ -1091,6 +1274,7 @@ var IDEA_ENUMS = {
   surface: ['MOBILE', 'WEB', 'AUTOMATION', 'AGENT', 'PROCESS', 'UNDECIDED'],
   automation_level: ['MANUAL', 'ASSISTED', 'AUTOMATIC', 'UNDECIDED']
 };
+var IDEA_BUCKET_RANK = { NOW: 0, NEXT: 1, LATER: 2 };
 
 function ideaValue_(p, key, max) { return str_(p[key], max || MAX_IDEA_TEXT).trim(); }
 function ideaEnum_(p, key, allowed, fallback) {
@@ -1099,10 +1283,51 @@ function ideaEnum_(p, key, allowed, fallback) {
 }
 function ideaId_() { return 'IDEA-' + Utilities.getUuid().slice(0, 8).toUpperCase(); }
 
+/** Sheet + header→column map (1-based). Appends any missing canonical headers at the end of the header row. */
+function ideasSheet_() {
+  var ss = openBoard_();
+  var sheet = ss.getSheetByName(IDEAS_SHEET);
+  if (!sheet) {
+    sheet = ss.insertSheet(IDEAS_SHEET);
+    sheet.getRange(1, 1, 1, IDEA_HEADERS.length).setValues([IDEA_HEADERS]).setFontWeight('bold');
+    sheet.setFrozenRows(1);
+  }
+  var lastCol = Math.max(1, sheet.getLastColumn());
+  var headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0].map(function (h) { return String(h || '').trim(); });
+  var cols = {};
+  headers.forEach(function (h, i) { if (h && cols[h] === undefined) cols[h] = i + 1; });
+  var missing = IDEA_HEADERS.filter(function (h) { return cols[h] === undefined; });
+  if (missing.length) {
+    var start = headers.length + 1;
+    sheet.getRange(1, start, 1, missing.length).setValues([missing]).setFontWeight('bold');
+    missing.forEach(function (h, i) { cols[h] = start + i; });
+  }
+  return { sheet: sheet, cols: cols, width: Math.max(headers.length, sheet.getLastColumn()) };
+}
+
+function ideaFromRow_(row, cols) {
+  var out = {};
+  IDEA_HEADERS.forEach(function (h) {
+    var c = cols[h];
+    var v = c ? row[c - 1] : '';
+    if (h.indexOf('_at') > 0) out[h] = cellIso_(v);
+    else if (h === 'manual_order') out[h] = v === '' || v === null || v === undefined || isNaN(Number(v)) ? null : Number(v);
+    else out[h] = str_(v, MAX_IDEA_TEXT);
+  });
+  out.planning_bucket = IDEA_BUCKETS.indexOf(String(out.planning_bucket).toUpperCase()) >= 0 ? String(out.planning_bucket).toUpperCase() : 'LATER';
+  out.maturity_score = ideaMaturity_(out);
+  return out;
+}
+
 function createIdea_(p) {
   var title = ideaValue_(p, 'title', 180);
   if (!title) throw new Error('title is required');
   var now = nowIso_();
+  var s = ideasSheet_();
+  var existing = listIdeas_(500);
+  var bucket = ideaEnum_(p, 'planning_bucket', IDEA_BUCKETS, 'LATER');
+  var maxOrder = 0;
+  existing.forEach(function (x) { if (x.planning_bucket === bucket && x.manual_order !== null && x.manual_order > maxOrder) maxOrder = x.manual_order; });
   var row = {
     idea_id: ideaId_(), created_at: now, updated_at: now, title: title,
     stage: ideaEnum_(p, 'stage', IDEA_STAGES, 'INBOX'),
@@ -1113,25 +1338,36 @@ function createIdea_(p) {
     surface: ideaEnum_(p, 'surface', IDEA_ENUMS.surface, 'UNDECIDED'),
     automation_level: ideaEnum_(p, 'automation_level', IDEA_ENUMS.automation_level, 'UNDECIDED'),
     data_needed: ideaValue_(p, 'data_needed'), success_metric: ideaValue_(p, 'success_metric'),
-    constraints: ideaValue_(p, 'constraints'), next_step: ideaValue_(p, 'next_step'), notes: ideaValue_(p, 'notes')
+    constraints: ideaValue_(p, 'constraints'), next_step: ideaValue_(p, 'next_step'), notes: ideaValue_(p, 'notes'),
+    planning_bucket: bucket,
+    manual_order: p.manual_order !== undefined && !isNaN(Number(p.manual_order)) ? Number(p.manual_order) : maxOrder + 10
   };
-  var sheet = ensureSheet_(IDEAS_SHEET, IDEA_HEADERS);
-  sheet.appendRow(IDEA_HEADERS.map(function (h) { return row[h] || ''; }));
-  return { item: row, row: sheet.getLastRow() };
+  var line = [];
+  for (var i = 0; i < s.width; i++) line.push('');
+  IDEA_HEADERS.forEach(function (h) { line[s.cols[h] - 1] = row[h] === null || row[h] === undefined ? '' : row[h]; });
+  s.sheet.appendRow(line);
+  return { item: row, row: s.sheet.getLastRow() };
+}
+
+function sortIdeas_(items) {
+  items.sort(function (a, b) {
+    var ba = IDEA_BUCKET_RANK[a.planning_bucket], bb = IDEA_BUCKET_RANK[b.planning_bucket];
+    if (ba !== bb) return ba - bb;
+    var oa = a.manual_order === null ? Number.MAX_SAFE_INTEGER : a.manual_order;
+    var ob = b.manual_order === null ? Number.MAX_SAFE_INTEGER : b.manual_order;
+    if (oa !== ob) return oa - ob;
+    return String(b.updated_at).localeCompare(String(a.updated_at));
+  });
+  return items;
 }
 
 function listIdeas_(limit) {
-  var sheet = ensureSheet_(IDEAS_SHEET, IDEA_HEADERS);
-  if (sheet.getLastRow() < 2) return [];
-  var values = sheet.getRange(2, 1, sheet.getLastRow() - 1, IDEA_HEADERS.length).getValues();
-  var items = values.map(function (row) {
-    var out = {};
-    IDEA_HEADERS.forEach(function (h, i) { out[h] = h.indexOf('_at') > 0 ? cellIso_(row[i]) : str_(row[i], MAX_IDEA_TEXT); });
-    out.maturity_score = ideaMaturity_(out);
-    return out;
-  }).filter(function (x) { return x.idea_id && x.title && x.stage !== 'ARCHIVED'; });
-  items.sort(function (a, b) { return String(b.updated_at).localeCompare(String(a.updated_at)); });
-  return items.slice(0, limit);
+  var s = ideasSheet_();
+  if (s.sheet.getLastRow() < 2) return [];
+  var values = s.sheet.getRange(2, 1, s.sheet.getLastRow() - 1, s.width).getValues();
+  var items = values.map(function (row) { return ideaFromRow_(row, s.cols); })
+    .filter(function (x) { return x.idea_id && x.title && x.stage !== 'ARCHIVED'; });
+  return sortIdeas_(items).slice(0, limit);
 }
 
 function ideaMaturity_(x) {
@@ -1140,25 +1376,58 @@ function ideaMaturity_(x) {
   return Math.round(filled * 100 / keys.length);
 }
 
+function findIdeaRow_(s, id) {
+  if (s.sheet.getLastRow() < 2) return -1;
+  var ids = s.sheet.getRange(2, s.cols.idea_id, s.sheet.getLastRow() - 1, 1).getValues();
+  for (var i = 0; i < ids.length; i++) if (String(ids[i][0]) === id) return i + 2;
+  return -1;
+}
+
 function updateIdea_(p) {
   var id = ideaValue_(p, 'idea_id', 40);
   if (!id) throw new Error('idea_id is required');
-  var sheet = ensureSheet_(IDEAS_SHEET, IDEA_HEADERS);
-  if (sheet.getLastRow() < 2) throw new Error('idea not found');
-  var values = sheet.getRange(2, 1, sheet.getLastRow() - 1, IDEA_HEADERS.length).getValues();
-  var rowIndex = -1;
-  for (var i = 0; i < values.length; i++) if (String(values[i][0]) === id) { rowIndex = i + 2; break; }
+  var s = ideasSheet_();
+  var rowIndex = findIdeaRow_(s, id);
   if (rowIndex < 0) throw new Error('idea not found');
   var editable = ['title', 'need', 'target_user', 'desired_outcome', 'core_functionality', 'data_needed', 'success_metric', 'constraints', 'next_step', 'notes'];
   editable.forEach(function (key) {
-    if (Object.prototype.hasOwnProperty.call(p, key)) sheet.getRange(rowIndex, IDEA_HEADERS.indexOf(key) + 1).setValue(ideaValue_(p, key, key === 'title' ? 180 : MAX_IDEA_TEXT));
+    if (Object.prototype.hasOwnProperty.call(p, key)) s.sheet.getRange(rowIndex, s.cols[key]).setValue(ideaValue_(p, key, key === 'title' ? 180 : MAX_IDEA_TEXT));
   });
   Object.keys(IDEA_ENUMS).forEach(function (key) {
-    if (Object.prototype.hasOwnProperty.call(p, key)) sheet.getRange(rowIndex, IDEA_HEADERS.indexOf(key) + 1).setValue(ideaEnum_(p, key, IDEA_ENUMS[key], 'UNDECIDED'));
+    if (Object.prototype.hasOwnProperty.call(p, key)) s.sheet.getRange(rowIndex, s.cols[key]).setValue(ideaEnum_(p, key, IDEA_ENUMS[key], 'UNDECIDED'));
   });
-  if (Object.prototype.hasOwnProperty.call(p, 'stage')) sheet.getRange(rowIndex, IDEA_HEADERS.indexOf('stage') + 1).setValue(ideaEnum_(p, 'stage', IDEA_STAGES, 'INBOX'));
-  sheet.getRange(rowIndex, IDEA_HEADERS.indexOf('updated_at') + 1).setValue(nowIso_());
-  return { idea_id: id, updated_at: nowIso_() };
+  if (Object.prototype.hasOwnProperty.call(p, 'stage')) s.sheet.getRange(rowIndex, s.cols.stage).setValue(ideaEnum_(p, 'stage', IDEA_STAGES, 'INBOX'));
+  if (Object.prototype.hasOwnProperty.call(p, 'planning_bucket')) s.sheet.getRange(rowIndex, s.cols.planning_bucket).setValue(ideaEnum_(p, 'planning_bucket', IDEA_BUCKETS, 'LATER'));
+  if (Object.prototype.hasOwnProperty.call(p, 'manual_order') && !isNaN(Number(p.manual_order))) s.sheet.getRange(rowIndex, s.cols.manual_order).setValue(Number(p.manual_order));
+  var now = nowIso_();
+  s.sheet.getRange(rowIndex, s.cols.updated_at).setValue(now);
+  return { idea_id: id, updated_at: now };
+}
+
+/**
+ * Batch reorder from a drag & drop: items = [{idea_id, planning_bucket, manual_order}], applied atomically
+ * per row (bucket + order only). Unknown ids are reported, not fatal. Order values are normalised to 10,20,…
+ */
+function reorderIdeas_(p) {
+  var items = Array.isArray(p.items) ? p.items.slice(0, 300) : [];
+  if (!items.length) throw new Error('items is required');
+  var s = ideasSheet_();
+  var counters = { NOW: 0, NEXT: 0, LATER: 0 };
+  var applied = 0, unknown = [];
+  var now = nowIso_();
+  items.forEach(function (it) {
+    var id = str_(it && it.idea_id, 40).trim();
+    if (!id) return;
+    var rowIndex = findIdeaRow_(s, id);
+    if (rowIndex < 0) { unknown.push(id); return; }
+    var bucket = ideaEnum_(it, 'planning_bucket', IDEA_BUCKETS, 'LATER');
+    var order = it.manual_order !== undefined && !isNaN(Number(it.manual_order)) ? Number(it.manual_order) : (counters[bucket] += 10);
+    s.sheet.getRange(rowIndex, s.cols.planning_bucket).setValue(bucket);
+    s.sheet.getRange(rowIndex, s.cols.manual_order).setValue(order);
+    s.sheet.getRange(rowIndex, s.cols.updated_at).setValue(now);
+    applied++;
+  });
+  return { applied: applied, unknown: unknown, updated_at: now };
 }
 
 
@@ -1525,11 +1794,13 @@ function debugTestPush() {
  *   GATEWAY_TOKEN              required  — high-entropy shared secret (≥ 32 chars). Same value goes into the Android build.
  *   FCM_SERVICE_ACCOUNT_JSON   optional  — Firebase service-account JSON (whole file). Enables push.
  *   PROJECTS_COLUMN_MAP        optional  — JSON {field: "Exact Header"} overriding header auto-detection.
+ *   OS_CURRENT_CHANGE_MARKER   optional  — canonical OS change marker published by the OS owner; enables CURRENT/VERSION_DRIFT verdicts.
+ *   OS_CURRENT_VERSION         optional  — human-readable canonical OS version shown next to the marker.
  *   GITHUB_READ_TOKEN          required for PRIVATE repositories in ActivitySources (read-only, fine-grained: Contents/Metadata read);
  *                              optional for public repos (raises the anonymous 60/h quota). Never printed or returned.
  */
 
-var GATEWAY_VERSION = '0.9.0';
+var GATEWAY_VERSION = '0.10.0';
 
 var ACTIONS = {
   health: function () { return healthReport_(); },
@@ -1545,6 +1816,8 @@ var ACTIONS = {
   ,ideas: function (p) { return { items: listIdeas_(clampInt_(p.limit, 1, 200, 100)) }; }
   ,create_idea: function (p) { return createIdea_(p); }
   ,update_idea: function (p) { return updateIdea_(p); }
+  ,reorder_ideas: function (p) { return reorderIdeas_(p); }
+  ,os_receipt: function (p) { return recordOsReceipt_(p); }
 };
 
 function doPost(e) {
@@ -1633,6 +1906,14 @@ function nowIso_() {
   return new Date().toISOString();
 }
 
+function osHealth_() {
+  try {
+    return osAlignmentSummary_(readPortfolio_());
+  } catch (e) {
+    return { counts: {}, os_current_marker_configured: !!canonicalOsMarker_().marker, error: str_(e && e.message ? e.message : e, 120) };
+  }
+}
+
 function healthReport_() {
   var ss = openBoard_();
   var tabs = ss.getSheets().map(function (s) { return s.getName(); });
@@ -1653,6 +1934,7 @@ function healthReport_() {
     fcm_configured: isFcmConfigured_(),
     scanner_trigger_installed: isScannerTriggerInstalled_(),
     activity: activityHealth_(),
+    os: osHealth_(),
     contract_version: GATEWAY_CONTRACT_VERSION,
     server_time: nowIso_()
   };

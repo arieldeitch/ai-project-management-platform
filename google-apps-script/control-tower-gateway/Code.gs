@@ -13,11 +13,13 @@
  *   GATEWAY_TOKEN              required  — high-entropy shared secret (≥ 32 chars). Same value goes into the Android build.
  *   FCM_SERVICE_ACCOUNT_JSON   optional  — Firebase service-account JSON (whole file). Enables push.
  *   PROJECTS_COLUMN_MAP        optional  — JSON {field: "Exact Header"} overriding header auto-detection.
+ *   OS_CURRENT_CHANGE_MARKER   optional  — canonical OS change marker published by the OS owner; enables CURRENT/VERSION_DRIFT verdicts.
+ *   OS_CURRENT_VERSION         optional  — human-readable canonical OS version shown next to the marker.
  *   GITHUB_READ_TOKEN          required for PRIVATE repositories in ActivitySources (read-only, fine-grained: Contents/Metadata read);
  *                              optional for public repos (raises the anonymous 60/h quota). Never printed or returned.
  */
 
-var GATEWAY_VERSION = '0.9.0';
+var GATEWAY_VERSION = '0.10.0';
 
 var ACTIONS = {
   health: function () { return healthReport_(); },
@@ -33,6 +35,8 @@ var ACTIONS = {
   ,ideas: function (p) { return { items: listIdeas_(clampInt_(p.limit, 1, 200, 100)) }; }
   ,create_idea: function (p) { return createIdea_(p); }
   ,update_idea: function (p) { return updateIdea_(p); }
+  ,reorder_ideas: function (p) { return reorderIdeas_(p); }
+  ,os_receipt: function (p) { return recordOsReceipt_(p); }
 };
 
 function doPost(e) {
@@ -121,6 +125,14 @@ function nowIso_() {
   return new Date().toISOString();
 }
 
+function osHealth_() {
+  try {
+    return osAlignmentSummary_(readPortfolio_());
+  } catch (e) {
+    return { counts: {}, os_current_marker_configured: !!canonicalOsMarker_().marker, error: str_(e && e.message ? e.message : e, 120) };
+  }
+}
+
 function healthReport_() {
   var ss = openBoard_();
   var tabs = ss.getSheets().map(function (s) { return s.getName(); });
@@ -141,6 +153,7 @@ function healthReport_() {
     fcm_configured: isFcmConfigured_(),
     scanner_trigger_installed: isScannerTriggerInstalled_(),
     activity: activityHealth_(),
+    os: osHealth_(),
     contract_version: GATEWAY_CONTRACT_VERSION,
     server_time: nowIso_()
   };
