@@ -28,6 +28,14 @@ function scanHighSignalEvents() {
   var lock = LockService.getScriptLock();
   if (!lock.tryLock(10000)) return { skipped: 'locked' };
   try {
+    // Refresh observable project activity first. Failure here must not disable high-signal supervision.
+    var activityPoll = { checked: 0, inserted: 0, errors: [] };
+    try {
+      activityPoll = pollActivitySources_();
+    } catch (activityErr) {
+      activityPoll.errors = [String(activityErr && activityErr.message ? activityErr.message : activityErr)];
+      console.error('activity poll failed: ' + activityPoll.errors[0]);
+    }
     var projects = readPortfolio_();
     var state = readPushState_();
     var now = nowIso_();
@@ -70,7 +78,7 @@ function scanHighSignalEvents() {
     if (appendRows.length) {
       state.sheet.getRange(state.sheet.getLastRow() + 1, 1, appendRows.length, PUSH_STATE_HEADERS.length).setValues(appendRows);
     }
-    return { scanned: projects.length, seeded_now: !state.seeded, pushes: sent };
+    return { scanned: projects.length, seeded_now: !state.seeded, pushes: sent, activity_poll: activityPoll };
   } finally {
     lock.releaseLock();
   }
