@@ -109,4 +109,28 @@ public final class Hebrew {
             default: return "לא ידוע";
         }
     }
+
+    public static String activityType(String type) {
+        switch (norm(type)) {
+            case "PROGRESS": return "התקדמות";
+            case "CHECKPOINT": return "נקודת ביניים";
+            case "AUTOMATION": return "אוטומציה";
+            case "REPORT": return "דיווח";
+            case "CONTROL CHECK": return "בדיקת בקרה";
+            case "": return "פעילות";
+            default: return type == null ? "פעילות" : type.trim();
+        }
+    }
+
+    public static String activitySource(String source) {
+        switch (source == null ? "" : source.trim().toLowerCase(Locale.ROOT)) {
+            case "github_commit":
+            case "github_pr": return "GitHub";
+            case "agent_heartbeat": return "דיווח סוכן";
+            case "project_board": return "לוח הבקרה";
+            case "drive":
+            case "drive_doc": return "Google Drive";
+            default: return source == null || source.trim().isEmpty() ? "מקור לא ידוע" : source.trim();
+        }
+    }
 }
