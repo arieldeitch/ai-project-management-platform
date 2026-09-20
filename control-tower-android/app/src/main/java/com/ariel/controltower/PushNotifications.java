@@ -171,7 +171,25 @@ public final class PushNotifications {
         });
     }
 
-    /** Human-readable push state for the Activity tab. */
+    /** Human layer for the מערכת screen: one short sentence, no product names. */
+    public static String humanStatus(Context context) {
+        SharedPreferences p = prefs(context);
+        if (!BuildConfig.FIREBASE_CONFIGURED || !isFirebaseAvailable(context)) return "התראות: לא זמינות בגרסה הזו";
+        if (!hasPermission(context)) return "התראות: כבויות — אפשר להפעיל בהגדרות הטלפון";
+        if (p.getString(PREF_TOKEN, null) == null) return "התראות: בהכנה";
+        return p.getBoolean(PREF_TOKEN_REGISTERED, false) ? "התראות: פעילות" : "התראות: בהכנה";
+    }
+
+    /** Human layer for the test-push result. */
+    public static String humanTestResult(String technical) {
+        if (technical == null) return "";
+        if (technical.startsWith("נשלח")) return technical;
+        if (technical.contains("FCM_SERVICE_ACCOUNT_JSON")) return "ההתראות עדיין לא הופעלו במגדל הפיקוח — נדרשת פעולה חד־פעמית שלך (ראה פרטים טכניים)";
+        if (technical.contains("אין מכשירים")) return "הטלפון עדיין לא רשום להתראות";
+        return "התראת הבדיקה לא נשלחה — " + com.ariel.controltower.model.UserMessage.FIX_RUN;
+    }
+
+    /** Technical push state (diagnostics section only). */
     public static String statusLine(Context context) {
         SharedPreferences p = prefs(context);
         if (!BuildConfig.FIREBASE_CONFIGURED) return "התראות: לא מוגדר (חסר google-services.json בבנייה)";

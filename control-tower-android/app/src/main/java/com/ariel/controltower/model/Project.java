@@ -55,8 +55,11 @@ public final class Project {
     public final String osEvidence;
     public final String osSyncAction;
     public final String osCurrentMarker;
+    /** The row exactly as the gateway sent it — the machine layer. Never trimmed for display reasons. */
+    public final JSONObject raw;
 
     private Project(JSONObject o, long now) {
+        raw = o;
         id = o.optString("id", "");
         name = o.optString("name", "פרויקט");
         role = o.optString("role", "project");
@@ -181,6 +184,64 @@ public final class Project {
         if (needsAriel) return nextAction.isEmpty() ? "נדרשת החלטה או פעולה שלך" : nextAction;
         if (isRed() && !blocker.isEmpty()) return "לשחרר חסם: " + blocker;
         return nextAction;
+    }
+
+    // ---------- human layer (what Ariel sees by default) ----------
+
+    /** True when the row should carry a "why" line: anything that is not simply OK. */
+    public boolean hasReason() { return status != Status.OK; }
+
+    /**
+     * One management sentence for the row, in priority order: what Ariel must do, else why the status is
+     * not OK, else nothing (an OK project needs no explanation).
+     */
+    public String humanLine() {
+        if (status == Status.NEEDS_ARIEL) {
+            String a = arielAction();
+            return a.isEmpty() ? "צריך החלטה או פעולה שלך" : a;
+        }
+        if (status == Status.BLOCKED) return blocker.isEmpty() ? "משהו חוסם את ההתקדמות" : "חסום: " + blocker;
+        if (status == Status.AT_RISK) return risk.isEmpty() ? "דורש טיפול לפני שהמצב מחמיר" : risk;
+        if (status == Status.WATCH) return risk.isEmpty() ? "" : risk;
+        return "";
+    }
+
+    /** True when the OS state deserves a chip on the compact row (drift / never / failed). UNKNOWN stays quiet. */
+    public boolean osNeedsChip() {
+        return osAlignment == OsAlignment.VERSION_DRIFT || osAlignment == OsAlignment.NEVER_SEEN || osAlignment == OsAlignment.ACCESS_FAILED;
+    }
+
+    /** Human OS next step: the board's sync action when present, else the state's default. */
+    public String osHumanAction() {
+        return osSyncAction.isEmpty() ? osAlignment.action : osSyncAction;
+    }
+
+    /** Short freshness phrase for rows: "עודכן לפני יומיים" / "לא התקבל עדכון". */
+    public String updatedLine(long now) {
+        if (latestActivityMillis > 0) return Labels.UPDATED + " " + TimeText.relative(latestActivityMillis, now);
+        return Labels.NO_UPDATE;
+    }
+
+    // ---------- machine layer (kept intact for agents, Chief of Staff and diagnostics) ----------
+
+    /** Raw structured facts as "key: value" lines — the technical section shows these verbatim. */
+    public List<String> technicalLines() {
+        List<String> t = new ArrayList<>();
+        t.add("project_id: " + id);
+        t.add("status_bucket: " + status.name() + (raw.has("status_bucket") ? "" : " (client-derived)"));
+        t.add("status_reason: " + statusReason);
+        t.add("rag: " + rag + " · lifecycle: " + lifecycle + " · needs_ariel: " + needsAriel + " · user_test_required: " + userTestRequired);
+        t.add("os_alignment: " + osAlignment.name());
+        t.add("last_os_check: " + raw.optString("last_os_check", ""));
+        t.add("os_version_seen: " + osVersionSeen + " · os_change_marker: " + osChangeMarker + " · os_current_marker: " + osCurrentMarker);
+        t.add("os_evidence: " + osEvidence);
+        t.add("os_sync_action: " + osSyncAction);
+        t.add("latest_activity_at: " + raw.optString("latest_activity_at", "") + " · type: " + latestActivityType + " · source: " + latestActivitySource);
+        t.add("latest_meaningful_activity_at: " + raw.optString("latest_meaningful_activity_at", "") + " · last_meaningful_progress: " + raw.optString("last_meaningful_progress", ""));
+        t.add("last_control_check: " + raw.optString("last_control_check", raw.optString("last_check", "")));
+        t.add("expected_cadence: " + expectedCadence + " · freshness: " + freshness.state.name() + "/" + freshness.reason.name());
+        t.add("evidence_url: " + latestActivityEvidenceUrl);
+        return t;
     }
 
     /** One-sentence "where it stands" for cards: milestone, else lifecycle in Hebrew. */

@@ -45,9 +45,11 @@ translates and prioritises; it never derives a state.
 4. Never copy the OS into the project repository. The pointer is a pointer.
 
 ## Canonical marker (Ariel, once per OS change)
+Current live values (set 2026-09-20): `OS_CURRENT_VERSION = 1.1.0`, `OS_CURRENT_CHANGE_MARKER = OS-2026-09-19-01`.
+
 Apps Script → Project Settings → Script Properties: `OS_CURRENT_CHANGE_MARKER` (e.g. `OS-2026-09-17`) and optionally
 `OS_CURRENT_VERSION` (e.g. `1.1`). Until these exist every receipt resolves to `UNKNOWN` (truthful), and `health.os`
-reports `os_current_marker_configured: false`; the Android "פעילות" tab shows the same sentence in Hebrew.
+reports `os_current_marker_configured: false`; the Android "מערכת" screen shows the same sentence in Hebrew.
 
 ## Where each project points from (rollout 2026-09-19)
 See the rollout matrix in `docs/claude-runs/2026-09-19_control-tower-ux-os-chief-alignment_REPORT.md`.

@@ -6,6 +6,7 @@ import android.os.Build;
 import android.provider.Settings;
 
 import com.ariel.controltower.model.BuildIdentity;
+import com.ariel.controltower.model.UserMessage;
 
 import org.json.JSONObject;
 
@@ -92,7 +93,19 @@ public final class Gateway {
 
         public boolean ok() { return error == null && body.optBoolean("ok", false); }
 
-        /** Hebrew, user-facing explanation for the Activity/Share screens. */
+        /** Human layer: one short management sentence for Ariel (see {@link UserMessage}). */
+        public String human() {
+            if (ok()) return "תקין";
+            return UserMessage.human(body.optString("error", ""), error, httpCode);
+        }
+
+        /** Machine layer: the exact technical description for diagnostics and reports. */
+        public String technical() {
+            if (ok()) return "ok";
+            return UserMessage.technical(body.optString("error", ""), error, httpCode, body.optString("message", ""));
+        }
+
+        /** Technical Hebrew (kept for the diagnostics section; never shown on a primary screen). */
         public String describe() {
             if (ok()) return "תקין";
             if (error != null) return error;

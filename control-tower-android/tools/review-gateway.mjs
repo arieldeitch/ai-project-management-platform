@@ -6,6 +6,7 @@
 import { createServer } from 'node:http';
 
 const PORT = Number(process.env.PORT || 8787);
+const LATENCY_MS = Number(process.env.LATENCY_MS || 0); // simulate a slow gateway to prove taps never wait for it
 const now = Date.now();
 const H = 3_600_000, D = 24 * H;
 const iso = (msAgo) => new Date(now - msAgo).toISOString();
@@ -118,7 +119,7 @@ const handlers = {
 createServer((req, res) => {
   let raw = '';
   req.on('data', (c) => (raw += c));
-  req.on('end', () => {
+  req.on('end', () => setTimeout(() => {
     let body = {};
     try { body = JSON.parse(raw || '{}'); } catch {}
     const action = body.action;
@@ -129,5 +130,5 @@ createServer((req, res) => {
     console.log(new Date().toISOString(), req.method, action ?? '-', payload.status);
     res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
     res.end(JSON.stringify(payload));
-  });
+  }, LATENCY_MS));
 }).listen(PORT, () => console.log(`review gateway (fixture data) on http://localhost:${PORT}/exec`));

@@ -9,7 +9,9 @@ credentials exist on the build machine, and none should be created for this). Ev
 node google-apps-script/control-tower-gateway/verify-deployment.mjs
 ```
 - prints `contract_version=5` → gateway 0.10.0 (OS alignment, status taxonomy, ideas planning) is deployed — nothing to do.
-- prints `contract_version=4` (VERIFIED deployed on 2026-09-19 ~12:55 IDT) → the live activity pipeline works, but the
+  **Current live state (VERIFIED 2026-09-20, token-free probe): `gateway_version=0.10.0 contract_version=5`, with Script
+  Properties `OS_CURRENT_VERSION = 1.1.0` and `OS_CURRENT_CHANGE_MARKER = OS-2026-09-19-01`.**
+- prints `contract_version=4` → the live activity pipeline works, but the
   app's OS-alignment block, status reasons, short descriptions and idea buckets stay empty/UNKNOWN and drag & drop
   reorder is rejected with "unknown_action". Do the 3-minute step below.
 - prints `contract_version=2` or `3` → also the time wall still follows the curated cell. Same step.

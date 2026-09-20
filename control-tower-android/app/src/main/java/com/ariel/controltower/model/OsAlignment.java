@@ -5,18 +5,22 @@ package com.ariel.controltower.model;
  * gateway (OS Access Receipts). Never derived from commits or activity on the client either.
  */
 public enum OsAlignment {
-    CURRENT("מיושר ל-OS", "הפרויקט קרא את מערכת ההפעלה הנוכחית והחיל את הכללים"),
-    VERSION_DRIFT("OS לא עדכני", "הפרויקט ראה גרסה ישנה של מערכת ההפעלה — נדרשת ריצת סנכרון"),
-    NEVER_SEEN("טרם בדק OS", "אין עדיין ראיה שהפרויקט קרא את מערכת ההפעלה"),
-    ACCESS_FAILED("אין גישה ל-OS", "הפרויקט ניסה ולא הצליח לגשת למערכת ההפעלה"),
-    UNKNOWN("OS לא ידוע", "אין מספיק ראיות כדי לקבוע יישור");
+    // label = chip (≤ 12 chars, management Hebrew) · meaning = one sentence for the detail · action = what should happen
+    CURRENT("מסונכרן", "הפרויקט מסונכרן למערכת ההפעלה", ""),
+    VERSION_DRIFT("לא מסונכרן", "הפרויקט לא מסונכרן למערכת ההפעלה", "נדרשת ריצת סנכרון בפרויקט"),
+    NEVER_SEEN("טרם סונכרן", "הפרויקט עדיין לא סונכרן למערכת ההפעלה", "נדרשת ריצת סנכרון ראשונה בפרויקט"),
+    ACCESS_FAILED("סנכרון נכשל", "הפרויקט לא הצליח לגשת למערכת ההפעלה", "נדרשת ריצת תיקון ב-GPT/Claude"),
+    UNKNOWN("סנכרון לא אומת", "לא התקבל עדיין אישור סנכרון מהפרויקט", "נדרשת ריצת סנכרון בפרויקט");
 
     public final String label;
     public final String meaning;
+    /** Human next step (empty when nothing is needed). Control Tower's own os_sync_action wins when present. */
+    public final String action;
 
-    OsAlignment(String label, String meaning) {
+    OsAlignment(String label, String meaning, String action) {
         this.label = label;
         this.meaning = meaning;
+        this.action = action;
     }
 
     public static OsAlignment parse(String value) {
