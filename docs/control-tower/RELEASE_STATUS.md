@@ -1,6 +1,7 @@
 # Control Tower Android — release status
 
-**Current candidate:** 0.11.0 (versionCode 12) · branch `control-tower-apk-build` · code commit — see `docs/claude-runs/2026-09-20_control-tower-night-ux-performance_REPORT.md` (artifact of record, run id, SHA-256 recorded there once CI is green)
+**Current candidate:** 0.11.0 (versionCode 12) · branch `control-tower-apk-build` · code commit `3c46618`
+**Artifact of record:** GitHub Actions run 35528322215 → **`ControlTower-0.11.0-release`** (artifact 10610158177, `ControlTower-0.11.0-release.apk`, 1,950,271 bytes, SHA-256 `8e4cfc9f…87cba4`)
 **Signing:** persistent release key (cert SHA-256 `00151c98…7c7950`) — installs **over** 0.10.0 with data kept.
 **Engineering gate:** 🟢 GREEN — build, 53/53 Android unit tests (14 new: human layer vs machine layer, label fit, error mapping, latency instrumentation), 40/40 gateway tests, lint 0 errors, secret scan clean, emulator review at 412 / 393 / 360 dp and font scale 1.3 + one remediation pass (`docs/claude-runs/screenshots/2026-09-20_control-tower-0.11/`).
 **Product gate:** 🟡 AMBER — 🧪 מחכה לאריאל — USER TEST REQUIRED (physical-device acceptance pending).
