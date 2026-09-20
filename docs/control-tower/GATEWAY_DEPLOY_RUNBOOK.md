@@ -30,8 +30,8 @@ Nothing else changes: `GATEWAY_TOKEN`, `FCM_SERVICE_ACCOUNT_JSON`, `GITHUB_READ_
 ## Once per OS change: the canonical OS marker (0.10.0)
 
 The gateway decides CURRENT / VERSION_DRIFT by comparing a project's receipt with **Script Properties**
-`OS_CURRENT_CHANGE_MARKER` (e.g. `OS-2026-09-17`, the change marker of the current canonical OS) and optionally
-`OS_CURRENT_VERSION` (e.g. `1.1`). Apps Script → Project Settings → Script properties → add both. Until they exist every
+`OS_CURRENT_CHANGE_MARKER` (current canonical value: `OS-2026-09-19-01`) and
+`OS_CURRENT_VERSION` (current canonical value: `1.1.0`). Apps Script → Project Settings → Script properties → add both. Until they exist every
 receipt resolves to UNKNOWN (truthful) and `health.os.os_current_marker_configured` is `false`. Update the marker whenever
 the OS changes; nothing else needs redeploying. Projects record receipts with `scripts/control-tower/os-receipt.mjs`
 (protocol: `docs/control-tower/OS_ALIGNMENT_RECEIPT_PROTOCOL.md`).
