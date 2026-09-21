@@ -1,12 +1,17 @@
 # Control Tower Android — release status
 
-**Current candidate:** 0.11.0 (versionCode 12) · branch `control-tower-apk-build` · code commit `3c46618`
-**Artifact of record:** GitHub Actions run 35528322215 → **`ControlTower-0.11.0-release`** (artifact 10610158177, `ControlTower-0.11.0-release.apk`, 1,950,271 bytes, SHA-256 `8e4cfc9f…87cba4`)
-**Signing:** persistent release key (cert SHA-256 `00151c98…7c7950`) — installs **over** 0.10.0 with data kept.
-**Engineering gate:** 🟢 GREEN — build, 53/53 Android unit tests (14 new: human layer vs machine layer, label fit, error mapping, latency instrumentation), 40/40 gateway tests, lint 0 errors, secret scan clean, emulator review at 412 / 393 / 360 dp and font scale 1.3 + one remediation pass (`docs/claude-runs/screenshots/2026-09-20_control-tower-0.11/`).
-**Product gate:** 🟡 AMBER — 🧪 מחכה לאריאל — USER TEST REQUIRED (physical-device acceptance pending).
+**Current candidate:** 0.12.0 (versionCode 13) · branch `control-tower-apk-build` · code commit `885f0da`
+**Artifact of record:** GitHub Actions run 35582790209 → **`ControlTower-0.12.0-release`** (artifact 10631415217, `ControlTower-0.12.0-release.apk`, 1,951,932 bytes, SHA-256 `a5e34220…acc7c`, signer cert `00151c98…7c7950` — installs over 0.11.0 with data kept, verified on the emulator with the signed builds).
+**Engineering gate:** 🟢 GREEN — 62/62 Android unit tests (9 new: screenshot regression — no English / no problem detail on cards), 41/41 gateway tests (0.10.1, additive `display_name`), lint 0 errors, secret scan clean, emulator review at 412 / 393 / 360 dp + font 1.3× with one remediation pass (`docs/claude-runs/screenshots/2026-09-21_control-tower-0.12/`).
+**Product gate:** 🟡 AMBER — 🧪 מחכה לאריאל — USER TEST REQUIRED.
 
-## What 0.11.0 changes over 0.10.0 (night run 2026-09-20)
+## What 0.12.0 changes over 0.11.0 (human layer v2, 2026-09-21)
+- **Cards are a management indicator, not a diagnostic console:** Hebrew display name · status chip · at most one signal (לא עודכן לאחרונה / לא מסונכרן) · update age · פתח. No description, objective, next action, blocker, reason or evidence on cards — the class of English prose from Ariel's phone screenshot is blocked by a regression test.
+- **Hebrew display names** for every known project (אפליקציית הכושר, מערכת הבית, אזרחות ודרכון אירי, הצ'יף, רדאר החדשות, אפליקציית התזונה, הלמידה של תום, מערכת החיים); canonical names untouched; optional board column `display_name` ("שם תצוגה") overrides.
+- **Detail:** one management card (מחכה לך / חסום / דורש התייחסות / במעקב / תקין + meaning + "הפרטים אצל ה-GPT / הסוכן של הפרויקט"), then a single closed "מידע למערכת" section holding every board field and technical line verbatim.
+- סגן headlines and מערכת alerts use display names and never quote agent prose.
+
+## Previous: 0.11.0 over 0.10.0 (night run 2026-09-20)
 - **Two layers, one rule.** Ariel sees short management Hebrew only (statuses תקין / במעקב / דורש טיפול / חסום / צריך אותך, sync states מסונכרן / לא מסונכרן / טרם סונכרן / סנכרון נכשל / סנכרון לא אומת, errors like "החיבור למגדל הפיקוח נדחה — נדרשת ריצת תיקון ב-GPT/Claude"). Every raw fact (status_bucket, os_alignment enum, markers, evidence, clocks, gateway error codes, perf samples) is kept in `Project.raw` / `technicalLines()` and shown only under "פרטים טכניים" — nothing was removed from the gateway contract.
 - **עכשיו vs פרויקטים are now different screens.** עכשיו = "מה דורש אותי עכשיו": only projects that need Ariel + a three-line תמונת מצב (portfolio / OS sync / deputy) that deep-links. פרויקטים = the whole portfolio grouped by status with filters and the ⓘ legend. Filters live only on פרויקטים.
 - **Compact rows:** name, one-line purpose, one status chip, one human sentence only when not תקין, "עודכן לפני …", and a chip only for לא עודכן / OS needs action.
@@ -30,11 +35,11 @@ Deployed Web App: **0.10.0 / contract 5** — live and verified (`verify-deploym
 Unchanged from 0.7.0 (client registration VERIFIED on the emulator; server sending NOT VERIFIED — `FCM_SERVICE_ACCOUNT_JSON` not set).
 
 ## Minimum remaining Ariel action
-1. Install `ControlTower-0.11.0-release.apk` over 0.10.0 (no uninstall), use it for a day and say what is still unclear or slow.
+1. Install `ControlTower-0.12.0-release.apk` over 0.11.0 (no uninstall) and confirm the cards now only signal what needs attention.
 
 ## Evidence trail
-- Run report: `docs/claude-runs/2026-09-20_control-tower-night-ux-performance_REPORT.md` (this release); previous: `…_control-tower-ux-os-chief-alignment_REPORT.md` (0.10.0), `…_control-tower-live-activity-pipeline_REPORT.md` (0.9.0), `…_8h-hardening_REPORT.md` (0.7.0)
-- Emulator screenshots: `docs/claude-runs/screenshots/2026-09-20_control-tower-0.11/` (0.10.0: `…/2026-09-19_control-tower-0.10/`)
+- Run report: `docs/claude-runs/2026-09-21_control-tower-human-layer-v2_REPORT.md` (this release); previous: `…_control-tower-night-ux-performance_REPORT.md` (0.11.0), `…_control-tower-ux-os-chief-alignment_REPORT.md` (0.10.0), `…_control-tower-live-activity-pipeline_REPORT.md` (0.9.0), `…_8h-hardening_REPORT.md` (0.7.0)
+- Emulator screenshots: `docs/claude-runs/screenshots/2026-09-21_control-tower-0.12/` (0.11.0: `…/2026-09-20_control-tower-0.11/`) (0.10.0: `…/2026-09-19_control-tower-0.10/`)
 - OS alignment protocol: `docs/control-tower/OS_ALIGNMENT_RECEIPT_PROTOCOL.md`
 
 ---
