@@ -31,8 +31,20 @@ public final class Labels {
     public static final String ACTION_LEGEND_CLOSE = "הסתר הסבר";
     public static final int ACTION_MAX_CHARS = 12;
 
+    // Card signals (one per card at most)
+    public static final String SIGNAL_WAITING_FOR_YOU = "מחכה לך";
+    public static final String SIGNAL_BLOCKED = "חסום";
+    public static final String SIGNAL_NEEDS_ATTENTION = "דורש התייחסות";
+    public static final String SIGNAL_WATCH = "במעקב";
+    public static final String SIGNAL_OK = "תקין";
+    public static final String SIGNAL_NOT_UPDATED = "לא עודכן לאחרונה";
+    public static final String SIGNAL_NOT_SYNCED = "לא מסונכרן";
+    public static final String ACTION_OPEN = "פתח";
+    public static final String SECTION_MACHINE = "מידע למערכת";
+    public static final String MACHINE_NOTE = "לא נדרש לשימוש רגיל — מיועד ל-GPT, ל-Claude ולצ'יף";
+
     // Filters that are not statuses
-    public static final String FILTER_STALE = "לא עודכן";
+    public static final String FILTER_STALE = "לא עודכן לאחרונה";
     public static final String FILTER_OS = "לא מסונכרן";
 
     // Sections

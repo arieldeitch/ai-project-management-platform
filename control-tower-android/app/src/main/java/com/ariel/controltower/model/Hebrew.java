@@ -92,13 +92,25 @@ public final class Hebrew {
         }
     }
 
+    /** Push event kinds → Hebrew. Unknown kinds never leak their English name to a screen. */
     public static String pushEvent(String event) {
-        if (event == null || event.isEmpty()) return "אירוע";
-        return event.replace("project_red", "הפך לאדום")
-                .replace("needs_ariel", "צריך אותך")
-                .replace("user_test_required", "מחכה לבדיקה שלך")
-                .replace("test", "בדיקת התראות")
-                .replace("+", " + ");
+        String e = event == null ? "" : event.trim().toLowerCase(Locale.ROOT);
+        if (e.isEmpty()) return "התראה";
+        StringBuilder sb = new StringBuilder();
+        for (String part : e.split("\\+")) {
+            String h;
+            switch (part.trim()) {
+                case "project_red": h = "הפך לאדום"; break;
+                case "needs_ariel": h = "צריך אותך"; break;
+                case "user_test_required": h = "מחכה לבדיקה שלך"; break;
+                case "test": h = "בדיקת התראות"; break;
+                case "stale": h = "לא עודכן לאחרונה"; break;
+                default: h = "התראה";
+            }
+            if (sb.length() > 0) sb.append(" + ");
+            sb.append(h);
+        }
+        return sb.toString();
     }
 
     public static String freshness(Freshness.State state) {

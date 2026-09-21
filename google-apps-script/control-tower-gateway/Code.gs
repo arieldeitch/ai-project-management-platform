@@ -19,7 +19,7 @@
  *                              optional for public repos (raises the anonymous 60/h quota). Never printed or returned.
  */
 
-var GATEWAY_VERSION = '0.10.0';
+var GATEWAY_VERSION = '0.10.1';
 
 var ACTIONS = {
   health: function () { return healthReport_(); },

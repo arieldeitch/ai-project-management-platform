@@ -65,6 +65,8 @@ var PROJECT_FIELD_ALIASES = {
   expected_cadence: ['expected cadence', 'cadence', 'expected rhythm', 'rhythm', 'קצב צפוי', 'קצב'],
   progress_evidence: ['progress evidence', 'latest evidence', 'evidence summary', 'ראיות'],
   short_description: ['short description', 'description', 'purpose', 'one liner', 'תיאור קצר', 'תיאור'],
+  // Presentation only: the Hebrew name Ariel sees. The canonical (English) name stays the integration key.
+  display_name: ['display name', 'hebrew name', 'שם תצוגה', 'שם בעברית'],
   // OS alignment (evidence-backed; never inferred from activity). Written only by os_receipt / evaluation.
   os_alignment: ['os alignment', 'os status', 'יישור os'],
   last_os_check: ['last os check', 'os check', 'בדיקת os אחרונה'],
@@ -308,6 +310,7 @@ function mapProjectRow_(row, map, rowNumber) {
     user_test_required: isUserTestState_(lifecycle),
     // v5: optional one-line purpose for compact displays
     short_description: get('short_description', 160),
+    display_name: get('display_name', 80),
     // v5: OS alignment record (curated by receipts, never by activity). Raw cells; evaluated in Os.gs.
     os_alignment: normalizeOsAlignment_(get('os_alignment', 40)),
     last_os_check: (map.last_os_check >= 0 ? parseCellDate_(row[map.last_os_check]) : { iso: '', raw: '' }).iso,
@@ -1800,7 +1803,7 @@ function debugTestPush() {
  *                              optional for public repos (raises the anonymous 60/h quota). Never printed or returned.
  */
 
-var GATEWAY_VERSION = '0.10.0';
+var GATEWAY_VERSION = '0.10.1';
 
 var ACTIONS = {
   health: function () { return healthReport_(); },

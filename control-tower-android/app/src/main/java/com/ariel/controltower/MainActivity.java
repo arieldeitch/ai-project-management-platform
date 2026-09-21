@@ -50,6 +50,7 @@ import com.ariel.controltower.model.OsAlignment;
 import com.ariel.controltower.model.Perf;
 import com.ariel.controltower.model.Portfolio;
 import com.ariel.controltower.model.Project;
+import com.ariel.controltower.model.ProjectCard;
 import com.ariel.controltower.model.Status;
 import com.ariel.controltower.model.TimeText;
 import com.ariel.controltower.model.UserMessage;
@@ -69,8 +70,8 @@ import java.util.concurrent.Executors;
  * Data: PROJECT_CONTROL_BOARD Sheet via the Apps Script gateway ({@link Gateway}). Push: FCM, transport only.
  *
  * Two layers, one rule: what Ariel sees by default is short management Hebrew ({@link Labels}, {@link UserMessage},
- * {@link Project#humanLine()}); the structured machine data stays intact in {@link Project#raw} and is shown only
- * under "פרטים טכניים". Every tap renders from memory first; the network only ever refreshes in the background.
+ * {@link ProjectCard}); the structured machine data stays intact in {@link Project#raw} and is shown only
+ * under "מידע למערכת". Every tap renders from memory first; the network only ever refreshes in the background.
  */
 public class MainActivity extends Activity {
     private static final int TAB_NOW = 0, TAB_PROJECTS = 1, TAB_IDEAS = 2, TAB_DEPUTY = 3, TAB_SYSTEM = 4;
@@ -673,51 +674,42 @@ public class MainActivity extends Activity {
         return box;
     }
 
-    // ---------- compact project row (the human layer) ----------
+    // ---------- project card: the management projection, nothing else ----------
 
-    /** Name — purpose · status · one reason (only when not OK) · one next step (only when there is one). */
+    /** [Hebrew name] [status chip] / [one signal] / [updated · פתח]. Built only from ProjectCard — board prose cannot reach it. */
     private void addProjectRow(LinearLayout parent, Project p, boolean emphasise) {
+        ProjectCard card = ProjectCard.of(p, now());
         LinearLayout c = card();
-        if (emphasise) c.setBackground(box(SURFACE, Theme.tint(statusColor(p.status), 140), 12));
+        if (emphasise) c.setBackground(box(SURFACE, Theme.tint(statusColor(card.statusValue), 140), 12));
 
         LinearLayout top = row();
-        LinearLayout titles = column();
-        TextView name = text(p.name, 16, TEXT, true);
+        TextView name = text(card.title, 16, TEXT, true);
         name.setMaxLines(1);
         name.setEllipsize(TextUtils.TruncateAt.END);
-        titles.addView(name);
-        if (!p.shortDescription.isEmpty()) {
-            TextView desc = text(p.shortDescription, 13, MUTED, false);
-            desc.setMaxLines(1);
-            desc.setEllipsize(TextUtils.TruncateAt.END);
-            titles.addView(desc);
-        }
-        top.addView(titles, grow());
-        TextView st = chip(p.status.label, statusColor(p.status));
+        top.addView(name, grow());
+        TextView st = chip(card.status, statusColor(card.statusValue));
         LinearLayout.LayoutParams stLp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         stLp.setMarginStart(dp(8));
         top.addView(st, stLp);
         c.addView(top);
 
-        String line = p.humanLine();
-        if (!line.isEmpty()) c.addView(text(shortText(line, 120), 14, TEXT, false), full(6, 0));
+        if (!card.signal.isEmpty()) c.addView(text(card.signal, 14, TEXT, false), full(4, 0));
 
-        boolean showStale = p.freshness.state == Freshness.State.STALE;
-        boolean showOs = p.osNeedsChip();
-        if (showStale || showOs || p.latestActivityMillis > 0) {
-            FlowLayout meta = flow();
-            TextView when = text(p.updatedLine(now()), 12, MUTED, false);
-            when.setPadding(0, dp(4), 0, dp(4));
-            meta.addView(when);
-            if (showStale) meta.addView(chip(Labels.FILTER_STALE, AMBER));
-            if (showOs) meta.addView(chip(p.osAlignment.label, osColor(p.osAlignment)));
-            c.addView(meta, full(4, 0));
-        }
+        FlowLayout meta = flow();
+        TextView when = text(card.updated, 12, MUTED, false);
+        when.setPadding(0, dp(4), 0, dp(4));
+        meta.addView(when);
+        for (String extra : ProjectCard.extraChips(p)) meta.addView(chip(extra, AMBER));
+        TextView open = text(card.action + " ›", 12, BLUE, true);
+        open.setPadding(0, dp(4), 0, dp(4));
+        meta.addView(open);
+        c.addView(meta, full(4, 0));
 
         c.setOnClickListener(v -> showProjectDetail(p));
-        c.setContentDescription("פרויקט " + p.name + ", " + p.status.label + ". הקש לפרטים");
+        c.setContentDescription("פרויקט " + card.title + ", " + card.status + ". הקש לפתיחה");
         parent.addView(c, full(0, 8));
     }
+
 
     // ---------- עכשיו: what needs me now ----------
 
@@ -905,30 +897,6 @@ public class MainActivity extends Activity {
 
     // ---------- פרטי פרויקט ----------
 
-    private void addField(LinearLayout c, String label, String value) {
-        if (value == null || value.trim().isEmpty() || "null".equals(value)) return;
-        c.addView(text(label, 12, BLUE, true), full(10, 0));
-        c.addView(text(value, 14, TEXT, false), full(2, 0));
-    }
-
-    private void addExpandableField(LinearLayout c, String label, String value, int limit) {
-        if (value == null || value.trim().isEmpty() || "null".equals(value)) return;
-        String all = value.trim();
-        if (all.length() <= limit + 40) { addField(c, label, all); return; }
-        c.addView(text(label, 12, BLUE, true), full(10, 0));
-        TextView body = text(shortText(all, limit), 14, TEXT, false);
-        c.addView(body, full(2, 0));
-        TextView more = text("הצג עוד", 13, BLUE, true);
-        more.setMinHeight(dp(40));
-        more.setGravity(Gravity.CENTER_VERTICAL | Gravity.START);
-        c.addView(more, full(0, 0));
-        more.setOnClickListener(v -> {
-            boolean expanded = body.getText().length() > limit + 1;
-            body.setText(expanded ? shortText(all, limit) : all);
-            more.setText(expanded ? "הצג עוד" : "הצג פחות");
-        });
-    }
-
     private void showProjectDetail(Project p) {
         Perf.Token perf = Perf.begin("open:project");
         ScrollView prev = currentScroll();
@@ -940,71 +908,59 @@ public class MainActivity extends Activity {
         scroll.setBackgroundColor(BG);
         LinearLayout c = column();
         c.setPadding(dp(14), dp(12), dp(14), dp(24));
+        ProjectCard card = ProjectCard.of(p, now());
 
         LinearLayout head = row();
-        TextView title = text(p.name, 21, TEXT, true);
+        TextView title = text(card.title, 21, TEXT, true);
         title.setMaxLines(2);
         head.addView(title, grow());
         Button back = linkButton("‹ " + Labels.ACTION_BACK);
         back.setOnClickListener(v -> selectTab(activeTab));
         head.addView(back);
         c.addView(head);
-        if (!p.shortDescription.isEmpty()) c.addView(text(p.shortDescription, 14, MUTED, false), full(2, 0));
 
         FlowLayout chips = flow();
-        chips.addView(chip(p.status.label, statusColor(p.status)));
-        if (p.osNeedsChip() || p.osAlignment == OsAlignment.CURRENT) chips.addView(chip(p.osAlignment.label, osColor(p.osAlignment)));
-        if (p.freshness.state == Freshness.State.STALE) chips.addView(chip(Labels.FILTER_STALE, AMBER));
+        chips.addView(chip(card.status, statusColor(card.statusValue)));
+        for (String extra : ProjectCard.extraChips(p)) chips.addView(chip(extra, AMBER));
+        if (p.osAlignment == OsAlignment.CURRENT) chips.addView(chip(p.osAlignment.label, GREEN));
         c.addView(chips, full(8, 6));
 
-        // What matters: one card, management language only.
+        // Management level only: status meaning, whether Ariel is needed, sync, freshness.
         LinearLayout main = card();
-        String line = p.humanLine();
-        if (p.status == Status.NEEDS_ARIEL) {
-            main.addView(text(Labels.NEEDS_YOU_HEADER, 12, RED, true));
-            main.addView(text(line, 16, TEXT, true), full(2, 0));
-        } else if (!line.isEmpty()) {
-            main.addView(text(Labels.WHY, 12, BLUE, true));
-            main.addView(text(line, 15, TEXT, false), full(2, 0));
-        } else {
-            main.addView(text(p.status.meaning, 15, TEXT, false));
-        }
-        if (!p.nextAction.isEmpty() && !line.contains(p.nextAction)) addField(main, Labels.NEXT, p.nextAction);
-        if (p.osNeedsChip()) addField(main, Labels.SECTION_OS, p.osAlignment.meaning + " — " + p.osHumanAction());
-        main.addView(text(p.updatedLine(now()) + (p.freshness.state == Freshness.State.STALE ? " · " + Labels.FILTER_STALE : ""), 12, MUTED, false), full(10, 0));
+        main.addView(text(ProjectCard.detailLine(p), 16, TEXT, true));
+        main.addView(text(p.status.meaning, 14, MUTED, false), full(4, 0));
+        if (!card.signal.isEmpty()) main.addView(text(card.signal, 14, AMBER, false), full(4, 0));
+        if (p.status == Status.NEEDS_ARIEL) main.addView(text("הפרטים אצל ה-GPT / הסוכן של הפרויקט", 13, MUTED, false), full(4, 0));
+        if (p.osNeedsChip() || p.osAlignment == OsAlignment.ACCESS_FAILED) main.addView(text(p.osAlignment.meaning, 14, osColor(p.osAlignment), false), full(8, 0));
+        main.addView(text(card.updated + (p.lastOsCheckMillis > 0 ? " · סנכרון אחרון " + TimeText.relative(p.lastOsCheckMillis, now()) : ""), 12, MUTED, false), full(8, 0));
         c.addView(main, full(0, 6));
 
-        // Management detail: only on request.
-        LinearLayout more = card();
-        addField(more, "המטרה", p.objective);
-        addField(more, "איפה זה עומד", p.milestone.isEmpty() ? Hebrew.lifecycle(p.lifecycle) : p.milestone);
-        addExpandableField(more, "מה קרה לאחרונה", p.latestActivitySummary, 240);
-        if (!p.progressEvidence.isEmpty() && !p.progressEvidence.equals(p.latestActivitySummary)) addExpandableField(more, "עדכון בלוח", p.progressEvidence, 240);
-        addField(more, "מה חוסם", p.status == Status.BLOCKED ? "" : p.blocker);
-        addField(more, "סיכון", p.status == Status.AT_RISK || p.status == Status.WATCH ? "" : p.risk);
-        addField(more, "רמת ביטחון", Hebrew.confidence(p.confidence));
-        if (p.latestMeaningfulActivityMillis > 0) addField(more, "התקדמות משמעותית אחרונה", TimeText.wall(p.latestMeaningfulActivityMillis, now()));
-        if (p.lastControlCheckMillis > 0) addField(more, "בדיקת מגדל הפיקוח האחרונה", TimeText.wall(p.lastControlCheckMillis, now()));
-        String note = p.freshness.note();
-        if (!note.isEmpty()) addField(more, "עדכניות", note);
-        collapsible(c, Labels.SECTION_MORE, more, false);
+        if (p.link.startsWith("http")) {
+            Button open = actionButton("פתח את הפרויקט", true);
+            open.setOnClickListener(v -> openUrl(p.link));
+            c.addView(open, lp(ViewGroup.LayoutParams.MATCH_PARENT, dp(48), 6, 6));
+        }
 
-        LinearLayout os = card();
-        os.addView(text(p.osAlignment.meaning, 14, osColor(p.osAlignment) == MUTED ? TEXT : osColor(p.osAlignment), true));
-        os.addView(text("סנכרון אחרון: " + (p.lastOsCheckMillis > 0 ? TimeText.relative(p.lastOsCheckMillis, now()) : "אף פעם"), 13, MUTED, false), full(4, 0));
-        if (!p.osHumanAction().isEmpty()) os.addView(text(Labels.NEXT + ": " + p.osHumanAction(), 13, TEXT, false), full(4, 0));
+        // Secondary, visually separated, closed by default: the machine layer for GPT / Claude / the Chief.
+        LinearLayout machine = card();
+        machine.setBackground(box(SURFACE_2, BORDER, 12));
+        machine.addView(text(Labels.MACHINE_NOTE, 12, MUTED, false), full(0, 6));
+        for (String[] kv : p.boardProse()) {
+            TextView k = text(kv[0], 11, BLUE, true);
+            k.setTextDirection(View.TEXT_DIRECTION_LTR);
+            k.setTypeface(Typeface.MONOSPACE);
+            machine.addView(k, full(8, 0));
+            TextView v = text(kv[1], 13, MUTED, false);
+            machine.addView(v, full(2, 0));
+        }
         String evUrl = p.osEvidenceUrl();
         if (!evUrl.isEmpty()) {
-            Button ev = linkButton("פתח את האישור");
+            Button ev = linkButton("אישור סנכרון");
             ev.setOnClickListener(v -> openUrl(evUrl));
-            os.addView(ev, lp(ViewGroup.LayoutParams.WRAP_CONTENT, dp(44), 6, 0));
+            machine.addView(ev, lp(ViewGroup.LayoutParams.WRAP_CONTENT, dp(44), 8, 4));
         }
-        collapsible(c, Labels.SECTION_OS, os, false);
-
-        // Machine layer: verbatim, for agents and for a fix run. Never opened by default.
-        LinearLayout tech = card();
-        tech.setBackground(box(SURFACE_2, BORDER, 12));
-        tech.setLayoutDirection(View.LAYOUT_DIRECTION_LTR); // machine text reads left-to-right
+        LinearLayout tech = column();
+        tech.setLayoutDirection(View.LAYOUT_DIRECTION_LTR);
         for (String l : p.technicalLines()) {
             TextView t = text(l, 11, MUTED, false);
             t.setTextDirection(View.TEXT_DIRECTION_LTR);
@@ -1013,20 +969,17 @@ public class MainActivity extends Activity {
             t.setTypeface(Typeface.MONOSPACE);
             tech.addView(t, full(2, 0));
         }
-        collapsible(c, Labels.SECTION_TECH, tech, false);
+        machine.addView(tech, full(10, 0));
+        collapsible(c, Labels.SECTION_MACHINE, machine, false);
 
-        if (p.link.startsWith("http")) {
-            Button open = actionButton("פתח את הפרויקט", false);
-            open.setOnClickListener(v -> openUrl(p.link));
-            c.addView(open, lp(ViewGroup.LayoutParams.MATCH_PARENT, dp(48), 10, 6));
-        }
-        Button backBottom = actionButton(Labels.ACTION_BACK, true);
+        Button backBottom = actionButton(Labels.ACTION_BACK, false);
         backBottom.setOnClickListener(v -> selectTab(activeTab));
-        c.addView(backBottom, lp(ViewGroup.LayoutParams.MATCH_PARENT, dp(48), 2, 0));
+        c.addView(backBottom, lp(ViewGroup.LayoutParams.MATCH_PARENT, dp(48), 10, 0));
         scroll.addView(c);
         contentHost.addView(scroll);
         endOnNextFrame(perf);
     }
+
 
     // ---------- רעיונות ----------
 
@@ -1475,9 +1428,10 @@ public class MainActivity extends Activity {
     private String projectDisplayName(String key) {
         Portfolio p = portfolio;
         if (p != null) {
-            for (Project x : p.projects) if (x.name.equalsIgnoreCase(key)) return x.name;
-            for (Project x : p.infrastructure) if (x.name.equalsIgnoreCase(key)) return x.name;
+            for (Project x : p.projects) if (x.name.equalsIgnoreCase(key)) return x.displayName;
+            for (Project x : p.infrastructure) if (x.name.equalsIgnoreCase(key)) return x.displayName;
         }
-        return key.isEmpty() ? "פרויקט" : key;
+        String known = com.ariel.controltower.model.DisplayName.known(key);
+        return known != null ? known : key.isEmpty() ? "פרויקט" : key;
     }
 }

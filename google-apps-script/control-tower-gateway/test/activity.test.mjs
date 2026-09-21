@@ -282,5 +282,5 @@ test('gateway exposes activity_heartbeat and project_activity actions and report
   assert.ok(typeof ctx.ACTIONS.activity_heartbeat === 'function');
   assert.ok(typeof ctx.ACTIONS.project_activity === 'function');
   assert.equal(ctx.GATEWAY_CONTRACT_VERSION, 5);
-  assert.equal(ctx.GATEWAY_VERSION, '0.10.0');
+  assert.equal(ctx.GATEWAY_VERSION, '0.10.1');
 });

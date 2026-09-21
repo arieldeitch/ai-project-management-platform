@@ -38,6 +38,14 @@ const projects = [
     progress_evidence: 'קריאה חיה אומתה מול השער', next_action: 'לסקור את מסך "היום" עם נתונים חיים',
     blocker: '', needs_ariel: false, ariel_input: '', risk: '',
     last_meaningful_progress: '', last_meaningful_progress_raw: 'VERIFIED 2026-09-18 12:03: live read confirmed against the gateway', last_control_check: iso(3 * H), expected_cadence: 'as needed', link: '' },
+  { id: 'P-007', name: 'Fitness App Recovery', lifecycle: 'Active', rag: 'RED', confidence: 'LOW',
+    objective: 'Recovery and revalidation of a previously built fitness app so it becomes a real, usable product.', milestone: 'Locate canonical repo',
+    progress_evidence: 'Control delta: no canonical repo confirmed yet.', next_action: 'Confirm the exact existing fitness app/repository and its current state.', blocker: 'Control delta: no canonical repo confirmed yet.', needs_ariel: true, ariel_input: 'Confirm the exact existing fitness app/repository to recover.', risk: 'Run the existing owner/family-device checklist and record results.',
+    last_meaningful_progress: iso(2 * D), last_control_check: iso(3 * H), expected_cadence: 'weekly', link: '' },
+  { id: 'P-008', name: 'Irish Citizenship & Passport', lifecycle: 'Active', rag: 'GREEN', confidence: 'MEDIUM',
+    objective: 'Personal bureaucracy/document control for the Irish citizenship path.', milestone: 'Document map',
+    progress_evidence: '', next_action: 'Provide/obtain the aunt document map and the birth certificate scan.', blocker: '', needs_ariel: true, ariel_input: 'Provide/obtain the aunt document map.', risk: '',
+    last_meaningful_progress: iso(5 * D), last_control_check: iso(3 * H), expected_cadence: 'weekly', link: '' },
   { id: 'P-003', name: 'Personal News Radar', lifecycle: 'Active', rag: 'GREEN', confidence: 'HIGH',
     objective: 'תקציר יומי מסונן', milestone: 'תקציר בוקר יציב',
     progress_evidence: '', next_action: 'להוסיף מקור חדשות אחד', blocker: '', needs_ariel: false, ariel_input: '', risk: '',
@@ -67,7 +75,7 @@ const projects = [
 
 // Contract 5 fields (fixture): short description, status bucket, OS alignment (evidence-based, never from activity).
 function v5(p) {
-  const short = { 'P-005': 'אפליקציית תזונה משפחתית', 'P-002': 'אפליקציית ניהול בית', 'P-004': 'לימוד AI עם תום', 'P-001': 'סקירה שבועית ואנרגיה', 'P-006': 'תמונת יום אחת מכל הפרויקטים', 'P-003': 'תקציר חדשות יומי' }[p.id] || '';
+  const short = { 'P-005': 'אפליקציית תזונה משפחתית', 'P-002': 'אפליקציית ניהול בית', 'P-004': 'לימוד AI עם תום', 'P-001': 'סקירה שבועית ואנרגיה', 'P-006': 'תמונת יום אחת מכל הפרויקטים', 'P-003': 'תקציר חדשות יומי', 'P-007': 'Fitness app recovery', 'P-008': 'Irish passport process' }[p.id] || '';
   const os = {
     'P-006': { os_alignment: 'CURRENT', last_os_check: iso(2 * D), os_version_seen: '2026.09.2', os_change_marker: 'OS-2026-09-17', os_evidence: 'OS Access Receipt · https://drive.google.com/drive/folders/fixture-receipt-p006', os_sync_action: '' },
     'P-002': { os_alignment: 'VERSION_DRIFT', last_os_check: iso(20 * D), os_version_seen: '2026.08.4', os_change_marker: 'OS-2026-08-30', os_evidence: 'OS Access Receipt 30/08/2026', os_sync_action: 'להריץ סנכרון OS בפרויקט ולרשום קבלה חדשה' },
@@ -101,7 +109,7 @@ const activity = [
 ];
 
 const handlers = {
-  health: () => ({ spreadsheet_title: 'PROJECT_CONTROL_BOARD (fixture)', tabs: ['Projects', 'Connections', 'MobileInbox', 'MobileDevices', 'MobilePushState', 'ActivitySources', 'ActivityLedger'], projects_rows: 6, mobile_tabs_ready: true, resolved_columns: {}, unresolved_columns: [], active_devices: 1, fcm_configured: true, scanner_trigger_installed: true, activity: { sources_enabled: 6, ledger_events: 12, latest_observed_activity: iso(5 * 60_000) }, contract_version: 5, os: { os_current_marker_configured: true, os_current_marker: 'OS-2026-09-17', aligned: 1, needs_action: 5 }, server_time: new Date().toISOString() }),
+  health: () => ({ spreadsheet_title: 'PROJECT_CONTROL_BOARD (fixture)', tabs: ['Projects', 'Connections', 'MobileInbox', 'MobileDevices', 'MobilePushState', 'ActivitySources', 'ActivityLedger'], projects_rows: 8, mobile_tabs_ready: true, resolved_columns: {}, unresolved_columns: [], active_devices: 1, fcm_configured: true, scanner_trigger_installed: true, activity: { sources_enabled: 6, ledger_events: 12, latest_observed_activity: iso(5 * 60_000) }, contract_version: 5, os: { os_current_marker_configured: true, os_current_marker: 'OS-2026-09-17', aligned: 1, needs_action: 5 }, server_time: new Date().toISOString() }),
   portfolio: () => ({ projects, snapshot_at: new Date().toISOString(), contract_version: 5 }),
   ideas: () => ({ items: sortIdeas().slice() }),
   create_idea: (b) => { const i = { idea_id: 'IDEA-' + String(ideas.length + 1).padStart(4, '0'), title: b.title || '', stage: 'INBOX', planning_bucket: b.planning_bucket || 'LATER', manual_order: 1000, need: b.need || '', next_step: '', urgency: 'MEDIUM', surface: 'UNDECIDED', maturity_score: 0, updated_at: new Date().toISOString() }; ideas.push(i); return { idea: i }; },

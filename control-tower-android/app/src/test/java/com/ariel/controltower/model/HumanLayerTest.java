@@ -68,7 +68,7 @@ public class HumanLayerTest {
             assertTrue(a.meaning, a.meaning.matches(HEB) && UserMessage.isHumanLayer(a.meaning));
             assertFalse(a.label, a.label.contains("OS")); // the raw enum vocabulary stays behind the scenes
         }
-        assertTrue(Labels.FILTER_STALE.length() <= 10);
+        assertTrue(Labels.FILTER_STALE.length() <= 16);
         assertTrue(Labels.FILTER_OS.length() <= 12);
     }
 
@@ -192,7 +192,7 @@ public class HumanLayerTest {
             assertTrue(it.nextAction, UserMessage.isHumanLayer(it.nextAction));
             assertFalse(it.evidence.isEmpty()); // technical text is still there, behind "ראיות"
         }
-        assertEquals("הבדיקות האוטומטיות נכשלות ב-Chief of Staff", out.get(0).problem);
+        assertEquals("הבדיקות האוטומטיות נכשלות בצ'יף", out.get(0).problem);
         assertTrue(out.get(0).evidence.get(0).contains("lint errors"));
     }
 

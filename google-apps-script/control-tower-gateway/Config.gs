@@ -55,6 +55,8 @@ var PROJECT_FIELD_ALIASES = {
   expected_cadence: ['expected cadence', 'cadence', 'expected rhythm', 'rhythm', 'קצב צפוי', 'קצב'],
   progress_evidence: ['progress evidence', 'latest evidence', 'evidence summary', 'ראיות'],
   short_description: ['short description', 'description', 'purpose', 'one liner', 'תיאור קצר', 'תיאור'],
+  // Presentation only: the Hebrew name Ariel sees. The canonical (English) name stays the integration key.
+  display_name: ['display name', 'hebrew name', 'שם תצוגה', 'שם בעברית'],
   // OS alignment (evidence-backed; never inferred from activity). Written only by os_receipt / evaluation.
   os_alignment: ['os alignment', 'os status', 'יישור os'],
   last_os_check: ['last os check', 'os check', 'בדיקת os אחרונה'],

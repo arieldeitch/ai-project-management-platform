@@ -116,5 +116,5 @@ test('gateway exposes reorder_ideas and os_receipt actions at contract 5', () =>
   assert.equal(typeof ctx.ACTIONS.reorder_ideas, 'function');
   assert.equal(typeof ctx.ACTIONS.os_receipt, 'function');
   assert.equal(ctx.GATEWAY_CONTRACT_VERSION, 5);
-  assert.equal(ctx.GATEWAY_VERSION, '0.10.0');
+  assert.equal(ctx.GATEWAY_VERSION, '0.10.1');
 });

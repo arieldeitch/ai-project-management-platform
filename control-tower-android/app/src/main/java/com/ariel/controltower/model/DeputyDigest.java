@@ -132,9 +132,13 @@ public final class DeputyDigest {
         return first;
     }
 
+    /**
+     * Hebrew management headline only. Raw report text (often English agent prose) never becomes the headline:
+     * it stays in {@link Item#evidence}. Ariel's own commands are quoted because he wrote them.
+     */
     static String problem(Kind kind, String text, String project, String source) {
-        String in = project.isEmpty() ? "" : " ב-" + project;
-        if (!project.isEmpty()) text = stripProjectPrefix(text, project);
+        String shown = project.isEmpty() ? "" : displayName(project);
+        String in = shown.isEmpty() ? "" : " " + prep("ב", shown);
         switch (kind) {
             case TECH_FAILURE: return "הבדיקות האוטומטיות נכשלות" + in;
             case SYNC_FAILURE: return "הסנכרון אינו עובד" + in;
@@ -142,9 +146,21 @@ public final class DeputyDigest {
             case USER_TEST: return "גרסה מחכה לבדיקה שלך" + in;
             case DECISION: return "מחכים להחלטה שלך" + in;
             case COMMAND: return "פקודה שלך: " + headline(text, 90);
-            case REPORT: return (project.isEmpty() ? "דיווח" : "דיווח על " + project) + ": " + headline(text, 80);
-            default: return headline(text, 100);
+            case REPORT: return "התקבל דיווח" + (shown.isEmpty() ? "" : " " + prep("מ", shown));
+            default: return "התקבל עדכון" + (shown.isEmpty() ? "" : " " + prep("מ", shown));
         }
+    }
+
+    /** "ב"+"הצ'יף" → "בצ'יף", "ב"+"מערכת הבית" → "במערכת הבית", "ב"+"Nutrition App" → "ב-Nutrition App". */
+    static String prep(String p, String name) {
+        if (!DisplayName.hasHebrew(name)) return p + "-" + name;
+        if (name.startsWith("ה")) return p + name.substring(1);
+        return p + name;
+    }
+
+    static String displayName(String canonical) {
+        String d = DisplayName.known(canonical);
+        return d == null ? canonical : d;
     }
 
     static String impact(Kind kind) {

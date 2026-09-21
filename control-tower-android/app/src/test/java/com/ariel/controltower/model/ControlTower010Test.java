@@ -238,7 +238,7 @@ public class ControlTower010Test {
         assertEquals(3, it.count);
         assertEquals(DeputyDigest.Kind.TECH_FAILURE, it.kind);
         assertEquals("Nutrition App", it.project);
-        assertEquals("הבדיקות האוטומטיות נכשלות ב-Nutrition App", it.problem);
+        assertEquals("הבדיקות האוטומטיות נכשלות באפליקציית התזונה", it.problem);
         assertFalse(it.problem.toLowerCase().contains("dogfood"));
         assertFalse(it.problem.toLowerCase().contains("suite"));
         assertFalse(it.problem.toLowerCase().contains("ci"));
@@ -276,10 +276,10 @@ public class ControlTower010Test {
         List<DeputyDigest.Item> out = DeputyDigest.from(items, Arrays.asList("Tom AI Learning", "Chief of Staff"), NOW);
         DeputyDigest.Item tom = out.get(0);
         assertEquals(DeputyDigest.Kind.USER_TEST, tom.kind);
-        assertEquals("גרסה מחכה לבדיקה שלך ב-Tom AI Learning", tom.problem);
+        assertEquals("גרסה מחכה לבדיקה שלך בלמידה של תום", tom.problem);
         assertEquals("אריאל", tom.owner);
         DeputyDigest.Item cos = out.get(1);
-        assertEquals("דיווח על Chief of Staff: weekly digest published", cos.problem);
+        assertEquals("התקבל דיווח מצ'יף", cos.problem);
         assertEquals("x", DeputyDigest.stripProjectPrefix("[Nutrition App] — x", "Nutrition App"));
         assertEquals("y", DeputyDigest.stripProjectPrefix("nutrition app: y", "Nutrition App"));
     }

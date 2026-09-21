@@ -125,7 +125,8 @@ test('health exposes the contract version and unresolved columns', () => {
   ctx.activityHealth_ = () => ({ sources_enabled: 0, ledger_events: 0, latest_observed_activity: '', activity_sources_enabled: 6, activity_last_scan_at: '2026-09-19T05:00:00.000Z', activity_scan_status: 'ok', activity_source_failures: [], activity_ledger_latest_at: '2026-09-19T04:27:36.000Z' });
   const h = ctx.healthReport_();
   assert.equal(h.contract_version, 5);
-  assert.equal(JSON.stringify(h.unresolved_columns), '[]');
+  // display_name is an optional presentation column: the live board may not have it yet, and that is not an error.
+  assert.equal(JSON.stringify(h.unresolved_columns), '["display_name"]');
   assert.equal(h.resolved_columns.last_meaningful_progress, 'Last Meaningful Progress');
   assert.equal(h.activity_scan_status, 'ok');
   assert.equal(h.activity_sources_enabled, 6);
@@ -197,7 +198,7 @@ test('every reply carries contract/gateway version so a deployment can be verifi
   ctx.reply_(401, { ok: false, error: 'unauthorized' });
   const body = JSON.parse(captured);
   assert.equal(body.contract_version, 5);
-  assert.equal(body.gateway_version, '0.10.0');
+  assert.equal(body.gateway_version, '0.10.1');
   assert.equal(body.error, 'unauthorized');
 });
 
@@ -215,4 +216,21 @@ test('board column names from the hardening brief resolve without collisions', (
   for (const [field, header] of Object.entries(expect)) assert.equal(HEAD[map[field]], header, field);
   const used = Object.values(map).filter((i) => i >= 0);
   assert.equal(new Set(used).size, used.length, 'no two fields share a column');
+});
+
+test('display_name is a separate presentation field: Hebrew "שם תצוגה" column maps to it, canonical name untouched, absent → empty', () => {
+  const HEAD = ['ID', 'Project', 'שם תצוגה', 'Lifecycle', 'RAG', 'Short Description'];
+  const ctx = makeContext([]);
+  ctx.SpreadsheetApp.openById = () => ({ getSheetByName: (n) => n === 'Projects' ? { getLastColumn: () => HEAD.length, getLastRow: () => 1, getRange: (r, c, nr, nc) => ({ getValues: () => [HEAD.slice(c - 1, c - 1 + nc)] }) } : null });
+  const map = ctx.resolveProjectColumns_();
+  assert.equal(HEAD[map.display_name], 'שם תצוגה');
+  assert.equal(HEAD[map.name], 'Project');
+  const row = ctx.mapProjectRow_(['P-002', 'Household OS', 'מערכת הבית', 'Active', 'GREEN', 'ניהול בית'], map, 2);
+  assert.equal(row.name, 'Household OS');
+  assert.equal(row.display_name, 'מערכת הבית');
+  const ctx2 = makeContext([]);
+  const map2 = ctx2.resolveProjectColumns_();
+  assert.equal(map2.display_name, -1);
+  const row2 = ctx2.mapProjectRow_(new Array(HEADERS.length).fill('').map((v, i) => i === 0 ? 'P-1' : i === 1 ? 'X' : v), map2, 2);
+  assert.equal(row2.display_name, '');
 });

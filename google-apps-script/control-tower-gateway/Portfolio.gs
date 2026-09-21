@@ -179,6 +179,7 @@ function mapProjectRow_(row, map, rowNumber) {
     user_test_required: isUserTestState_(lifecycle),
     // v5: optional one-line purpose for compact displays
     short_description: get('short_description', 160),
+    display_name: get('display_name', 80),
     // v5: OS alignment record (curated by receipts, never by activity). Raw cells; evaluated in Os.gs.
     os_alignment: normalizeOsAlignment_(get('os_alignment', 40)),
     last_os_check: (map.last_os_check >= 0 ? parseCellDate_(row[map.last_os_check]) : { iso: '', raw: '' }).iso,

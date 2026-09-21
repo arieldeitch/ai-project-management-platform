@@ -57,6 +57,8 @@ public final class Project {
     public final String osCurrentMarker;
     /** The row exactly as the gateway sent it — the machine layer. Never trimmed for display reasons. */
     public final JSONObject raw;
+    /** Hebrew name Ariel sees (board display_name → known mapping → Hebrew description → canonical). */
+    public final String displayName;
 
     private Project(JSONObject o, long now) {
         raw = o;
@@ -122,11 +124,27 @@ public final class Project {
         osEvidence = o.optString("os_evidence", "").trim();
         osSyncAction = o.optString("os_sync_action", "").trim();
         osCurrentMarker = o.optString("os_current_marker", "").trim();
+        displayName = DisplayName.resolve(o.optString("display_name", ""), name, shortDescription);
     }
 
-    /** Name plus the optional one-line purpose: "Momentum OS — אפליקציית ניהול בית". */
+    /** Name plus the optional one-line purpose: "Momentum OS — אפליקציית ניהול בית" (machine-layer / reports only). */
     public String compactTitle() {
         return shortDescription.isEmpty() ? name : name + " — " + shortDescription;
+    }
+
+    /** Board prose for the machine section, labelled; never rendered on cards. */
+    public List<String[]> boardProse() {
+        List<String[]> t = new ArrayList<>();
+        if (!shortDescription.isEmpty()) t.add(new String[]{"short_description", shortDescription});
+        if (!objective.isEmpty()) t.add(new String[]{"objective", objective});
+        if (!milestone.isEmpty()) t.add(new String[]{"milestone", milestone});
+        if (!nextAction.isEmpty()) t.add(new String[]{"next_action", nextAction});
+        if (!arielInput.isEmpty()) t.add(new String[]{"ariel_input", arielInput});
+        if (!blocker.isEmpty()) t.add(new String[]{"blocker", blocker});
+        if (!risk.isEmpty()) t.add(new String[]{"risk", risk});
+        if (!progressEvidence.isEmpty()) t.add(new String[]{"progress_evidence", progressEvidence});
+        if (!latestActivitySummary.isEmpty() && !latestActivitySummary.equals(progressEvidence)) t.add(new String[]{"latest_activity_summary", latestActivitySummary});
+        return t;
     }
 
     /** Evidence URL for the OS record, when the evidence text carries one. */
@@ -227,7 +245,7 @@ public final class Project {
     /** Raw structured facts as "key: value" lines — the technical section shows these verbatim. */
     public List<String> technicalLines() {
         List<String> t = new ArrayList<>();
-        t.add("project_id: " + id);
+        t.add("project_id: " + id + " · canonical name: " + name);
         t.add("status_bucket: " + status.name() + (raw.has("status_bucket") ? "" : " (client-derived)"));
         t.add("status_reason: " + statusReason);
         t.add("rag: " + rag + " · lifecycle: " + lifecycle + " · needs_ariel: " + needsAriel + " · user_test_required: " + userTestRequired);
